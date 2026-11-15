@@ -27,6 +27,11 @@ import type {
   AppLocation,
   LocationSaveOsInput,
   SttPreference,
+  TtsPreference,
+  TtsSetSettingsInput,
+  TtsSettings,
+  TtsSynthesizeInput,
+  TtsSynthesizeResult,
   VoiceProgress,
   VoiceStatus,
   VoiceTranscribeInput,
@@ -62,6 +67,11 @@ export type {
   AppLocation,
   LocationSaveOsInput,
   SttPreference,
+  TtsPreference,
+  TtsSetSettingsInput,
+  TtsSettings,
+  TtsSynthesizeInput,
+  TtsSynthesizeResult,
   VoiceProgress,
   VoiceStatus,
   VoiceTranscribeInput,
@@ -220,6 +230,40 @@ export const VoiceTranscribeInputSchema = z.object({
 
 export const VoiceTranscribeResultSchema = z.object({
   text: z.string(),
+})
+
+export const TtsPreferenceSchema = z.enum(['auto', 'system', 'edge'])
+
+export const TtsSettingsSchema = z.object({
+  enabled: z.boolean(),
+  provider: TtsPreferenceSchema,
+  edgeVoice: z.string().min(1).max(80),
+  envOverride: z.boolean(),
+  hint: z.string(),
+})
+
+export const TtsSetSettingsInputSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    provider: TtsPreferenceSchema.optional(),
+    edgeVoice: z.string().trim().min(1).max(80).optional(),
+  })
+  .refine(
+    (v) =>
+      v.enabled !== undefined || v.provider !== undefined || v.edgeVoice !== undefined,
+    { message: 'Informe ao menos um campo' },
+  )
+
+export const TtsSynthesizeInputSchema = z.object({
+  text: z.string().trim().min(1).max(8000),
+  voice: z.string().trim().min(1).max(80).optional(),
+})
+
+export const TtsSynthesizeResultSchema = z.object({
+  audioBase64: z.string().min(1),
+  mimeType: z.literal('audio/mpeg'),
+  voice: z.string().min(1),
+  chars: z.number().int().nonnegative(),
 })
 
 export const ShellStateSchema = z.object({

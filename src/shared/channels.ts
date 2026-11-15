@@ -32,6 +32,13 @@ export const IpcChannels = {
   VOICE_TRANSCRIBE: 'voice:transcribe',
   /** Evento main → renderer (progresso de download). */
   VOICE_PROGRESS: 'voice:progress',
+  /** Preferências + síntese TTS (edge-tts no main; system no renderer). */
+  TTS_GET_SETTINGS: 'tts:getSettings',
+  TTS_SET_SETTINGS: 'tts:setSettings',
+  TTS_SYNTHESIZE: 'tts:synthesize',
+  TTS_STOP: 'tts:stop',
+  /** Evento main → renderer: settings TTS mudaram. */
+  TTS_SETTINGS_CHANGED: 'tts:settingsChanged',
   SHELL_GET_STATE: 'shell:getState',
   SHELL_TOGGLE_PANEL: 'shell:togglePanel',
   SHELL_OPEN_PANEL: 'shell:openPanel',

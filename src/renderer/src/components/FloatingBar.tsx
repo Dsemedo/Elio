@@ -7,9 +7,12 @@ import {
   MicOff,
   Minimize2,
   MoreHorizontal,
+  Square,
+  Volume2,
+  VolumeX,
   WifiOff,
 } from 'lucide-react'
-import type { ChatStatus, ShellState, SttPreference } from '@shared/ipc'
+import type { ChatStatus, ShellState, SttPreference, TtsSettings } from '@shared/ipc'
 import { detectChatToolIntent } from '@shared/chatIntent'
 import {
   extractWindowsSpeechErrorCode,
@@ -30,9 +33,17 @@ import {
   startWindowsSpeech,
   type WindowsSpeechSession,
 } from '../lib/windowsSpeech'
+import { ttsController } from '../lib/ttsController'
 
 export type BarUiState =
-  'idle' | 'listening' | 'transcribing' | 'thinking' | 'error' | 'offline' | 'executing'
+  | 'idle'
+  | 'listening'
+  | 'transcribing'
+  | 'thinking'
+  | 'speaking'
+  | 'error'
+  | 'offline'
+  | 'executing'
 
 type VoicePhase = 'idle' | 'preparing' | 'recording' | 'transcribing'
 
@@ -50,6 +61,7 @@ const STATE_LABEL: Record<BarUiState, string> = {
   listening: 'Ouvindo…',
   transcribing: 'Transcrevendo…',
   thinking: 'Pensando…',
+  speaking: 'Falando…',
   executing: 'Abrindo…',
   error: 'Erro',
   offline: 'Sem provedor',
@@ -73,6 +85,8 @@ export function FloatingBar(): React.JSX.Element {
   const [statusLine, setStatusLine] = useState<string | null>(null)
   const [sttPreference, setSttPreference] = useState<SttPreference>('auto')
   const [platform, setPlatform] = useState<string>('win32')
+  const [ttsSettings, setTtsSettings] = useState<TtsSettings | null>(null)
+  const [ttsSpeaking, setTtsSpeaking] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const captureRef = useRef<ActiveCapture | null>(null)
   const recordingActiveRef = useRef(false)
@@ -84,18 +98,20 @@ export function FloatingBar(): React.JSX.Element {
     let cancelled = false
     async function boot(): Promise<void> {
       try {
-        const [shellState, chatStatus, list, voice, appInfo] = await Promise.all([
+        const [shellState, chatStatus, list, voice, appInfo, tts] = await Promise.all([
           window.elio.getShellState(),
           window.elio.getChatStatus(),
           window.elio.listConversations(),
           window.elio.getVoiceStatus(),
           window.elio.getAppInfo(),
+          ttsController.ensureBoot(),
         ])
         if (cancelled) return
         setShell(shellState)
         setStatus(chatStatus)
         setSttPreference(voice.sttPreference)
         setPlatform(voice.platform || appInfo.platform)
+        setTtsSettings(tts)
         if (list[0]) {
           setConversationId(list[0].id)
         } else {
@@ -114,6 +130,25 @@ export function FloatingBar(): React.JSX.Element {
     }
     void boot()
     const unsubShell = window.elio.onShellState((s) => setShell(s))
+    const unsubTts = ttsController.subscribe((snap) => {
+      if (cancelled) return
+      setTtsSettings(snap.settings)
+      setTtsSpeaking(snap.ui === 'speaking')
+      if (snap.ui === 'speaking') {
+        setBarState((s) =>
+          s === 'listening' ||
+          s === 'transcribing' ||
+          s === 'thinking' ||
+          s === 'executing'
+            ? s
+            : 'speaking',
+        )
+      } else {
+        setBarState((s) =>
+          s === 'speaking' ? (offlineRef.current ? 'offline' : 'idle') : s,
+        )
+      }
+    })
     const unsubChat = window.elio.onChatUpdated((event) => {
       if (cancelled) return
       if (event.reason === 'deleted') {
@@ -134,6 +169,10 @@ export function FloatingBar(): React.JSX.Element {
           const lastAssistant = [...msgs].reverse().find((m) => m.role === 'assistant')
           if (lastAssistant?.content.trim()) {
             setLastReply(lastAssistant.content.trim())
+            void ttsController.maybeSpeakAssistant(
+              lastAssistant.id,
+              lastAssistant.content,
+            )
           }
           return current ?? event.conversationId
         })
@@ -142,6 +181,7 @@ export function FloatingBar(): React.JSX.Element {
     return () => {
       cancelled = true
       unsubShell()
+      unsubTts()
       unsubChat()
       const capture = captureRef.current
       if (capture?.kind === 'windows-speech') {
@@ -154,6 +194,8 @@ export function FloatingBar(): React.JSX.Element {
       void window.elio.setBarOverlay(false)
     }
   }, [])
+
+  const offlineRef = useRef(false)
 
   useEffect(() => {
     const onDoc = (event: MouseEvent): void => {
@@ -215,6 +257,7 @@ export function FloatingBar(): React.JSX.Element {
 
   const panelOpen = shell?.panelOpen ?? false
   const offline = status?.preferredProvider === 'none'
+  offlineRef.current = offline
 
   const resolvedState = ((): BarUiState => {
     if (
@@ -225,6 +268,7 @@ export function FloatingBar(): React.JSX.Element {
     ) {
       return barState
     }
+    if (barState === 'speaking' || ttsSpeaking) return 'speaking'
     if (barState === 'error' && error) return 'error'
     if (offline) return 'offline'
     return 'idle'
@@ -244,6 +288,7 @@ export function FloatingBar(): React.JSX.Element {
     setLastReply(null)
     setStatusLine(null)
     setMenuOpen(false)
+    void ttsController.stop()
     if (detectChatToolIntent(content).needsWeather) {
       try {
         await ensureAppLocation()
@@ -251,9 +296,10 @@ export function FloatingBar(): React.JSX.Element {
         /* clima cai no fallback IP/cidade no main */
       }
     }
-    const looksLikeOpen = /^\s*(?:por\s+favor\s+|pf\s+|pode\s+)?(?:abre|abrir|abra|confirma\s+abrir)\b/i.test(
-      content,
-    )
+    const looksLikeOpen =
+      /^\s*(?:por\s+favor\s+|pf\s+|pode\s+)?(?:abre|abrir|abra|confirma\s+abrir)\b/i.test(
+        content,
+      )
     const looksLikeSpotify =
       /\bspotify\b/i.test(content) &&
       /\b(tocar?|toque|play|reproduz|m[uú]sica|conectar|conecte|desconectar|desconecte)\b/i.test(
@@ -281,6 +327,9 @@ export function FloatingBar(): React.JSX.Element {
       setLastReply(replyText || '(sem texto na resposta)')
       setStatusLine(null)
       setBarState(nextStatus.preferredProvider === 'none' ? 'offline' : 'idle')
+      if (replyText) {
+        void ttsController.maybeSpeakAssistant(result.reply.id, replyText)
+      }
     } catch (err) {
       setStatusLine(null)
       setError(err instanceof Error ? err.message : 'Não foi possível responder')
@@ -333,6 +382,7 @@ export function FloatingBar(): React.JSX.Element {
     setStatusLine(null)
     setMenuOpen(false)
     setInputActive(false)
+    void ttsController.stop()
     setVoicePhase('preparing')
     try {
       await probeMicPresence()
@@ -486,12 +536,15 @@ export function FloatingBar(): React.JSX.Element {
 
   const showErrorInline = resolvedState === 'error' && !!error
 
-  const showTextField = busy || showErrorInline
-    ? false
-    : inputActive || draft.trim().length > 0
+  const showTextField =
+    busy || showErrorInline ? false : inputActive || draft.trim().length > 0
 
   const showLastReply =
-    !busy && !showTextField && !showErrorInline && !!lastReply && resolvedState === 'idle'
+    !busy &&
+    !showTextField &&
+    !showErrorInline &&
+    !!lastReply &&
+    (resolvedState === 'idle' || resolvedState === 'speaking')
 
   const showStatusLine =
     !busy && !showTextField && !showErrorInline && !showLastReply && !!statusLine
@@ -557,6 +610,11 @@ export function FloatingBar(): React.JSX.Element {
                   ? statusLine
                   : STATE_LABEL[resolvedState]}
               </span>
+            </div>
+          ) : resolvedState === 'speaking' && !showLastReply ? (
+            <div className="fb-state-inline speaking" aria-live="polite">
+              <Volume2 size={15} className="fb-wave" aria-hidden />
+              <span>{STATE_LABEL.speaking}</span>
             </div>
           ) : showErrorInline ? (
             <div className="fb-error-inline" role="alert" title={error ?? undefined}>
@@ -627,9 +685,25 @@ export function FloatingBar(): React.JSX.Element {
           ) : null}
 
           {showErrorInline && !micMissing ? (
-            <span className="fb-chip error" title={error ?? undefined} aria-label={error ?? 'Erro'}>
+            <span
+              className="fb-chip error"
+              title={error ?? undefined}
+              aria-label={error ?? 'Erro'}
+            >
               !
             </span>
+          ) : null}
+
+          {resolvedState === 'speaking' || ttsSpeaking ? (
+            <button
+              type="button"
+              className="fb-icon-btn active"
+              title="Parar fala"
+              aria-label="Parar fala do Elio"
+              onClick={() => void ttsController.stop()}
+            >
+              <Square size={14} />
+            </button>
           ) : null}
 
           <button
@@ -759,6 +833,41 @@ export function FloatingBar(): React.JSX.Element {
                 >
                   Palavra de ativação · em breve
                 </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  title={ttsSettings?.hint}
+                  onClick={() => {
+                    void (async () => {
+                      const next = !(ttsSettings?.enabled ?? false)
+                      const updated = await ttsController.setEnabled(next)
+                      setTtsSettings(updated)
+                      setMenuOpen(false)
+                    })()
+                  }}
+                >
+                  {ttsSettings?.enabled ? (
+                    <>
+                      <VolumeX size={14} aria-hidden /> Desligar fala (TTS)
+                    </>
+                  ) : (
+                    <>
+                      <Volume2 size={14} aria-hidden /> Falar respostas (TTS)
+                    </>
+                  )}
+                </button>
+                {ttsSpeaking ? (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setMenuOpen(false)
+                      void ttsController.stop()
+                    }}
+                  >
+                    Parar fala agora
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   role="menuitem"

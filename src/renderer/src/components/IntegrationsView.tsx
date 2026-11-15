@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import type { ChatStatus, SettingsPublic } from '@shared/ipc'
+import type { ChatStatus, SettingsPublic, TtsPreference, TtsSettings } from '@shared/ipc'
+import { ttsController } from '../lib/ttsController'
 
 type Props = {
   status: ChatStatus
@@ -17,6 +18,9 @@ export function IntegrationsView({ status, onStatusRefresh }: Props): React.JSX.
   const [spotifyBusy, setSpotifyBusy] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [spotifyMsg, setSpotifyMsg] = useState<string | null>(null)
+  const [tts, setTts] = useState<TtsSettings | null>(null)
+  const [ttsBusy, setTtsBusy] = useState(false)
+  const [ttsSpeaking, setTtsSpeaking] = useState(false)
 
   const loadSettings = async (): Promise<void> => {
     const next = await window.elio.getSettings()
@@ -31,6 +35,23 @@ export function IntegrationsView({ status, onStatusRefresh }: Props): React.JSX.
     void loadSettings().catch((err) => {
       setMessage(err instanceof Error ? err.message : 'Falha ao carregar configurações')
     })
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    void ttsController.ensureBoot().then((s) => {
+      if (!cancelled) setTts(s)
+    })
+    const unsub = ttsController.subscribe((snap) => {
+      if (!cancelled) {
+        setTts(snap.settings)
+        setTtsSpeaking(snap.ui === 'speaking')
+      }
+    })
+    return () => {
+      cancelled = true
+      unsub()
+    }
   }, [])
 
   const savePrefs = async (): Promise<void> => {
@@ -129,6 +150,26 @@ export function IntegrationsView({ status, onStatusRefresh }: Props): React.JSX.
       setSpotifyMsg(err instanceof Error ? err.message : 'Falha ao desconectar')
     } finally {
       setSpotifyBusy(false)
+    }
+  }
+
+  const toggleTts = async (): Promise<void> => {
+    setTtsBusy(true)
+    try {
+      const updated = await ttsController.setEnabled(!(tts?.enabled ?? false))
+      setTts(updated)
+    } finally {
+      setTtsBusy(false)
+    }
+  }
+
+  const setTtsProvider = async (provider: TtsPreference): Promise<void> => {
+    setTtsBusy(true)
+    try {
+      const updated = await ttsController.setProvider(provider)
+      setTts(updated)
+    } finally {
+      setTtsBusy(false)
     }
   }
 
@@ -355,6 +396,55 @@ export function IntegrationsView({ status, onStatusRefresh }: Props): React.JSX.
           </div>
           <footer>
             <span className="badge accent">ok</span>
+          </footer>
+        </article>
+
+        <article className="integration-card">
+          <header>
+            <span className="integration-kind">App</span>
+            <h2>Fala do Elio (TTS)</h2>
+          </header>
+          <p>
+            {tts?.hint ??
+              'O Elio pode falar respostas em pt-BR (vozes do Windows ou edge-tts). Desligado por padrão.'}
+          </p>
+          <div className="integration-actions">
+            <button
+              type="button"
+              className={tts?.enabled ? 'btn ghost' : 'btn primary'}
+              disabled={ttsBusy || !tts}
+              onClick={() => void toggleTts()}
+            >
+              {tts?.enabled ? 'Desligar TTS' : 'Ativar TTS'}
+            </button>
+            <label className="integration-select">
+              Provedor
+              <select
+                value={tts?.provider ?? 'auto'}
+                disabled={ttsBusy || !tts}
+                onChange={(e) => void setTtsProvider(e.target.value as TtsPreference)}
+              >
+                <option value="auto">auto (Windows → edge)</option>
+                <option value="system">system (SAPI / offline)</option>
+                <option value="edge">edge-tts (rede)</option>
+              </select>
+            </label>
+            {ttsSpeaking ? (
+              <button
+                type="button"
+                className="btn ghost"
+                onClick={() => void ttsController.stop()}
+              >
+                Parar fala
+              </button>
+            ) : null}
+          </div>
+          <footer>
+            {tts?.enabled ? (
+              <span className="badge accent">ligado</span>
+            ) : (
+              <span className="badge muted">desligado</span>
+            )}
           </footer>
         </article>
       </div>

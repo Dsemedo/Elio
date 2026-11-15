@@ -1,7 +1,7 @@
 # Elio
 
 Assistente pessoal de IA para desktop (**JARVIS MVP**).  
-**v0.15.0** — Lane C: aba ativa (status honesto sem extensão) + pesquisa web (open https + fetch allowlist). Base 0.14.1: memória + cascata BYOK.
+**v0.15.1** — TTS opcional (system/SAPI + edge-tts); Lane C aba/pesquisa (0.15.0); memória (0.14.1).
 
 Spec UI: [`docs/elio-design-system.md`](./docs/elio-design-system.md) · ADRs: [`docs/ADRs/`](./docs/ADRs/) · Distribuição: [`docs/windows-distribution.md`](./docs/windows-distribution.md)
 
@@ -10,8 +10,8 @@ Spec UI: [`docs/elio-design-system.md`](./docs/elio-design-system.md) · ADRs: [
 - **Windows 10/11 (x64)**  
 - **Node.js 22.12+** (só para desenvolvimento)  
 - Microfone (voz)  
-- Pacote de idioma de fala **pt-BR** do Windows (reconhecimento nativo)  
-- Internet: OpenRouter (se usar BYOK/cota); pesquisa web (open/fetch allowlist); Whisper na 1ª vez do fallback (~**466 MB**); clima  
+- Pacote de idioma de fala **pt-BR** do Windows (reconhecimento nativo + **vozes TTS** pt-BR)  
+- Internet: OpenRouter (se usar BYOK/cota); pesquisa web (open/fetch allowlist); Whisper na 1ª vez do fallback (~**466 MB**); clima; **edge-tts** se não houver voz system  
 - Localização do Windows (opcional; se negar, usa IP aproximado)  
 - (Opcional) chave [OpenRouter](https://openrouter.ai) — BYOK e/ou modelos `:free`  
 - (Opcional) [Ollama](https://ollama.com) com um modelo (ex.: `llama3.2`) — fallback local  
@@ -40,16 +40,19 @@ npm run ensure:electron
 npm run dev
 ```
 
-### O que Douglas deve ver (0.15.0)
+### O que Douglas deve ver (0.15.1)
 
-1. Selo **v0.15.0**  
+1. Selo **v0.15.1**  
 2. **“o que está na aba aberta?”** → resposta honesta: precisa de extensão (ainda não incluída)  
 3. **“pesquisa na web sobre Elio”** → abre busca https no navegador (sem crawl genérico)  
 4. **“resume https://pt.wikipedia.org/wiki/Electron”** → abre + lê trecho público (allowlist) e resume via LLM (cascata)  
 5. Memória (0.14.1): criar/listar/apagar; export/delete-all em Configurações  
 6. Cascata BYOK → free → Ollama; Command Center threads/histórico  
-7. Floating Bar: Windows Speech → auto-envio; permissão falha → “Usando Whisper…”  
-8. `npm run dist:win` gera instalador NSIS; Spotify / clima ok  
+7. **Integrações → Fala do Elio (TTS)** + Floating Bar **⋯ → Falar respostas**; botão ■ para a fala  
+8. Floating Bar: Windows Speech → auto-envio; permissão falha → “Usando Whisper…”  
+9. `npm run dist:win` gera instalador NSIS; Spotify / clima ok  
+
+
 ### Cascata de IAs (BYOK → free → Ollama)
 
 Ordem automática ([ADR 0011](./docs/ADRs/0011-ai-cascade-byok.md)):
@@ -145,6 +148,9 @@ Ordem de resolução:
 | `ELIO_TIMEZONE` | Fuso IANA (padrão `America/Sao_Paulo`) |
 | `ELIO_WHISPER_MODEL` | `tiny` / `base` / `small` (padrão `small`; só fallback) |
 | `ELIO_STT_PROVIDER` | `auto` (padrão) / `windows-speech` / `whisper` |
+| `ELIO_TTS_ENABLED` | `1` / `0` — sobrescreve o toggle da UI |
+| `ELIO_TTS_PROVIDER` | `auto` (padrão) / `system` / `edge` |
+| `ELIO_TTS_EDGE_VOICE` | Voz neural (padrão `pt-BR-FranciscaNeural`) |
 | `ELIO_SPOTIFY_CLIENT_ID` | Client ID Spotify (PKCE; sem secret) |
 | `OPENROUTER_API_KEY` | Chave OpenRouter (prioridade sobre cofre da UI) |
 | `OPENROUTER_MODEL` | Modelo (`:free` = cota; sem `:free` = BYOK) |
@@ -183,15 +189,37 @@ Ordem de resolução:
 - Chave OpenRouter: cofre `safeStorage` (`secrets/openrouter-key.bin`) via **Configurações → Integrações** (cascata BYOK/free)  
 - Export / apagar tudo: **Configurações → Dados** (sem keys/tokens no export)  
 
+
+## TTS — fala do Elio (0.15.1)
+
+Desligado por padrão. Quando ligado, o Elio **fala as respostas** em pt-BR.
+
+| Provedor | Onde | Rede | Notas |
+|----------|------|------|--------|
+| **system** (preferido no `auto`) | `speechSynthesis` → vozes Windows | Não | Offline; instale voz pt-BR |
+| **edge** | main → Edge Read Aloud → MP3 | Sim | Neural; sem API key (ADR 0014) |
+
+### Como habilitar TTS no Windows
+
+1. Instale/ative **voz pt-BR** em **Configurações → Hora e idioma → Fala** (e, se existir, *Vozes* / *Voice access*).  
+2. `npm run dev` → selo **v0.15.1**.  
+3. Na Floating Bar: **⋯ → Falar respostas (TTS)**  
+   — ou **Command Center → Configurações → Integrações → Ativar TTS**.  
+4. Envie uma mensagem (texto ou voz). A barra mostra **Falando…**; use **■** ou “Parar fala” para interromper.  
+5. Provedor **auto**: usa voz do Windows se houver `pt*`; senão edge-tts (precisa internet).  
+6. Offline: force **system** no card de Integrações (ou `$env:ELIO_TTS_PROVIDER = "system"`).  
+7. Prefs em `%APPDATA%\elio\elio-tts.json` (sem secrets).
+
 ## Segurança
 
 `contextIsolation`, sem `nodeIntegration`, sandbox, Zod IPC.  
 STT: Windows Speech no renderer; Whisper subprocess só no main (`shell: false`).  
 Clima: Open-Meteo + cache local; coords não vão ao histórico/LLM.  
+TTS: SSML escapado; sem shell; edge-tts só Microsoft Speech; texto não vai para log.  
 Pesquisa web: só https; fetch só hosts allowlisted; sem crawl; conteúdo marcado não confiável.  
 Aba ativa: sem extensão = sem leitura (sem CDP).  
 Spotify / OpenRouter: PKCE + `safeStorage`; opens só `spotify:` / `https://open.spotify.com`.  
-Ver `docs/ADRs/0002-whisper-subprocess.md`, `0006-auto-location-weather.md`, `0007-spotify-voice-pkce.md`, `0008-windows-speech-primary-stt.md`, `0009-windows-distribution.md`, `0010-command-center-ux-settings.md`, `0011-ai-cascade-byok.md`, `0012-persistent-memory-settings.md` e `0013-web-context-extension-research.md`.
+Ver `docs/ADRs/0002-whisper-subprocess.md`, `0006-auto-location-weather.md`, `0007-spotify-voice-pkce.md`, `0008-windows-speech-primary-stt.md`, `0009-windows-distribution.md`, `0010-command-center-ux-settings.md`, `0011-ai-cascade-byok.md`, `0012-persistent-memory-settings.md` e `0013-web-context-extension-research.md` e `0014-tts-system-and-edge.md`.
 
 ## Licença
 
