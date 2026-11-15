@@ -39,7 +39,7 @@ export async function enrichMessagesWithLocalFacts(
   }
 
   lines.push(
-    'Responda em português do Brasil, de forma direta. Sem abrir pastas/apps (fora do escopo).',
+    'Responda em português do Brasil, de forma direta. Abrir sites/pastas/arquivos/apps é feito pelo Elio via allowlist (não invente que abriu algo).',
   )
 
   return [{ role: 'system', content: lines.join('\n') }, ...messages]

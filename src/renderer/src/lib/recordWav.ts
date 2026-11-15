@@ -1,5 +1,9 @@
 /** Grava PCM do microfone e devolve WAV 16 kHz mono 16-bit (base64). */
 
+import { isMicMissingMessage } from '@shared/micMessages'
+
+export { isMicMissingMessage }
+
 const TARGET_RATE = 16_000
 
 function writeString(view: DataView, offset: number, str: string): void {
@@ -68,9 +72,33 @@ export type MicRecorder = {
   cancel: () => void
 }
 
+export type MicPresence = {
+  inputCount: number
+  /** true se enumerateDevices listou pelo menos um audioinput */
+  listed: boolean
+}
+
+/**
+ * Rechecagem leve da lista de devices (mau contato / plug intermitente).
+ * Não pede permissão — só lê o que o OS já expõe.
+ */
+export async function probeMicPresence(): Promise<MicPresence> {
+  const media = navigator.mediaDevices
+  if (!media?.enumerateDevices) {
+    return { inputCount: 0, listed: false }
+  }
+  try {
+    const devices = await media.enumerateDevices()
+    const inputs = devices.filter((d: MediaDeviceInfo) => d.kind === 'audioinput')
+    return { inputCount: inputs.length, listed: inputs.length > 0 }
+  } catch {
+    return { inputCount: 0, listed: false }
+  }
+}
+
 /**
  * Inicia captura via Web Audio. Chame `stop()` para obter WAV base64.
- * Erros de permissão sobem como DOMException / Error.
+ * Erros de permissão / device sobem como DOMException / Error.
  */
 export async function startMicRecording(): Promise<MicRecorder> {
   const stream = await navigator.mediaDevices.getUserMedia({
@@ -140,12 +168,21 @@ export async function startMicRecording(): Promise<MicRecorder> {
   }
 }
 
-export function micPermissionMessage(err: unknown): string {
+/**
+ * Mensagem amigável. NotFoundError pode ser lista vazia de verdade
+ * (mau contato / mic desconectado) — mensagem clássica permanece válida.
+ * Se a lista ainda mostra um input, sugere contato/uso/bloqueio.
+ */
+export async function micPermissionMessage(err: unknown): Promise<string> {
   if (err instanceof DOMException) {
     if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
       return 'Sem permissão de microfone. Libere o mic nas configurações do Windows / do app e tente de novo.'
     }
     if (err.name === 'NotFoundError') {
+      const presence = await probeMicPresence()
+      if (presence.listed) {
+        return 'Microfone listado, mas sem sinal — confira o encaixe / mau contato e tente de novo.'
+      }
       return 'Nenhum microfone encontrado. Conecte um mic e tente de novo.'
     }
   }

@@ -205,7 +205,7 @@ export function ChatView({
       setVoiceUi('recording')
     } catch (err) {
       recordingActiveRef.current = false
-      setError(micPermissionMessage(err))
+      setError(await micPermissionMessage(err))
       setVoiceUi('idle')
     }
   }

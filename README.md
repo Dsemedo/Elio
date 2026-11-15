@@ -1,9 +1,9 @@
 # Elio
 
-Assistente pessoal de IA para desktop (**JARVIS MVP** — Estágio 1).  
-**v0.7.0** — chat scrollável no Command Center; hora local + clima (Open-Meteo); sync Bar ↔ Painel.
+Assistente pessoal de IA para desktop (**JARVIS MVP**).  
+**v0.8.0** — Floating Bar opaca + erros legíveis; opens seguros (site/pasta/arquivo/app); router de intents A/B/C.
 
-Spec UI: [`docs/elio-design-system.md`](./docs/elio-design-system.md)
+Spec UI: [`docs/elio-design-system.md`](./docs/elio-design-system.md) · ADR: [`docs/ADRs/0005-desktop-opens-intent-router.md`](./docs/ADRs/0005-desktop-opens-intent-router.md)
 
 ## Requisitos
 
@@ -27,15 +27,25 @@ npm run ensure:electron
 npm run dev
 ```
 
-### O que Douglas deve ver
+### O que Douglas deve ver (0.8.0)
 
-1. Selo **v0.7.0**  
-2. Em **Conversas**: lista de mensagens **rola** (rodinha / barra); mensagens novas vão ao fim se você já estava no fundo  
-3. Perguntar **“que horas são?”** → hora real (fuso `America/Sao_Paulo` ou `ELIO_TIMEZONE`)  
-4. Perguntar **“como está o tempo?”** → clima real (padrão São Paulo; ver env abaixo)  
-5. Voz ou texto na Floating Bar atualiza o chat do Command Center (mesma conversa)
+1. Selo **v0.8.0**  
+2. Floating Bar = cápsula grafite **opaca**; erro de mic **dentro** da barra (sem retângulo transparente sob a pill)  
+3. **“abre o site da Exame”** → browser no https da Exame; feedback na barra + chat  
+4. **“abre a pasta Downloads”** → Explorer na pasta; paths fora de home/comuns são bloqueados  
+5. **“que horas são?”** / **“como está o tempo?”** → fatos locais (como em 0.7)  
+6. Pedidos de “ler a aba aberta” → resposta honesta **em breve** (sem CDP/extensão neste release)
 
-**Não neste PR:** abrir pastas, browser ou ações no desktop (Estágio 2 / PJ-20).
+### Modelo de intents
+
+| Lane | Exemplos | Status |
+|------|----------|--------|
+| **A** PC | abre site / pasta / arquivo / app | ✅ allowlist `openExternal` / `openPath` |
+| **B** Fato local | hora, clima | ✅ enrich (Open-Meteo + relógio) |
+| **C** Web context | aba aberta, pesquisa web | ⏳ deferred (extensão/CDP) |
+| **D** Chat | conversa geral | ✅ LLM (Ollama / OpenRouter) |
+
+**Não neste PR:** ler aba do browser, digitar em outros apps, apagar/mover arquivos, RPA completo.
 
 ### Clima e fuso (opcional)
 
