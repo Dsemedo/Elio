@@ -45,6 +45,7 @@ describe('voice IPC contracts', () => {
     expect(friendlyVoiceError('AUDIO_TOO_SHORT: x')).toMatch(/curto/i)
     expect(friendlyVoiceError('WHISPER_MISSING: x')).toMatch(/Whisper/i)
     expect(friendlyVoiceError('DOWNLOAD_FAILED: x')).toMatch(/download/i)
+    expect(friendlyVoiceError('EXTRACT_FAILED: x')).toMatch(/extrair/i)
     expect(friendlyVoiceError('algo-interno-com-path')).toMatch(/digitar/i)
   })
 })

@@ -1,7 +1,7 @@
 # Elio
 
 Assistente pessoal de IA para desktop (**JARVIS MVP** — Estágio 1).  
-**v0.6.0** — Whisper **base** (PT-BR) + **envio automático** ao chat; Floating Bar UX (voz primeiro, sem chrome duplo).
+**v0.6.1** — Correção do “Preparar voz” no Windows (download/extract + erros claros); Whisper **base** + envio automático ao chat.
 
 Spec UI: [`docs/elio-design-system.md`](./docs/elio-design-system.md)
 
@@ -20,7 +20,7 @@ Pasta: `C:\Users\Douglas\Elio`
 ```powershell
 git restore package-lock.json
 git fetch
-git checkout cursor/whisper-base-auto-send-b66e
+git checkout main
 git pull
 npm install
 npm run ensure:electron
@@ -29,13 +29,11 @@ npm run dev
 
 ### O que Douglas deve ver
 
-1. **Floating Bar** ~420×58 **sem moldura preta** — idle “Segure o mic” + stub “Palavra de ativação · em breve”  
-2. Segurar mic → **Ouvindo…** → soltar → **Transcrevendo…** → **Pensando…** → resposta (Ollama/OpenRouter)  
-3. O texto **não fica parado no input** — após a transcrição o Elio **envia sozinho** ao chat  
-4. Mesmo fluxo no **Command Center** (Conversas)  
-5. Clicar em outro app: **barra permanece**; ocultar só pelo menu / bandeja  
-6. Selo **v0.6.0**  
-7. Na 1ª vez (ou se ainda tiver só o `tiny`): download do modelo **base** com progresso
+1. Selo **v0.6.1**  
+2. **Preparar voz** / 1ª fala: progresso do download (~150 MB) e, no fim, “Voz pronta” — **sem** a mensagem genérica “Não foi possível usar a voz agora”  
+3. Se falhar de novo: mensagem clara em PT (internet / antivírus / timeout) e no terminal o **erro real** (`[elio] voice:ensure falhou` com `name`/`message`/`code`)  
+4. **Floating Bar** — idle “Segure o mic”; segurar → **Ouvindo…** → soltar → **Transcrevendo…** → **Pensando…** → resposta  
+5. Texto da fala **envia sozinho** ao chat (Floating Bar e Command Center)
 
 **Não neste PR:** abrir pastas, browser ou ações no desktop (Estágio 2).
 

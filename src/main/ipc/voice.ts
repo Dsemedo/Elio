@@ -6,7 +6,7 @@ import {
 } from '../../shared/ipc'
 import { MODEL_ID, MODEL_SIZE_HINT_MB, WHISPER_RELEASE } from '../services/voice/constants'
 import { ensureVoiceAssets, voiceAssetsStatus } from '../services/voice/download'
-import { friendlyVoiceError } from '../services/voice/errors'
+import { friendlyVoiceError, logVoiceError } from '../services/voice/errors'
 import { transcribeWavBase64 } from '../services/voice/transcribe'
 import type { VoiceProgress } from '../../shared/types'
 
@@ -41,7 +41,7 @@ export function registerVoiceIpc(): void {
       return toVoiceStatus()
     } catch (err) {
       const message = err instanceof Error ? err.message : 'DOWNLOAD_FAILED'
-      console.error('[elio] voice:ensure falhou')
+      logVoiceError('voice:ensure falhou', err)
       throw new Error(friendlyVoiceError(message))
     }
   })
@@ -53,7 +53,7 @@ export function registerVoiceIpc(): void {
       return result
     } catch (err) {
       const message = err instanceof Error ? err.message : 'TRANSCRIBE_FAILED'
-      console.error('[elio] voice:transcribe falhou')
+      logVoiceError('voice:transcribe falhou', err)
       throw new Error(friendlyVoiceError(message))
     }
   })
