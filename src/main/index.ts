@@ -8,7 +8,7 @@ import { registerShellIpc } from './ipc/shell'
 import { registerSpotifyIpc } from './ipc/spotify'
 import { registerTtsIpc } from './ipc/tts'
 import { registerVoiceIpc } from './ipc/voice'
-import { isAppPermissionAllowed } from './sessionPermissions'
+import { isAppPermissionAllowed, isMediaAudioAllowed } from './sessionPermissions'
 import { startAutoUpdater } from './services/updater'
 import { getShellManager } from './shell/manager'
 
@@ -30,17 +30,24 @@ function registerIpc(): void {
 }
 
 /**
- * Concede geolocation + media/mic ao origin do app.
+ * Concede geolocation + media/mic (áudio) ao origin do app.
  * O SO ainda pode mostrar o diálogo do Windows; sem isto o renderer recebe
  * PERMISSION_DENIED / SpeechRecognition `not-allowed` imediatamente.
  * (0.9 só liberava geolocation — isso bloqueava Web Speech / getUserMedia.)
+ *
+ * Request + Check: Chromium consulta os dois; SpeechRecognition costuma ir
+ * pelo check. `mediaTypes` pode vir omitido — não negar por isso.
  */
 function allowAppMediaAndLocationPermissions(ses: Session): void {
-  ses.setPermissionRequestHandler((_wc, permission, callback) => {
-    callback(isAppPermissionAllowed(permission))
+  ses.setPermissionRequestHandler((_wc, permission, callback, details) => {
+    const allowed = isMediaAudioAllowed(permission, details as { mediaTypes?: string[] })
+    if (!allowed && !isAppPermissionAllowed(permission)) {
+      console.info('[elio] permissão negada:', permission)
+    }
+    callback(allowed)
   })
-  ses.setPermissionCheckHandler((_wc, permission) => {
-    return isAppPermissionAllowed(permission)
+  ses.setPermissionCheckHandler((_wc, permission, _origin, details) => {
+    return isMediaAudioAllowed(permission, details as { mediaType?: string })
   })
 }
 

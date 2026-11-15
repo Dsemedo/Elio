@@ -3,6 +3,7 @@ import {
   extractWindowsSpeechErrorCode,
   parseSttPreference,
   resolveSttBackend,
+  sanitizeVoiceUiError,
   shouldFallbackToWhisper,
   windowsSpeechUserMessage,
 } from '../src/shared/sttPolicy'
@@ -108,5 +109,20 @@ describe('windowsSpeechUserMessage', () => {
   it('mensagem curta o bastante para a barra', () => {
     const msg = windowsSpeechUserMessage(new Error('WINDOWS_SPEECH_ERROR:not-allowed'))
     expect(msg.length).toBeLessThan(120)
+  })
+})
+
+describe('sanitizeVoiceUiError', () => {
+  it('nunca deixa código cru na UI', () => {
+    const msg = sanitizeVoiceUiError('WINDOWS_SPEECH_ERROR:not-allowed')
+    expect(msg.toLowerCase()).not.toContain('windows_speech_error')
+    expect(msg.toLowerCase()).not.toContain('not-allowed')
+    expect(msg).toMatch(/permissão|microfone|fala/i)
+  })
+
+  it('preserva mensagens amigáveis', () => {
+    expect(sanitizeVoiceUiError('Áudio muito curto — segure e fale um pouco mais.')).toContain(
+      'curto',
+    )
   })
 })

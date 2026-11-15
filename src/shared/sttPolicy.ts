@@ -72,3 +72,15 @@ export function windowsSpeechUserMessage(err: unknown): string {
   }
   return 'Falha no reconhecimento de fala do Windows.'
 }
+
+/**
+ * Última linha de defesa na UI: nunca mostrar `WINDOWS_SPEECH_ERROR:…` cru
+ * (o chip da Floating Bar trunca e assusta). Outras mensagens passam.
+ */
+export function sanitizeVoiceUiError(message: string | null | undefined): string {
+  if (!message) return 'Falha na voz — tente de novo.'
+  if (/WINDOWS_SPEECH/i.test(message)) {
+    return windowsSpeechUserMessage(new Error(message))
+  }
+  return message
+}

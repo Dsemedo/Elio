@@ -17,6 +17,7 @@ import { detectChatToolIntent } from '@shared/chatIntent'
 import {
   extractWindowsSpeechErrorCode,
   resolveSttBackend,
+  sanitizeVoiceUiError,
   shouldFallbackToWhisper,
   windowsSpeechUserMessage,
 } from '@shared/sttPolicy'
@@ -24,15 +25,15 @@ import {
   isMicMissingMessage,
   micPermissionMessage,
   probeMicPresence,
-  startMicRecording,
   type MicRecorder,
 } from '../lib/recordWav'
 import { ensureAppLocation } from '../lib/geolocation'
 import {
-  isWindowsSpeechAvailable,
-  startWindowsSpeech,
-  type WindowsSpeechSession,
-} from '../lib/windowsSpeech'
+  startWhisperPtt,
+  startWindowsSpeechPtt,
+  type PttCapture,
+} from '../lib/startPttCapture'
+import { isWindowsSpeechAvailable } from '../lib/windowsSpeech'
 import { ttsController } from '../lib/ttsController'
 
 export type BarUiState =
@@ -47,14 +48,7 @@ export type BarUiState =
 
 type VoicePhase = 'idle' | 'preparing' | 'recording' | 'transcribing'
 
-type ActiveCapture =
-  | {
-      kind: 'windows-speech'
-      session: WindowsSpeechSession
-      /** WAV paralelo para fallback Whisper se o Speech falhar/vazio. */
-      recorder: MicRecorder | null
-    }
-  | { kind: 'whisper'; recorder: MicRecorder }
+type ActiveCapture = PttCapture
 
 const STATE_LABEL: Record<BarUiState, string> = {
   idle: '',
@@ -186,7 +180,7 @@ export function FloatingBar(): React.JSX.Element {
       const capture = captureRef.current
       if (capture?.kind === 'windows-speech') {
         capture.session.cancel()
-        capture.recorder?.cancel()
+        capture.recorder.cancel()
       } else if (capture?.kind === 'whisper') {
         capture.recorder.cancel()
       }
@@ -350,25 +344,6 @@ export function FloatingBar(): React.JSX.Element {
     await sendContent(draft)
   }
 
-  const startWhisperCapture = async (): Promise<void> => {
-    setVoicePhase('preparing')
-    const voice = await window.elio.ensureVoice()
-    setSttPreference(voice.sttPreference)
-    setPlatform(voice.platform)
-    if (!voice.ready) {
-      setError(voice.hint || 'Voz indisponível')
-      setBarState('error')
-      setVoicePhase('idle')
-      return
-    }
-    const recorder = await startMicRecording()
-    captureRef.current = { kind: 'whisper', recorder }
-    recordingActiveRef.current = true
-    recordStartedAt.current = Date.now()
-    setVoicePhase('recording')
-    setBarState('listening')
-  }
-
   const beginTalk = async (): Promise<void> => {
     if (
       resolvedState === 'thinking' ||
@@ -392,41 +367,45 @@ export function FloatingBar(): React.JSX.Element {
         preference: sttPreference,
       })
 
+      let capture: PttCapture
       if (backend === 'windows-speech') {
-        try {
-          const session = await startWindowsSpeech({ lang: 'pt-BR' })
-          let recorder: MicRecorder | null = null
-          try {
-            recorder = await startMicRecording()
-          } catch {
-            /* Speech sozinho ainda funciona; fallback Whisper fica indisponível neste PTT */
-          }
-          captureRef.current = { kind: 'windows-speech', session, recorder }
-          recordingActiveRef.current = true
-          recordStartedAt.current = Date.now()
-          setVoicePhase('recording')
-          setBarState('listening')
-          return
-        } catch (err) {
-          // Indisponível / erro no start (incl. not-allowed) → Whisper.
-          const code = extractWindowsSpeechErrorCode(
-            err instanceof Error ? err.message : String(err),
-          )
-          if (!shouldFallbackToWhisper(code)) {
-            setError(await micPermissionMessage(err).catch(() => windowsSpeechUserMessage(err)))
+        // getUserMedia antes do Speech — evita not-allowed residual no Chromium.
+        capture = await startWindowsSpeechPtt({ lang: 'pt-BR' })
+        if (capture.kind === 'whisper') {
+          setStatusLine('Usando Whisper…')
+          const voice = await window.elio.ensureVoice()
+          setSttPreference(voice.sttPreference)
+          setPlatform(voice.platform)
+          if (!voice.ready) {
+            capture.recorder.cancel()
+            setError(sanitizeVoiceUiError(voice.hint || 'Voz indisponível'))
             setBarState('error')
             setVoicePhase('idle')
             return
           }
-          setStatusLine('Usando Whisper…')
         }
+      } else {
+        const voice = await window.elio.ensureVoice()
+        setSttPreference(voice.sttPreference)
+        setPlatform(voice.platform)
+        if (!voice.ready) {
+          setError(sanitizeVoiceUiError(voice.hint || 'Voz indisponível'))
+          setBarState('error')
+          setVoicePhase('idle')
+          return
+        }
+        capture = await startWhisperPtt()
       }
 
-      await startWhisperCapture()
+      captureRef.current = capture
+      recordingActiveRef.current = true
+      recordStartedAt.current = Date.now()
+      setVoicePhase('recording')
+      setBarState('listening')
     } catch (err) {
       recordingActiveRef.current = false
       captureRef.current = null
-      setError(await micPermissionMessage(err))
+      setError(await micPermissionMessage(err).catch(() => windowsSpeechUserMessage(err)))
       setBarState('error')
       setVoicePhase('idle')
     }
@@ -454,7 +433,7 @@ export function FloatingBar(): React.JSX.Element {
       if (Date.now() - recordStartedAt.current < 400) {
         if (capture.kind === 'windows-speech') {
           capture.session.cancel()
-          capture.recorder?.cancel()
+          capture.recorder.cancel()
         } else {
           capture.recorder.cancel()
         }
@@ -480,31 +459,27 @@ export function FloatingBar(): React.JSX.Element {
         }
 
         if (speechText) {
-          capture.recorder?.cancel()
+          capture.recorder.cancel()
           trimmed = speechText
-        } else if (
-          capture.recorder &&
-          (!speechFailed || shouldFallbackToWhisper(speechErrorCode))
-        ) {
+        } else if (!speechFailed || shouldFallbackToWhisper(speechErrorCode)) {
           setStatusLine('Usando Whisper…')
           trimmed = await transcribeWithWhisper(capture.recorder)
         } else {
-          capture.recorder?.cancel()
-          if (speechFailed) {
-            setError(
-              windowsSpeechUserMessage(
-                new Error(`WINDOWS_SPEECH_ERROR:${speechErrorCode ?? 'unknown'}`),
-              ),
-            )
-          } else {
-            setError('Não deu para entender — tente falar de novo.')
-          }
+          capture.recorder.cancel()
+          setError(
+            windowsSpeechUserMessage(
+              new Error(`WINDOWS_SPEECH_ERROR:${speechErrorCode ?? 'unknown'}`),
+            ),
+          )
           setStatusLine(null)
           setBarState('error')
           setVoicePhase('idle')
           return
         }
       } else {
+        if (capture.speechErrorCode) {
+          setStatusLine('Usando Whisper…')
+        }
         trimmed = await transcribeWithWhisper(capture.recorder)
       }
 
@@ -522,7 +497,11 @@ export function FloatingBar(): React.JSX.Element {
       await sendContent(trimmed)
     } catch (err) {
       setStatusLine(null)
-      setError(err instanceof Error ? err.message : 'Falha na transcrição')
+      setError(
+        sanitizeVoiceUiError(
+          err instanceof Error ? err.message : 'Falha na transcrição',
+        ),
+      )
       setBarState('error')
       setVoicePhase('idle')
     }
@@ -747,7 +726,7 @@ export function FloatingBar(): React.JSX.Element {
               const capture = captureRef.current
               if (capture?.kind === 'windows-speech') {
                 capture.session.cancel()
-                capture.recorder?.cancel()
+                capture.recorder.cancel()
               } else if (capture?.kind === 'whisper') {
                 capture.recorder.cancel()
               }

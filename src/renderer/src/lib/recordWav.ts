@@ -1,7 +1,7 @@
 /** Grava PCM do microfone e devolve WAV 16 kHz mono 16-bit (base64). */
 
 import { isMicMissingMessage } from '@shared/micMessages'
-import { windowsSpeechUserMessage } from '@shared/sttPolicy'
+import { sanitizeVoiceUiError, windowsSpeechUserMessage } from '@shared/sttPolicy'
 
 export { isMicMissingMessage }
 
@@ -190,5 +190,6 @@ export async function micPermissionMessage(err: unknown): Promise<string> {
       return 'Nenhum microfone encontrado. Conecte um mic e tente de novo.'
     }
   }
-  return err instanceof Error ? err.message : 'Não foi possível usar o microfone'
+  const raw = err instanceof Error ? err.message : 'Não foi possível usar o microfone'
+  return sanitizeVoiceUiError(raw)
 }
