@@ -78,11 +78,21 @@ body {
   font-weight: 700;
   letter-spacing: -0.04em;
   line-height: 0.95;
+  /* Cor sólida primeiro (evita “texto invisível” se o clip falhar) */
+  color: var(--ink);
   background: linear-gradient(120deg, #ffffff 10%, var(--accent) 90%);
   -webkit-background-clip: text;
   background-clip: text;
-  color: transparent;
+  -webkit-text-fill-color: transparent;
   animation: brand-in 0.9s ease-out both;
+}
+
+@supports not ((-webkit-background-clip: text) or (background-clip: text)) {
+  .brand {
+    color: var(--accent);
+    -webkit-text-fill-color: currentColor;
+    background: none;
+  }
 }
 
 .lede {

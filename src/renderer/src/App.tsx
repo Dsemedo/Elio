@@ -8,7 +8,13 @@ export default function App(): React.JSX.Element {
   useEffect(() => {
     let cancelled = false
 
-    void window.elio
+    const api = window.elio
+    if (!api?.getAppInfo) {
+      setError('Bridge do app indisponível (preload).')
+      return
+    }
+
+    void api
       .getAppInfo()
       .then((data) => {
         if (!cancelled) setInfo(data)
@@ -28,11 +34,12 @@ export default function App(): React.JSX.Element {
     <main className="shell">
       <div className="glow" aria-hidden="true" />
       <section className="hero">
-        <p className="eyebrow">Fundação técnica · Sprint 0</p>
+        <p className="eyebrow">Fundação · base do app</p>
         <h1 className="brand">Elio</h1>
         <p className="lede">
-          Olá — a base desktop está no ar. Isolamento do renderer ativo, sem chat e
-          sem voz ainda. Este é o ponto de partida do JARVIS MVP.
+          Olá — a base desktop está no ar. Por enquanto não há chat nem voz: isto
+          só confirma que o programa abre com segurança. O próximo passo natural é
+          conversar por texto.
         </p>
         <div className="meta" role="status">
           {error ? (

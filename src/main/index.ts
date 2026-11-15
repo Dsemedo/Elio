@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, shell } from 'electron'
+import { app, BrowserWindow, Menu, ipcMain, shell } from 'electron'
 import { join } from 'node:path'
 import { IpcChannels, type AppInfo } from '../shared/ipc'
 
@@ -13,6 +13,7 @@ function createWindow(): BrowserWindow {
     show: false,
     title: 'Elio',
     backgroundColor: '#0c1222',
+    autoHideMenuBar: true,
     webPreferences: {
       preload: join(__dirname, '../preload/index.mjs'),
       contextIsolation: true,
@@ -25,7 +26,10 @@ function createWindow(): BrowserWindow {
     mainWindow.show()
   })
 
-  // Block unexpected navigation (open external links in the OS browser).
+  mainWindow.webContents.on('did-fail-load', (_event, code, desc, url) => {
+    console.error('[elio] falha ao carregar UI', { code, desc, url })
+  })
+
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     void shell.openExternal(url)
     return { action: 'deny' }
@@ -33,7 +37,7 @@ function createWindow(): BrowserWindow {
 
   mainWindow.webContents.on('will-navigate', (event, url) => {
     const allowed = isDev
-      ? url.startsWith('http://localhost')
+      ? url.startsWith('http://localhost') || url.startsWith('http://127.0.0.1')
       : url.startsWith('file://')
     if (!allowed) {
       event.preventDefault()
@@ -59,6 +63,8 @@ function registerIpc(): void {
 }
 
 app.whenReady().then(() => {
+  // Sem menu File/Edit padrão — menos ruído para quem não é desenvolvedor.
+  Menu.setApplicationMenu(null)
   registerIpc()
   createWindow()
 
