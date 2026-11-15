@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   ChatSendInputSchema,
   ChatStatusSchema,
+  ChatUpdatedEventSchema,
   IpcChannels,
 } from '../src/shared/ipc'
 
@@ -9,7 +10,16 @@ describe('chat IPC contracts', () => {
   it('expõe canais de chat fixos', () => {
     expect(IpcChannels.CHAT_SEND).toBe('chat:send')
     expect(IpcChannels.CHAT_CANCEL).toBe('chat:cancel')
+    expect(IpcChannels.CHAT_UPDATED).toBe('chat:updated')
     expect(Object.values(IpcChannels).every((c) => c.includes(':'))).toBe(true)
+  })
+
+  it('valida evento de sync chat:updated', () => {
+    const event = ChatUpdatedEventSchema.parse({
+      reason: 'updated',
+      conversationId: 'c1',
+    })
+    expect(event.reason).toBe('updated')
   })
 
   it('valida envio de mensagem', () => {

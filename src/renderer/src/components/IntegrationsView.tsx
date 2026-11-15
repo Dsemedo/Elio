@@ -33,6 +33,14 @@ export function IntegrationsView({ status }: Props): React.JSX.Element {
         : 'Opcional: defina OPENROUTER_API_KEY no terminal antes do npm run dev.',
     },
     {
+      id: 'weather',
+      title: 'Clima (Open-Meteo)',
+      kind: 'app',
+      status: 'ok',
+      detail:
+        'Sem chave. Padrão: São Paulo. Defina ELIO_WEATHER_CITY (ex.: Campinas) ou ELIO_WEATHER_LAT + ELIO_WEATHER_LON antes do npm run dev. Fuso: ELIO_TIMEZONE (padrão America/Sao_Paulo).',
+    },
+    {
       id: 'slack',
       title: 'Slack',
       kind: 'app',

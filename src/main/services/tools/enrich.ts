@@ -1,0 +1,46 @@
+import type { ChatMessage } from '../../../shared/ipc'
+import { detectChatToolIntent } from './intent'
+import { getLocalClock } from './time'
+import { getWeatherSnapshot } from './weather'
+
+type HistoryMessage = Pick<ChatMessage, 'role' | 'content'>
+
+/**
+ * Injeta fatos locais (hora sempre; clima sob demanda) como system message.
+ * Caminho simples e confiável com llama3.2 / OpenRouter — sem tool-call loop.
+ */
+export async function enrichMessagesWithLocalFacts(
+  messages: HistoryMessage[],
+  signal?: AbortSignal,
+): Promise<HistoryMessage[]> {
+  const lastUser = [...messages].reverse().find((m) => m.role === 'user')
+  const intent = detectChatToolIntent(lastUser?.content ?? '')
+  const clock = getLocalClock()
+
+  const lines = [
+    'Contexto local do Elio (fatos verificados — use-os; não invente hora/clima):',
+    `- Agora: ${clock.display}`,
+  ]
+
+  if (intent.needsWeather) {
+    try {
+      const weather = await getWeatherSnapshot(signal)
+      lines.push(`- ${weather.summary}`)
+      lines.push(
+        `- Fonte: Open-Meteo; local resolvido (${weather.location.source}): ${weather.location.name}.`,
+      )
+    } catch {
+      lines.push(
+        '- Clima: indisponível no momento (falha ao consultar Open-Meteo). Diga isso ao usuário sem inventar números.',
+      )
+    }
+  } else if (intent.needsTime) {
+    lines.push('- O usuário perguntou sobre hora/data — responda com o relógio acima.')
+  }
+
+  lines.push(
+    'Responda em português do Brasil, de forma direta. Sem abrir pastas/apps (fora do escopo).',
+  )
+
+  return [{ role: 'system', content: lines.join('\n') }, ...messages]
+}

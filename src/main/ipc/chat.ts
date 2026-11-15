@@ -1,12 +1,15 @@
-import { ipcMain } from 'electron'
+import { BrowserWindow, ipcMain } from 'electron'
 import {
   ChatCancelInputSchema,
+  ChatUpdatedEventSchema,
   ChatSendInputSchema,
   ConversationIdSchema,
   IpcChannels,
   type ChatSendResult,
+  type ChatUpdatedEvent,
   type Conversation,
 } from '../../shared/ipc'
+import { enrichMessagesWithLocalFacts } from '../services/tools/enrich'
 import { routeCompletion, getChatStatus } from '../services/router'
 import {
   appendMessages,
@@ -24,12 +27,28 @@ function titleFromPrompt(content: string): string {
   return compact.length > 48 ? `${compact.slice(0, 45)}…` : compact
 }
 
+function broadcastChatUpdated(event: ChatUpdatedEvent): void {
+  const payload = ChatUpdatedEventSchema.parse(event)
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (win.isDestroyed()) continue
+    win.webContents.send(IpcChannels.CHAT_UPDATED, payload)
+  }
+}
+
 export function registerChatIpc(): void {
   ipcMain.handle(IpcChannels.CHAT_STATUS, async () => getChatStatus())
 
   ipcMain.handle(IpcChannels.CHAT_LIST, () => listConversations())
 
-  ipcMain.handle(IpcChannels.CHAT_CREATE, () => createConversation())
+  ipcMain.handle(IpcChannels.CHAT_CREATE, () => {
+    const created = createConversation()
+    broadcastChatUpdated({
+      reason: 'created',
+      conversationId: created.id,
+      conversation: created,
+    })
+    return created
+  })
 
   ipcMain.handle(IpcChannels.CHAT_GET, (_event, raw: unknown) => {
     const { conversationId } = ConversationIdSchema.parse(raw)
@@ -44,7 +63,11 @@ export function registerChatIpc(): void {
     const { conversationId } = ConversationIdSchema.parse(raw)
     inflight.get(conversationId)?.abort()
     inflight.delete(conversationId)
-    return { ok: deleteConversation(conversationId) }
+    const ok = deleteConversation(conversationId)
+    if (ok) {
+      broadcastChatUpdated({ reason: 'deleted', conversationId })
+    }
+    return { ok }
   })
 
   ipcMain.handle(IpcChannels.CHAT_CANCEL, (_event, raw: unknown) => {
@@ -75,6 +98,11 @@ export function registerChatIpc(): void {
 
     // Persiste a mensagem do usuário antes da chamada ao modelo.
     let conversation = appendMessages(input.conversationId, [userMessage], title)
+    broadcastChatUpdated({
+      reason: 'updated',
+      conversationId: conversation.id,
+      conversation,
+    })
 
     const controller = new AbortController()
     inflight.set(input.conversationId, controller)
@@ -84,13 +112,20 @@ export function registerChatIpc(): void {
         .filter((m) => m.role === 'user' || m.role === 'assistant')
         .map((m) => ({ role: m.role, content: m.content }))
 
+      const messages = await enrichMessagesWithLocalFacts(history, controller.signal)
+
       const completion = await routeCompletion({
-        messages: history,
+        messages,
         signal: controller.signal,
       })
 
       const reply = makeMessage('assistant', completion.content, completion.model)
       conversation = appendMessages(input.conversationId, [reply])
+      broadcastChatUpdated({
+        reason: 'updated',
+        conversationId: conversation.id,
+        conversation,
+      })
 
       return {
         conversation,

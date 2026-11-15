@@ -51,6 +51,13 @@ export type ChatSendResult = {
   model: string
 }
 
+/** Evento de sync entre Floating Bar e Command Center. */
+export type ChatUpdatedEvent = {
+  reason: 'created' | 'updated' | 'deleted'
+  conversationId: string
+  conversation?: Conversation
+}
+
 export type VoiceModelId = 'base'
 
 export type VoiceStatus = {

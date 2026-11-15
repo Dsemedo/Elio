@@ -7,6 +7,7 @@ import type {
   ChatSendInput,
   ChatSendResult,
   ChatStatus,
+  ChatUpdatedEvent,
   Conversation,
   ConversationSummary,
   ProviderKind,
@@ -27,6 +28,7 @@ export type {
   ChatSendInput,
   ChatSendResult,
   ChatStatus,
+  ChatUpdatedEvent,
   Conversation,
   ConversationSummary,
   ProviderKind,
@@ -90,6 +92,12 @@ export const ChatCancelInputSchema = z.object({
 
 export const ConversationIdSchema = z.object({
   conversationId: z.string().min(1),
+})
+
+export const ChatUpdatedEventSchema = z.object({
+  reason: z.enum(['created', 'updated', 'deleted']),
+  conversationId: z.string().min(1),
+  conversation: ConversationSchema.optional(),
 })
 
 export const VoiceStatusSchema = z.object({
