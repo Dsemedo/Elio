@@ -11,17 +11,24 @@ import {
 import { join } from 'node:path'
 import { IpcChannels } from '../../shared/channels'
 import { FocusTracker } from './focusTracker'
+import { resolveFocusLossBehavior } from './focusPolicy'
 
 const isDev = !app.isPackaged
+
+/** Dimensões alvo DS §3.2 — a janela é a própria barra (sem frame externo). */
+const BAR_W = 420
+const BAR_H = 58
+/** Altura extra só enquanto o menu HTML está aberto (fundo transparente). */
+const BAR_OVERLAY_H = 240
 
 export type ShellSurface = 'bar' | 'panel'
 
 /**
- * Shell Fatia A: barrinha overlay (~20% largura) + painel completo.
- * - Barra always-on-top quando visível
- * - Clique na barra abre/fecha o painel
- * - Some (best-effort) quando outro app está em foco
- * - Volta via bandeja do sistema (atalho global = OD-20, ainda aberto)
+ * Shell: Floating Bar always-on-top + Command Center.
+ * - Barra preenche a BrowserWindow (~420×58); sem chrome/padding externo
+ * - Perda de foco: painel pode recolher; barra permanece (DS / feedback Douglas)
+ * - Ocultar barra: só menu/bandeja (ou preferência futura hideBarOnBlur)
+ * - Voltar barra oculta: bandeja (atalho global = OD-20)
  */
 export class ShellManager {
   private bar: BrowserWindow | null = null
@@ -29,14 +36,11 @@ export class ShellManager {
   private tray: Tray | null = null
   private panelOpen = false
   private hiddenByFocus = false
-  /**
-   * Só esconde por foco depois que o usuário interagiu com o Elio.
-   * Evita sumir na abertura enquanto o terminal/IDE ainda está na frente.
-   */
-  private engaged = false
   private blurHideTimer: ReturnType<typeof setTimeout> | null = null
   private readonly focus = new FocusTracker()
   private quitting = false
+  /** Preferência futura; default false = barra fica no desktop. */
+  private hideBarOnBlur = false
 
   start(): void {
     app.on('before-quit', () => {
@@ -81,7 +85,6 @@ export class ShellManager {
   }
 
   openPanel(): void {
-    this.markEngaged()
     this.hiddenByFocus = false
     this.showBar()
     if (!this.panel || this.panel.isDestroyed()) {
@@ -105,7 +108,6 @@ export class ShellManager {
 
   /** Mostra barra (e painel se estava aberto). Usado pela bandeja. */
   showShell(): void {
-    this.markEngaged()
     this.hiddenByFocus = false
     this.showBar()
     if (this.panelOpen) {
@@ -116,15 +118,26 @@ export class ShellManager {
     this.broadcastShellState()
   }
 
-  private markEngaged(): void {
-    this.engaged = true
-  }
-
   hideShell(): void {
     this.clearBlurTimer()
+    this.setBarOverlay(false)
     if (this.bar && !this.bar.isDestroyed()) this.bar.hide()
     if (this.panel && !this.panel.isDestroyed()) this.panel.hide()
     this.broadcastShellState()
+  }
+
+  /**
+   * Expande a janela da barra só para overlays (menu).
+   * Fundo continua transparente — sem “moldura” preta.
+   */
+  setBarOverlay(open: boolean): void {
+    if (!this.bar || this.bar.isDestroyed()) return
+    const bounds = this.bar.getBounds()
+    const height = open ? BAR_OVERLAY_H : BAR_H
+    this.bar.setBounds(
+      { x: bounds.x, y: bounds.y, width: BAR_W, height },
+      false,
+    )
   }
 
   private windows(): BrowserWindow[] {
@@ -134,21 +147,17 @@ export class ShellManager {
   }
 
   private createBar(): void {
-    // DS §3.2: pill 420×58, 12px do topo, centralizada.
-    // Janela um pouco maior para sombra CSS sem clip.
     const { width: screenW } = screen.getPrimaryDisplay().workAreaSize
-    const barW = 440
-    const barH = 96
-    const x = Math.round((screenW - barW) / 2)
+    const x = Math.round((screenW - BAR_W) / 2)
     const y = 12
 
     this.bar = new BrowserWindow({
-      width: barW,
-      height: barH,
+      width: BAR_W,
+      height: BAR_H,
       x,
       y,
-      minWidth: 360,
-      maxWidth: 580,
+      minWidth: 340,
+      maxWidth: 560,
       frame: false,
       transparent: true,
       resizable: false,
@@ -157,7 +166,7 @@ export class ShellManager {
       fullscreenable: false,
       skipTaskbar: true,
       alwaysOnTop: true,
-      hasShadow: false,
+      hasShadow: true,
       show: false,
       title: 'Elio',
       backgroundColor: '#00000000',
@@ -175,10 +184,10 @@ export class ShellManager {
     this.loadSurface(this.bar, 'bar')
 
     this.bar.on('ready-to-show', () => {
-      if (!this.hiddenByFocus) this.bar?.showInactive()
+      this.bar?.showInactive()
     })
 
-    this.bar.on('blur', () => this.scheduleHideIfUnfocused())
+    this.bar.on('blur', () => this.scheduleFocusLoss())
     this.bar.on('focus', () => {
       this.hiddenByFocus = false
       this.clearBlurTimer()
@@ -204,7 +213,7 @@ export class ShellManager {
       minHeight: 520,
       show: false,
       title: 'Elio',
-      backgroundColor: '#0c1222',
+      backgroundColor: '#101216',
       autoHideMenuBar: true,
       webPreferences: {
         preload: join(__dirname, '../preload/index.cjs'),
@@ -222,7 +231,7 @@ export class ShellManager {
       event.preventDefault()
       this.closePanel()
     })
-    this.panel.on('blur', () => this.scheduleHideIfUnfocused())
+    this.panel.on('blur', () => this.scheduleFocusLoss())
     this.panel.on('focus', () => {
       this.hiddenByFocus = false
       this.clearBlurTimer()
@@ -336,20 +345,19 @@ export class ShellManager {
     return nativeImage.createFromBitmap(buf, { width: size, height: size })
   }
 
-  private scheduleHideIfUnfocused(): void {
+  private scheduleFocusLoss(): void {
     this.clearBlurTimer()
     // Debounce: clique barra→painel / troca entre janelas do Elio.
     this.blurHideTimer = setTimeout(() => {
-      if (!this.engaged || this.quitting) return
+      if (this.quitting) return
       const anyFocused = this.windows().some((w) => w.isFocused())
       if (anyFocused) return
 
       const fg = this.focus.getState().foregroundIsElio
-      // Windows: some se FG não é Elio. Se FG desconhecido, some no blur (best-effort).
+      // Windows: se FG ainda é Elio, não age. Se FG desconhecido, age no blur.
       if (process.platform === 'win32' && fg === true) return
 
-      this.hiddenByFocus = true
-      this.hideShell()
+      this.applyFocusLoss()
     }, 280)
   }
 
@@ -360,22 +368,43 @@ export class ShellManager {
     if (this.quitting) return
 
     if (state.elioFocused) {
-      this.markEngaged()
       this.hiddenByFocus = false
       this.clearBlurTimer()
       return
     }
 
-    // Só esconde via polling depois que o usuário já usou o Elio.
     if (
-      this.engaged &&
       process.platform === 'win32' &&
       state.foregroundIsElio === false &&
       !state.elioFocused
     ) {
+      this.applyFocusLoss()
+    }
+  }
+
+  /** Aplica política de perda de foco (default: só recolhe o Command Center). */
+  private applyFocusLoss(): void {
+    this.setBarOverlay(false)
+    const behavior = resolveFocusLossBehavior({
+      hideBarOnBlur: this.hideBarOnBlur,
+    })
+
+    if (behavior === 'hide-all') {
       this.hiddenByFocus = true
       this.hideShell()
+      return
     }
+
+    // keep-bar-hide-panel (default DS)
+    this.hiddenByFocus = false
+    if (this.isPanelOpen()) {
+      this.closePanel()
+    }
+    // Garante barra visível mesmo se algum caminho a escondeu.
+    if (this.bar && !this.bar.isDestroyed() && !this.bar.isVisible()) {
+      this.bar.showInactive()
+    }
+    this.broadcastShellState()
   }
 
   private clearBlurTimer(): void {

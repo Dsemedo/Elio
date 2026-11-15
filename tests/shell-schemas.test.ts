@@ -4,6 +4,7 @@ import { IpcChannels, ShellStateSchema, SystemSnapshotSchema } from '../src/shar
 describe('shell IPC schemas', () => {
   it('expõe canais da shell e do sistema', () => {
     expect(IpcChannels.SHELL_TOGGLE_PANEL).toBe('shell:togglePanel')
+    expect(IpcChannels.SHELL_SET_BAR_OVERLAY).toBe('shell:setBarOverlay')
     expect(IpcChannels.SHELL_STATE_CHANGED).toBe('shell:stateChanged')
     expect(IpcChannels.SYSTEM_GET_SNAPSHOT).toBe('system:getSnapshot')
   })
