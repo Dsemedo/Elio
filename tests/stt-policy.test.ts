@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
+  extractWindowsSpeechErrorCode,
   parseSttPreference,
   resolveSttBackend,
   shouldFallbackToWhisper,
+  windowsSpeechUserMessage,
 } from '../src/shared/sttPolicy'
 
 describe('parseSttPreference', () => {
@@ -72,14 +74,39 @@ describe('resolveSttBackend', () => {
 })
 
 describe('shouldFallbackToWhisper', () => {
-  it('não cai no Whisper se permissão negada', () => {
-    expect(shouldFallbackToWhisper('not-allowed')).toBe(false)
-    expect(shouldFallbackToWhisper('service-not-allowed')).toBe(false)
+  it('cai no Whisper também se permissão negada (PTT continua útil)', () => {
+    expect(shouldFallbackToWhisper('not-allowed')).toBe(true)
+    expect(shouldFallbackToWhisper('service-not-allowed')).toBe(true)
   })
 
   it('cai no Whisper em erros recuperáveis / vazio', () => {
     expect(shouldFallbackToWhisper('network')).toBe(true)
     expect(shouldFallbackToWhisper('audio-capture')).toBe(true)
     expect(shouldFallbackToWhisper(null)).toBe(true)
+  })
+})
+
+describe('extractWindowsSpeechErrorCode', () => {
+  it('extrai código após o prefixo', () => {
+    expect(extractWindowsSpeechErrorCode('WINDOWS_SPEECH_ERROR:not-allowed')).toBe(
+      'not-allowed',
+    )
+    expect(extractWindowsSpeechErrorCode('WINDOWS_SPEECH_ERROR:service-not-allowed')).toBe(
+      'service-not-allowed',
+    )
+  })
+})
+
+describe('windowsSpeechUserMessage', () => {
+  it('não vaza código cru not-allowed', () => {
+    const msg = windowsSpeechUserMessage(new Error('WINDOWS_SPEECH_ERROR:not-allowed'))
+    expect(msg.toLowerCase()).not.toContain('windows_speech_error')
+    expect(msg.toLowerCase()).not.toContain('not-allowed')
+    expect(msg).toMatch(/permissão|microfone|fala|windows/i)
+  })
+
+  it('mensagem curta o bastante para a barra', () => {
+    const msg = windowsSpeechUserMessage(new Error('WINDOWS_SPEECH_ERROR:not-allowed'))
+    expect(msg.length).toBeLessThan(120)
   })
 })

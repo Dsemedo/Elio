@@ -1,7 +1,7 @@
 # Elio
 
 Assistente pessoal de IA para desktop (**JARVIS MVP**).  
-**v0.12.0** — instalador NSIS + auto-update (GitHub Releases); Windows Speech STT + Whisper fallback; Spotify PKCE.
+**v0.12.1** — corrige `not-allowed` do Windows Speech (permissão media + fallback Whisper); 0.12.0 trouxe NSIS + auto-update.
 
 Spec UI: [`docs/elio-design-system.md`](./docs/elio-design-system.md) · ADRs: [`docs/ADRs/`](./docs/ADRs/) · Distribuição: [`docs/windows-distribution.md`](./docs/windows-distribution.md)
 
@@ -39,15 +39,24 @@ npm run ensure:electron
 npm run dev
 ```
 
-### O que Douglas deve ver (0.12.0)
+### O que Douglas deve ver (0.12.1)
 
-1. Selo **v0.12.0**  
-2. `npm run dist:win` gera `dist\Elio-0.12.0-Setup.exe`; instalar e abrir pelo atalho  
+1. Selo **v0.12.1**  
+2. `npm run dist:win` gera `dist\Elio-0.12.1-Setup.exe`; instalar e abrir pelo atalho  
 3. Floating Bar: segurar mic → falar PT-BR → **envia sozinho** (sem tela de conferir/editar)  
 4. STT usa **Windows Speech** (sem baixar Whisper na 1ª vez)  
-5. Se o Windows Speech falhar: cai no **Whisper** (pode baixar ~466 MB na 1ª vez do fallback)  
-6. **“toca uma música no Spotify”** → abre o Spotify; se conectado + Premium → play remoto  
-7. **“como está o tempo?”** → localização → clima da **sua cidade**
+5. Se o Windows Speech falhar (incl. permissão): cai no **Whisper** e mostra **“Usando Whisper…”** (pode baixar ~466 MB na 1ª vez do fallback)  
+6. Erro de permissão em PT — **não** `WINDOWS_SPEECH_ERROR:not-allowed`  
+7. **“toca uma música no Spotify”** → abre o Spotify; se conectado + Premium → play remoto  
+8. **“como está o tempo?”** → localização → clima da **sua cidade**
+
+### Microfone / fala no Windows (se aparecer permissão negada)
+
+1. **Configurações → Privacidade e segurança → Microfone** → ativar *Acesso ao microfone* e permitir apps de desktop  
+2. **Configurações → Hora e idioma → Fala** (ou *Speech*) → pacote de idioma **português (Brasil)** com reconhecimento de fala  
+3. Se o Windows perguntar na 1ª vez, **Permitir** microfone/fala para o Elio  
+4. Reinicie o Elio (`npm run dev`) e segure o mic de novo  
+5. Se ainda falhar: o Elio cai no Whisper sozinho nesse PTT (aguarde “Usando Whisper…”)
 
 ### Conectar Spotify (Windows)
 

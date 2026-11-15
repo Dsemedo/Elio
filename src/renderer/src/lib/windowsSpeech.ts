@@ -177,13 +177,4 @@ export async function startWindowsSpeech(opts?: {
   }
 }
 
-export function windowsSpeechErrorMessage(err: unknown): string {
-  const raw = err instanceof Error ? err.message : String(err)
-  if (raw.includes('not-allowed') || raw.includes('service-not-allowed')) {
-    return 'Sem permissão de microfone / fala do Windows. Libere nas configurações e tente de novo.'
-  }
-  if (raw.includes('WINDOWS_SPEECH_UNAVAILABLE')) {
-    return 'Reconhecimento de fala do Windows indisponível neste ambiente.'
-  }
-  return 'Falha no reconhecimento de fala do Windows.'
-}
+export { windowsSpeechUserMessage as windowsSpeechErrorMessage } from '@shared/sttPolicy'

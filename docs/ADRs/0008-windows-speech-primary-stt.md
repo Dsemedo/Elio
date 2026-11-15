@@ -31,3 +31,4 @@ Alternativas:
 - Qualidade PT-BR depende do pacote de idioma de fala do Windows (pt-BR).
 - Privacidade no caminho primário: áudio tratado pelo stack de fala do OS/Chromium no Windows (não enviamos a um servidor nosso). Whisper fallback continua 100% local.
 - ADR 0002 permanece válido para o **caminho Whisper** (subprocess); deixa de ser o STT default no produto Windows.
+- A sessão Electron deve conceder `media`/`microphone` (além de `geolocation`); um handler só-geo produz `not-allowed` no Speech. Em `not-allowed` / `service-not-allowed` o PTT **cai no Whisper** com feedback “Usando Whisper…”.
