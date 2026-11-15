@@ -261,7 +261,11 @@ export function ChatView({
             <span className="badge" title="Versão do Elio">
               v{appVersion}
             </span>
-            {lastModel ? <span className="badge">{lastModel}</span> : null}
+            {lastModel ? (
+              <span className="badge ai" title="Modelo de IA">
+                {lastModel}
+              </span>
+            ) : null}
             <span className="badge muted">
               {status.preferredProvider === 'none'
                 ? 'sem provedor'

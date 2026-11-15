@@ -1,4 +1,4 @@
-import { TopBar } from './components/TopBar'
+import { FloatingBar } from './components/FloatingBar'
 import { PanelShell } from './components/PanelShell'
 
 function resolveSurface(): 'bar' | 'panel' {
@@ -12,9 +12,9 @@ function resolveSurface(): 'bar' | 'panel' {
   return 'panel'
 }
 
-/** Entrada única: barrinha overlay ou painel completo (query ?surface=). */
+/** Entrada única: Floating Bar ou Command Center (?surface=). */
 export default function App(): React.JSX.Element {
   const surface = resolveSurface()
-  if (surface === 'bar') return <TopBar />
+  if (surface === 'bar') return <FloatingBar />
   return <PanelShell />
 }

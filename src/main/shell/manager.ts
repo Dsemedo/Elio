@@ -134,17 +134,21 @@ export class ShellManager {
   }
 
   private createBar(): void {
+    // DS §3.2: pill 420×58, 12px do topo, centralizada.
+    // Janela um pouco maior para sombra CSS sem clip.
     const { width: screenW } = screen.getPrimaryDisplay().workAreaSize
-    const barW = Math.max(220, Math.round(screenW * 0.2))
-    const barH = 44
+    const barW = 440
+    const barH = 96
     const x = Math.round((screenW - barW) / 2)
-    const y = 10
+    const y = 12
 
     this.bar = new BrowserWindow({
       width: barW,
       height: barH,
       x,
       y,
+      minWidth: 360,
+      maxWidth: 580,
       frame: false,
       transparent: true,
       resizable: false,
