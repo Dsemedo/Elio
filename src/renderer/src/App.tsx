@@ -6,10 +6,12 @@ import type {
 } from '@shared/ipc'
 import { ChatView } from './components/ChatView'
 
+/** App sempre sobe no chat. A tela “Fundação” do Sprint 0 não existe mais. */
 export default function App(): React.JSX.Element {
   const [status, setStatus] = useState<ChatStatus | null>(null)
   const [summaries, setSummaries] = useState<ConversationSummary[]>([])
   const [active, setActive] = useState<Conversation | null>(null)
+  const [appVersion, setAppVersion] = useState<string | null>(null)
   const [bootError, setBootError] = useState<string | null>(null)
 
   const refreshList = useCallback(async () => {
@@ -26,13 +28,15 @@ export default function App(): React.JSX.Element {
         return
       }
       try {
-        const [chatStatus, list] = await Promise.all([
+        const [chatStatus, list, info] = await Promise.all([
           window.elio.getChatStatus(),
           window.elio.listConversations(),
+          window.elio.getAppInfo(),
         ])
         if (cancelled) return
         setStatus(chatStatus)
         setSummaries(list)
+        setAppVersion(info.version)
 
         if (list[0]) {
           const first = await window.elio.getConversation(list[0].id)
@@ -94,7 +98,7 @@ export default function App(): React.JSX.Element {
     )
   }
 
-  if (!active || !status) {
+  if (!active || !status || !appVersion) {
     return (
       <main className="shell shell-center">
         <p className="lede">Carregando o Elio…</p>
@@ -105,6 +109,7 @@ export default function App(): React.JSX.Element {
   return (
     <ChatView
       status={status}
+      appVersion={appVersion}
       summaries={summaries}
       conversation={active}
       onConversationChange={async (next) => {

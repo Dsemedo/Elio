@@ -11,16 +11,34 @@ Produto: **Elio**. Agora com **conversa por texto** (Ollama local → OpenRouter
 
 ## Como rodar (Windows)
 
-No PowerShell, na pasta do projeto:
+Pasta correta (só uma cópia): `C:\Users\Douglas\Elio`  
+Não use outro clone em Downloads, Desktop ou OneDrive.
 
-```bat
+No PowerShell, **nessa** pasta:
+
+```powershell
+git restore package-lock.json
+git checkout main
 git pull
 npm install
 npm run ensure:electron
 npm run dev
 ```
 
-Deve abrir a janela **Elio** com a tela de chat.
+(`git restore` descarta mudança local no lockfile que impede o `checkout`. Se quiser guardar a mudança: `git stash push -m "lock" -- package-lock.json` em vez de `restore`.)
+
+Deve abrir a janela **Elio** com a tela de chat e o selo **v0.2.0** no canto do cabeçalho.
+
+### Se ainda aparecer “FUNDAÇÃO · BASE DO APP”
+
+Você **não** está no `main` atual (ou está abrindo um `.exe` antigo). Cole no PowerShell e mande o resultado:
+
+```powershell
+git status; git rev-parse HEAD; git log -1 --oneline; git branch -vv
+```
+
+Confirme: branch `main`, último commit fala de chat / PR #2 (ou versão 0.2.0).  
+Feche atalhos/instaladores em `dist\` / `release\` — use só `npm run dev`.
 
 ### Testar o chat
 
