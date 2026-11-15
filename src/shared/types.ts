@@ -51,7 +51,7 @@ export type ChatSendResult = {
   model: string
 }
 
-export type VoiceModelId = 'tiny'
+export type VoiceModelId = 'base'
 
 export type VoiceStatus = {
   ready: boolean

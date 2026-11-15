@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync } from 'node:fs'
 import { join, resolve, sep } from 'node:path'
 import { app } from 'electron'
-import { MODEL_FILE, binaryFileName } from './constants'
+import { LEGACY_MODEL_FILE, MODEL_FILE, binaryFileName } from './constants'
 
 /**
  * Tudo sob userData (OD-18). Paths nunca são expostos ao renderer.
@@ -24,6 +24,15 @@ export function whisperTempDir(): string {
 
 export function modelPath(): string {
   return join(whisperModelDir(), MODEL_FILE)
+}
+
+/** Modelo tiny antigo — só para UX de migração; não é usado na transcrição. */
+export function legacyModelPath(): string {
+  return join(whisperModelDir(), LEGACY_MODEL_FILE)
+}
+
+export function hasLegacyTinyModel(): boolean {
+  return existsSync(legacyModelPath())
 }
 
 export function binaryPath(): string {

@@ -73,6 +73,8 @@ describe('WAV PCM para Whisper', () => {
       'utf8',
     )
     expect(src).toContain("WHISPER_RELEASE = 'v1.9.2'")
-    expect(src).toContain("MODEL_FILE = 'ggml-tiny.bin'")
+    expect(src).toContain("MODEL_ID = 'base'")
+    expect(src).toContain("MODEL_FILE = 'ggml-base.bin'")
+    expect(src).toContain("LEGACY_MODEL_FILE = 'ggml-tiny.bin'")
   })
 })

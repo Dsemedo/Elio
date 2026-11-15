@@ -4,7 +4,7 @@ import {
   VoiceTranscribeInputSchema,
   type VoiceStatus,
 } from '../../shared/ipc'
-import { MODEL_ID, WHISPER_RELEASE } from '../services/voice/constants'
+import { MODEL_ID, MODEL_SIZE_HINT_MB, WHISPER_RELEASE } from '../services/voice/constants'
 import { ensureVoiceAssets, voiceAssetsStatus } from '../services/voice/download'
 import { friendlyVoiceError } from '../services/voice/errors'
 import { transcribeWavBase64 } from '../services/voice/transcribe'
@@ -27,8 +27,8 @@ function toVoiceStatus(): VoiceStatus {
     supported:
       process.platform === 'win32' || process.platform === 'linux',
     hint: assets.ready
-      ? 'Voz pronta — segure o microfone e fale.'
-      : 'Na primeira vez a gente baixa o Whisper (~80 MB). Precisa de internet uma vez.',
+      ? 'Voz pronta — segure o microfone e fale (envia ao chat).'
+      : `Na primeira vez a gente baixa o Whisper (~${MODEL_SIZE_HINT_MB} MB, modelo base). Precisa de internet uma vez.`,
   }
 }
 

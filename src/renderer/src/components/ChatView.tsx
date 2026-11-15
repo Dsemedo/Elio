@@ -27,7 +27,7 @@ type Props = {
   onStatusRefresh: () => Promise<void>
 }
 
-type VoiceUiState = 'idle' | 'preparing' | 'recording' | 'transcribing'
+type VoiceUiState = 'idle' | 'preparing' | 'recording' | 'transcribing' | 'thinking'
 
 export function ChatView({
   status,
@@ -77,11 +77,12 @@ export function ChatView({
     }
   }, [])
 
-  const send = async (): Promise<void> => {
-    const content = draft.trim()
+  const sendContent = async (raw: string): Promise<void> => {
+    const content = raw.trim()
     if (!content || busy) return
 
     setBusy(true)
+    setVoiceUi('thinking')
     setError(null)
     setDraft('')
 
@@ -103,8 +104,13 @@ export function ChatView({
       }
     } finally {
       setBusy(false)
+      setVoiceUi('idle')
       inputRef.current?.focus()
     }
+  }
+
+  const send = async (): Promise<void> => {
+    await sendContent(draft)
   }
 
   const cancel = async (): Promise<void> => {
@@ -144,7 +150,14 @@ export function ChatView({
   }
 
   const beginTalk = async (): Promise<void> => {
-    if (busy || voiceUi === 'recording' || voiceUi === 'transcribing') return
+    if (
+      busy ||
+      voiceUi === 'recording' ||
+      voiceUi === 'transcribing' ||
+      voiceUi === 'thinking'
+    ) {
+      return
+    }
     setError(null)
 
     const ready = await ensureVoiceReady()
@@ -178,31 +191,42 @@ export function ChatView({
 
       const audioBase64 = await recorder.stop()
       const { text } = await window.elio.transcribeVoice({ audioBase64 })
-      setDraft((prev) => {
-        const trimmed = prev.trim()
-        return trimmed ? `${trimmed} ${text}` : text
-      })
+      const trimmed = text.trim()
+      if (!trimmed) {
+        setError('Não deu para entender — tente falar de novo.')
+        setVoiceUi('idle')
+        setVoiceProgress(null)
+        return
+      }
       setVoiceStatus(await window.elio.getVoiceStatus())
-      inputRef.current?.focus()
+      setVoiceProgress(null)
+      // Junta com rascunho e envia — ouvindo → transcrevendo → pensando.
+      const existing = draft.trim()
+      const content = existing ? `${existing} ${trimmed}` : trimmed
+      await sendContent(content)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Falha na transcrição')
-    } finally {
       setVoiceUi('idle')
       setVoiceProgress(null)
     }
   }
 
-  const voiceBusy = voiceUi === 'preparing' || voiceUi === 'transcribing'
+  const voiceBusy =
+    voiceUi === 'preparing' ||
+    voiceUi === 'transcribing' ||
+    voiceUi === 'thinking'
   const micLabel =
     voiceUi === 'recording'
-      ? 'Solte para transcrever'
+      ? 'Solte para enviar'
       : voiceUi === 'preparing'
         ? 'Preparando voz…'
         : voiceUi === 'transcribing'
           ? 'Transcrevendo…'
-          : voiceStatus?.ready
-            ? 'Segure para falar'
-            : 'Segure para falar (baixa Whisper na 1ª vez)'
+          : voiceUi === 'thinking'
+            ? 'Pensando…'
+            : voiceStatus?.ready
+              ? 'Segure para falar (envia ao chat)'
+              : 'Segure para falar (baixa Whisper na 1ª vez)'
 
   return (
     <div className={showSidebar ? 'chat-app' : 'chat-app chat-app-solo'}>
@@ -284,8 +308,9 @@ export function ChatView({
             <div className="empty-state">
               <p className="empty-title">Olá — sou o Elio.</p>
               <p>
-                Escreva ou use o microfone. Na primeira vez a voz baixa o Whisper (~80 MB,
-                uma vez). O áudio fica só neste PC.
+                Escreva ou use o microfone. Ao soltar o mic, o texto vai direto ao chat.
+                Na primeira vez a voz baixa o Whisper (~150 MB, modelo base). O áudio fica
+                só neste PC.
               </p>
             </div>
           ) : null}
@@ -338,9 +363,9 @@ export function ChatView({
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={onKeyDown}
-            placeholder="Escreva ou segure o microfone… (Enter envia)"
+            placeholder="Escreva ou segure o microfone… (voz envia sozinha)"
             rows={3}
-            disabled={busy || voiceUi === 'recording'}
+            disabled={busy || voiceUi === 'recording' || voiceUi === 'transcribing'}
           />
           <div className="composer-actions">
             {!voiceStatus?.ready ? (
@@ -374,10 +399,12 @@ export function ChatView({
               }}
             >
               {voiceUi === 'recording'
-                ? 'Gravando…'
+                ? 'Ouvindo…'
                 : voiceUi === 'transcribing'
                   ? 'Transcrevendo…'
-                  : 'Falar'}
+                  : voiceUi === 'thinking'
+                    ? 'Pensando…'
+                    : 'Falar'}
             </button>
             {busy ? (
               <button type="button" className="btn ghost" onClick={() => void cancel()}>
