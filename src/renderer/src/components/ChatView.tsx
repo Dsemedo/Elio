@@ -6,7 +6,11 @@ import type {
   VoiceProgress,
   VoiceStatus,
 } from '@shared/ipc'
-import { micPermissionMessage, startMicRecording, type MicRecorder } from '../lib/recordWav'
+import {
+  micPermissionMessage,
+  startMicRecording,
+  type MicRecorder,
+} from '../lib/recordWav'
 
 type Props = {
   status: ChatStatus
@@ -14,6 +18,8 @@ type Props = {
   appVersion: string
   summaries: ConversationSummary[]
   conversation: Conversation
+  /** Sidebar de threads; no painel shell o Histórico cobre isso. */
+  showSidebar?: boolean
   onConversationChange: (conversation: Conversation) => Promise<void>
   onSelect: (id: string) => Promise<void>
   onNew: () => Promise<void>
@@ -28,6 +34,7 @@ export function ChatView({
   appVersion,
   summaries,
   conversation,
+  showSidebar = true,
   onConversationChange,
   onSelect,
   onNew,
@@ -198,39 +205,41 @@ export function ChatView({
             : 'Segure para falar (baixa Whisper na 1ª vez)'
 
   return (
-    <div className="chat-app">
-      <aside className="sidebar">
-        <div className="sidebar-brand">
-          <span className="sidebar-logo">Elio</span>
-          <button type="button" className="btn ghost" onClick={() => void onNew()}>
-            Nova
-          </button>
-        </div>
-        <ul className="thread-list">
-          {summaries.map((item) => (
-            <li key={item.id}>
-              <button
-                type="button"
-                className={
-                  item.id === conversation.id ? 'thread-item active' : 'thread-item'
-                }
-                onClick={() => void onSelect(item.id)}
-              >
-                <span className="thread-title">{item.title}</span>
-                <span className="thread-meta">{item.messageCount} msgs</span>
-              </button>
-              <button
-                type="button"
-                className="thread-delete"
-                title="Excluir conversa"
-                onClick={() => void onDelete(item.id)}
-              >
-                ×
-              </button>
-            </li>
-          ))}
-        </ul>
-      </aside>
+    <div className={showSidebar ? 'chat-app' : 'chat-app chat-app-solo'}>
+      {showSidebar ? (
+        <aside className="sidebar">
+          <div className="sidebar-brand">
+            <span className="sidebar-logo">Elio</span>
+            <button type="button" className="btn ghost" onClick={() => void onNew()}>
+              Nova
+            </button>
+          </div>
+          <ul className="thread-list">
+            {summaries.map((item) => (
+              <li key={item.id}>
+                <button
+                  type="button"
+                  className={
+                    item.id === conversation.id ? 'thread-item active' : 'thread-item'
+                  }
+                  onClick={() => void onSelect(item.id)}
+                >
+                  <span className="thread-title">{item.title}</span>
+                  <span className="thread-meta">{item.messageCount} msgs</span>
+                </button>
+                <button
+                  type="button"
+                  className="thread-delete"
+                  title="Excluir conversa"
+                  onClick={() => void onDelete(item.id)}
+                >
+                  ×
+                </button>
+              </li>
+            ))}
+          </ul>
+        </aside>
+      ) : null}
 
       <section className="chat-main">
         <header className="chat-header">
@@ -239,13 +248,16 @@ export function ChatView({
             <p className="status-hint">{status.hint}</p>
             {voiceStatus ? (
               <p className="status-hint voice-hint">
-                {voiceStatus.ready
-                  ? 'Voz pronta (Whisper local).'
-                  : voiceStatus.hint}
+                {voiceStatus.ready ? 'Voz pronta (Whisper local).' : voiceStatus.hint}
               </p>
             ) : null}
           </div>
           <div className="header-badges">
+            {!showSidebar ? (
+              <button type="button" className="btn ghost" onClick={() => void onNew()}>
+                Nova
+              </button>
+            ) : null}
             <span className="badge" title="Versão do Elio">
               v{appVersion}
             </span>
@@ -268,8 +280,8 @@ export function ChatView({
             <div className="empty-state">
               <p className="empty-title">Olá — sou o Elio.</p>
               <p>
-                Escreva ou use o microfone. Na primeira vez a voz baixa o Whisper
-                (~80 MB, uma vez). O áudio fica só neste PC.
+                Escreva ou use o microfone. Na primeira vez a voz baixa o Whisper (~80 MB,
+                uma vez). O áudio fica só neste PC.
               </p>
             </div>
           ) : null}
@@ -339,9 +351,7 @@ export function ChatView({
             ) : null}
             <button
               type="button"
-              className={
-                voiceUi === 'recording' ? 'btn mic recording' : 'btn mic'
-              }
+              className={voiceUi === 'recording' ? 'btn mic recording' : 'btn mic'}
               disabled={busy || voiceBusy}
               aria-pressed={voiceUi === 'recording'}
               title={micLabel}

@@ -10,6 +10,8 @@ import type {
   Conversation,
   ConversationSummary,
   ProviderKind,
+  ShellState,
+  SystemSnapshot,
   VoiceProgress,
   VoiceStatus,
   VoiceTranscribeInput,
@@ -28,6 +30,8 @@ export type {
   Conversation,
   ConversationSummary,
   ProviderKind,
+  ShellState,
+  SystemSnapshot,
   VoiceProgress,
   VoiceStatus,
   VoiceTranscribeInput,
@@ -111,4 +115,38 @@ export const VoiceTranscribeInputSchema = z.object({
 
 export const VoiceTranscribeResultSchema = z.object({
   text: z.string(),
+})
+
+export const ShellStateSchema = z.object({
+  panelOpen: z.boolean(),
+  barVisible: z.boolean(),
+  hiddenByFocus: z.boolean(),
+})
+
+export const SystemSnapshotSchema = z.object({
+  platform: z.enum([
+    'aix',
+    'android',
+    'darwin',
+    'freebsd',
+    'haiku',
+    'linux',
+    'openbsd',
+    'sunos',
+    'win32',
+    'cygwin',
+    'netbsd',
+  ]),
+  release: z.string(),
+  arch: z.string(),
+  hostname: z.string(),
+  uptimeSec: z.number().nonnegative(),
+  totalMemBytes: z.number().nonnegative(),
+  freeMemBytes: z.number().nonnegative(),
+  usedMemBytes: z.number().nonnegative(),
+  memUsedPercent: z.number().min(0).max(100),
+  cpuModel: z.string(),
+  cpuCount: z.number().int().positive(),
+  cpuLoadPercent: z.number().min(0).max(100).nullable(),
+  note: z.string(),
 })
