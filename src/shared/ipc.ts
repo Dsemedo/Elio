@@ -15,6 +15,7 @@ import type {
   SystemSnapshot,
   AppLocation,
   LocationSaveOsInput,
+  SttPreference,
   VoiceProgress,
   VoiceStatus,
   VoiceTranscribeInput,
@@ -38,6 +39,7 @@ export type {
   SystemSnapshot,
   AppLocation,
   LocationSaveOsInput,
+  SttPreference,
   VoiceProgress,
   VoiceStatus,
   VoiceTranscribeInput,
@@ -114,6 +116,8 @@ export const VoiceStatusSchema = z.object({
   whisperVersion: z.string().min(1),
   supported: z.boolean(),
   hint: z.string(),
+  sttPreference: z.enum(['auto', 'windows-speech', 'whisper']),
+  platform: z.string().min(1),
 })
 
 export const AppLocationSchema = z.object({

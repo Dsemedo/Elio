@@ -7,6 +7,7 @@ import {
 import { WHISPER_RELEASE, resolveWhisperModel } from '../services/voice/constants'
 import { ensureVoiceAssets, voiceAssetsStatus } from '../services/voice/download'
 import { friendlyVoiceError, logVoiceError } from '../services/voice/errors'
+import { readSttPreferenceFromEnv } from '../services/voice/sttPreference'
 import { transcribeWavBase64 } from '../services/voice/transcribe'
 import type { VoiceProgress } from '../../shared/types'
 
@@ -19,6 +20,8 @@ function broadcastProgress(progress: VoiceProgress): void {
 function toVoiceStatus(): VoiceStatus {
   const assets = voiceAssetsStatus()
   const model = resolveWhisperModel()
+  const sttPreference = readSttPreferenceFromEnv()
+  const onWindows = process.platform === 'win32'
   return {
     ready: assets.ready,
     binaryReady: assets.binaryReady,
@@ -27,9 +30,16 @@ function toVoiceStatus(): VoiceStatus {
     whisperVersion: WHISPER_RELEASE,
     supported:
       process.platform === 'win32' || process.platform === 'linux',
-    hint: assets.ready
-      ? 'Voz pronta — segure o microfone, confira o texto e envie.'
-      : `Na primeira vez a gente baixa o Whisper (~${model.sizeHintMb} MB, modelo ${model.id}). Precisa de internet uma vez.`,
+    sttPreference,
+    platform: process.platform,
+    hint: onWindows
+      ? assets.ready
+        ? 'Windows Speech primário; Whisper pronto como fallback offline.'
+        : 'Windows Speech primário (sem download). Whisper (~' +
+          `${model.sizeHintMb} MB) só se o Windows Speech falhar — “Preparar fallback” baixa agora.`
+      : assets.ready
+        ? 'Voz pronta (Whisper local) — segure o microfone e fale.'
+        : `Na primeira vez a gente baixa o Whisper (~${model.sizeHintMb} MB, modelo ${model.id}). Precisa de internet uma vez.`,
   }
 }
 

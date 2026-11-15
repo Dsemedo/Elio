@@ -24,8 +24,11 @@ describe('voice IPC contracts', () => {
       whisperVersion: 'v1.9.2',
       supported: true,
       hint: 'baixar',
+      sttPreference: 'auto',
+      platform: 'win32',
     })
     expect(status.modelId).toBe('small')
+    expect(status.sttPreference).toBe('auto')
   })
 
   it('expõe canais de localização', () => {
