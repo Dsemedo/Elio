@@ -10,6 +10,10 @@ import type {
   Conversation,
   ConversationSummary,
   ProviderKind,
+  VoiceProgress,
+  VoiceStatus,
+  VoiceTranscribeInput,
+  VoiceTranscribeResult,
 } from './types'
 
 export { IpcChannels }
@@ -24,6 +28,10 @@ export type {
   Conversation,
   ConversationSummary,
   ProviderKind,
+  VoiceProgress,
+  VoiceStatus,
+  VoiceTranscribeInput,
+  VoiceTranscribeResult,
 }
 
 export const ChatRoleSchema = z.enum(['user', 'assistant', 'system'])
@@ -78,4 +86,29 @@ export const ChatCancelInputSchema = z.object({
 
 export const ConversationIdSchema = z.object({
   conversationId: z.string().min(1),
+})
+
+export const VoiceStatusSchema = z.object({
+  ready: z.boolean(),
+  binaryReady: z.boolean(),
+  modelReady: z.boolean(),
+  modelId: z.literal('tiny'),
+  whisperVersion: z.string().min(1),
+  supported: z.boolean(),
+  hint: z.string(),
+})
+
+export const VoiceProgressSchema = z.object({
+  phase: z.enum(['binary', 'model', 'extract', 'idle']),
+  percent: z.number().min(0).max(100),
+  message: z.string(),
+})
+
+/** WAV PCM em base64 (sem data-URL obrigatória). Limite ~8 MB decodificados no main. */
+export const VoiceTranscribeInputSchema = z.object({
+  audioBase64: z.string().min(1).max(12_000_000),
+})
+
+export const VoiceTranscribeResultSchema = z.object({
+  text: z.string(),
 })

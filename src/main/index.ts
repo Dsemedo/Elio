@@ -2,6 +2,7 @@ import { app, BrowserWindow, Menu, ipcMain, shell } from 'electron'
 import { join } from 'node:path'
 import { IpcChannels, type AppInfo } from '../shared/ipc'
 import { registerChatIpc } from './ipc/chat'
+import { registerVoiceIpc } from './ipc/voice'
 
 const isDev = !app.isPackaged
 
@@ -63,6 +64,7 @@ function registerIpc(): void {
     platform: process.platform,
   }))
   registerChatIpc()
+  registerVoiceIpc()
 }
 
 app.whenReady().then(() => {

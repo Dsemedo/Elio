@@ -50,3 +50,29 @@ export type ChatSendResult = {
   provider: ProviderKind
   model: string
 }
+
+export type VoiceModelId = 'tiny'
+
+export type VoiceStatus = {
+  ready: boolean
+  binaryReady: boolean
+  modelReady: boolean
+  modelId: VoiceModelId
+  whisperVersion: string
+  supported: boolean
+  hint: string
+}
+
+export type VoiceProgress = {
+  phase: 'binary' | 'model' | 'extract' | 'idle'
+  percent: number
+  message: string
+}
+
+export type VoiceTranscribeInput = {
+  audioBase64: string
+}
+
+export type VoiceTranscribeResult = {
+  text: string
+}
