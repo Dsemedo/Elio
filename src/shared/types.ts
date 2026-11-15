@@ -1,8 +1,10 @@
 import type { BudgetSnapshot } from './aiBudget'
 import type { RouteTier } from './aiRoute'
 import type { SttPreference } from './sttPolicy'
+import type { TtsPreference } from './ttsPolicy'
 
 export type { BudgetSnapshot, RouteTier, SttPreference }
+export type { TtsPreference }
 
 export type AppInfo = {
   name: string
@@ -187,6 +189,34 @@ export type VoiceTranscribeInput = {
 
 export type VoiceTranscribeResult = {
   text: string
+}
+
+export type TtsSettings = {
+  enabled: boolean
+  provider: TtsPreference
+  edgeVoice: string
+  /** true se ELIO_TTS_* está sobrescrevendo o arquivo. */
+  envOverride: boolean
+  hint: string
+}
+
+export type TtsSetSettingsInput = {
+  enabled?: boolean
+  provider?: TtsPreference
+  edgeVoice?: string
+}
+
+export type TtsSynthesizeInput = {
+  text: string
+  /** Opcional — senão usa voz das prefs. */
+  voice?: string
+}
+
+export type TtsSynthesizeResult = {
+  audioBase64: string
+  mimeType: 'audio/mpeg'
+  voice: string
+  chars: number
 }
 
 export type ShellState = {

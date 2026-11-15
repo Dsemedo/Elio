@@ -26,6 +26,7 @@ import {
   startWindowsSpeech,
   type WindowsSpeechSession,
 } from '../lib/windowsSpeech'
+import { ttsController } from '../lib/ttsController'
 
 type Props = {
   status: ChatStatus
@@ -141,6 +142,7 @@ export function ChatView({
     setWhisperFallbackHint(false)
     setError(null)
     setDraft('')
+    void ttsController.stop()
 
     if (detectChatToolIntent(content).needsWeather) {
       try {
@@ -175,6 +177,10 @@ export function ChatView({
       stickToBottomRef.current = true
       await onConversationChange(result.conversation)
       await onStatusRefresh()
+      const replyText = result.reply.content.trim()
+      if (replyText) {
+        void ttsController.maybeSpeakAssistant(result.reply.id, replyText)
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Não foi possível responder')
       try {
@@ -195,6 +201,7 @@ export function ChatView({
   }
 
   const cancel = async (): Promise<void> => {
+    await ttsController.stop()
     await window.elio.cancelReply(conversation.id)
   }
 
@@ -387,9 +394,7 @@ export function ChatView({
   }
 
   const voiceBusy =
-    voiceUi === 'preparing' ||
-    voiceUi === 'transcribing' ||
-    voiceUi === 'thinking'
+    voiceUi === 'preparing' || voiceUi === 'transcribing' || voiceUi === 'thinking'
   const micLabel =
     voiceUi === 'recording'
       ? 'Solte para transcrever'

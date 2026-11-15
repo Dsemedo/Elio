@@ -175,6 +175,15 @@ textarea {
   background: #252b34;
 }
 
+.fb-shell.state-speaking {
+  border-color: rgba(114, 217, 192, 0.45);
+  background: #17201e;
+}
+
+.fb-shell.state-speaking .fb-logo-mark {
+  animation: elio-speak-pulse 1.2s ease-in-out infinite;
+}
+
 .fb-shell.state-error {
   border-color: rgba(231, 131, 131, 0.65);
   background: #1c181a;
@@ -475,6 +484,9 @@ textarea {
 }
 
 .fb-menu-pop button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
   text-align: left;
   border: 0;
   background: transparent;
@@ -506,6 +518,18 @@ textarea {
 @keyframes spin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+@keyframes elio-speak-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.55;
+    transform: scale(1.25);
   }
 }
 
@@ -1501,6 +1525,22 @@ textarea {
   display: grid;
   gap: 0.45rem;
   justify-items: start;
+}
+
+.integration-select {
+  display: grid;
+  gap: 0.25rem;
+  font-size: 0.78rem;
+  color: var(--elio-text-secondary);
+}
+
+.integration-select select {
+  font: inherit;
+  color: var(--elio-text);
+  background: var(--elio-bg);
+  border: 1px solid var(--elio-border);
+  border-radius: var(--elio-radius-sm);
+  padding: 0.35rem 0.5rem;
 }
 
 .integration-msg {

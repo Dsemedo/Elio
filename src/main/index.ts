@@ -6,6 +6,7 @@ import { registerMemoryIpc } from './ipc/memory'
 import { registerSettingsIpc } from './ipc/settings'
 import { registerShellIpc } from './ipc/shell'
 import { registerSpotifyIpc } from './ipc/spotify'
+import { registerTtsIpc } from './ipc/tts'
 import { registerVoiceIpc } from './ipc/voice'
 import { isAppPermissionAllowed } from './sessionPermissions'
 import { startAutoUpdater } from './services/updater'
@@ -20,6 +21,7 @@ function registerIpc(): void {
   }))
   registerChatIpc()
   registerVoiceIpc()
+  registerTtsIpc()
   registerShellIpc()
   registerLocationIpc()
   registerSpotifyIpc()

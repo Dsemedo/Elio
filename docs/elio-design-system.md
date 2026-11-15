@@ -197,7 +197,7 @@ A UI reflete o estado **real** do assistente. Não inventar execução/aprovaç�
 | LISTENING | Mic gravando (PTT) | **Accent**; indicador de áudio |
 | TRANSCRIBING | Whisper processando | **Accent** sutil |
 | THINKING | Chat aguardando modelo | **Neutro** (spinner / surface) — **não** roxo |
-| SPEAKING | TTS ativo (futuro) | Accent pulsante leve |
+| SPEAKING | TTS ativo (0.15.1) | Accent pulsante leve |
 | EXECUTING | Tool/ação no PC | **Estágio 2** — não fingir |
 | AWAITING_APPROVAL | Ação sensível pendente | **Estágio 2** — Warning quando existir |
 | ERROR | Falha real | Error |

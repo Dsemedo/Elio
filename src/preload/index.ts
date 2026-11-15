@@ -21,6 +21,10 @@ import type {
   SettingsUpdateInput,
   ShellState,
   SystemSnapshot,
+  TtsSetSettingsInput,
+  TtsSettings,
+  TtsSynthesizeInput,
+  TtsSynthesizeResult,
   VoiceProgress,
   VoiceStatus,
   VoiceTranscribeInput,
@@ -104,6 +108,27 @@ const elioApi = {
     ipcRenderer.on(IpcChannels.VOICE_PROGRESS, listener)
     return () => {
       ipcRenderer.removeListener(IpcChannels.VOICE_PROGRESS, listener)
+    }
+  },
+
+  getTtsSettings: (): Promise<TtsSettings> =>
+    ipcRenderer.invoke(IpcChannels.TTS_GET_SETTINGS),
+
+  setTtsSettings: (input: TtsSetSettingsInput): Promise<TtsSettings> =>
+    ipcRenderer.invoke(IpcChannels.TTS_SET_SETTINGS, input),
+
+  synthesizeTts: (input: TtsSynthesizeInput): Promise<TtsSynthesizeResult> =>
+    ipcRenderer.invoke(IpcChannels.TTS_SYNTHESIZE, input),
+
+  stopTts: (): Promise<{ ok: boolean }> => ipcRenderer.invoke(IpcChannels.TTS_STOP),
+
+  onTtsSettings: (handler: (settings: TtsSettings) => void): (() => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, settings: TtsSettings): void => {
+      handler(settings)
+    }
+    ipcRenderer.on(IpcChannels.TTS_SETTINGS_CHANGED, listener)
+    return () => {
+      ipcRenderer.removeListener(IpcChannels.TTS_SETTINGS_CHANGED, listener)
     }
   },
 
