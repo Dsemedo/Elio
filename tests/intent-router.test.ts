@@ -5,7 +5,7 @@ describe('classifyUserIntent — lanes A/B/C/D', () => {
   it('A: ação no PC (abrir site/pasta)', () => {
     const site = classifyUserIntent('abre o site da Exame')
     expect(site.lane).toBe('pc_action')
-    if (site.lane === 'pc_action') {
+    if (site.lane === 'pc_action' && site.action === 'desktop') {
       expect(site.desktop.kind).toBe('open_url')
       expect(site.confirmRisky).toBe(false)
     }
@@ -17,8 +17,16 @@ describe('classifyUserIntent — lanes A/B/C/D', () => {
   it('A: confirmação de path sensível', () => {
     const c = classifyUserIntent('confirma abrir .ssh')
     expect(c.lane).toBe('pc_action')
-    if (c.lane === 'pc_action') {
+    if (c.lane === 'pc_action' && c.action === 'desktop') {
       expect(c.confirmRisky).toBe(true)
+    }
+  })
+
+  it('A: Spotify play/connect', () => {
+    const play = classifyUserIntent('Elio, tocar música no Spotify')
+    expect(play.lane).toBe('pc_action')
+    if (play.lane === 'pc_action') {
+      expect(play.action).toBe('spotify')
     }
   })
 

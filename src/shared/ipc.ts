@@ -76,6 +76,8 @@ export const ChatStatusSchema = z.object({
   openRouterConfigured: z.boolean(),
   preferredProvider: ProviderKindSchema,
   hint: z.string(),
+  spotifyClientConfigured: z.boolean(),
+  spotifyConnected: z.boolean(),
 })
 
 export const ChatSendInputSchema = z.object({

@@ -32,6 +32,10 @@ export const IpcChannels = {
   LOCATION_GET: 'location:get',
   LOCATION_SAVE_OS: 'location:saveOs',
   LOCATION_ENSURE_IP_FALLBACK: 'location:ensureIpFallback',
+  /** OAuth PKCE Spotify — abre browser + loopback. */
+  SPOTIFY_CONNECT: 'spotify:connect',
+  SPOTIFY_DISCONNECT: 'spotify:disconnect',
+  SPOTIFY_STATUS: 'spotify:status',
 } as const
 
 export type IpcChannel = (typeof IpcChannels)[keyof typeof IpcChannels]

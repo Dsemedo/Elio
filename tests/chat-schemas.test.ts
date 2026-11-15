@@ -42,7 +42,10 @@ describe('chat IPC contracts', () => {
       openRouterConfigured: false,
       preferredProvider: 'none',
       hint: 'configure',
+      spotifyClientConfigured: false,
+      spotifyConnected: false,
     })
     expect(status.preferredProvider).toBe('none')
+    expect(status.spotifyConnected).toBe(false)
   })
 })

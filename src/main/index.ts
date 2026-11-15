@@ -3,6 +3,7 @@ import { IpcChannels, type AppInfo } from '../shared/ipc'
 import { registerChatIpc } from './ipc/chat'
 import { registerLocationIpc } from './ipc/location'
 import { registerShellIpc } from './ipc/shell'
+import { registerSpotifyIpc } from './ipc/spotify'
 import { registerVoiceIpc } from './ipc/voice'
 import { getShellManager } from './shell/manager'
 
@@ -17,6 +18,7 @@ function registerIpc(): void {
   registerVoiceIpc()
   registerShellIpc()
   registerLocationIpc()
+  registerSpotifyIpc()
 }
 
 /**

@@ -45,6 +45,10 @@ export function PanelShell(): React.JSX.Element {
     setSummaries(await window.elio.listConversations())
   }, [])
 
+  const refreshStatus = useCallback(async () => {
+    setStatus(await window.elio.getChatStatus())
+  }, [])
+
   useEffect(() => {
     activeIdRef.current = active?.id ?? null
   }, [active?.id])
@@ -302,7 +306,7 @@ export function PanelShell(): React.JSX.Element {
 
         {section === 'configuracoes' ? (
           <div className="config-stack">
-            <IntegrationsView status={status} />
+            <IntegrationsView status={status} onStatusRefresh={refreshStatus} />
             <ComputerView />
           </div>
         ) : null}

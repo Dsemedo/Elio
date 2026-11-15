@@ -1,9 +1,9 @@
 # Elio
 
 Assistente pessoal de IA para desktop (**JARVIS MVP**).  
-**v0.9.0** — Whisper **small** + confirmação de transcript; localização automática para clima.
+**v0.10.0** — Spotify por voz (PKCE + fallback URI); inclui Whisper **small**, confirmação STT e localização automática do clima (0.9.0).
 
-Spec UI: [`docs/elio-design-system.md`](./docs/elio-design-system.md) · ADRs: [`0002`](./docs/ADRs/0002-whisper-subprocess.md), [`0006`](./docs/ADRs/0006-auto-location-weather.md)
+Spec UI: [`docs/elio-design-system.md`](./docs/elio-design-system.md) · ADRs: [`docs/ADRs/`](./docs/ADRs/)
 
 ## Requisitos
 
@@ -12,7 +12,8 @@ Spec UI: [`docs/elio-design-system.md`](./docs/elio-design-system.md) · ADRs: [
 - Microfone (voz)  
 - Internet: 1ª vez da voz (~**466 MB** Whisper **small**) e clima (Open-Meteo + opcional IP geo)  
 - Localização do Windows (opcional; se negar, usa IP aproximado)  
-- (Opcional) [Ollama](https://ollama.com) com um modelo (ex.: `llama3.2`)
+- (Opcional) [Ollama](https://ollama.com) com um modelo (ex.: `llama3.2`)  
+- (Opcional) Spotify Premium + Client ID para play remoto por API
 
 ## Como rodar (Windows)
 
@@ -28,14 +29,32 @@ npm run ensure:electron
 npm run dev
 ```
 
-### O que Douglas deve ver (0.9.0)
+### O que Douglas deve ver (0.10.0)
 
-1. Selo **v0.9.0**  
+1. Selo **v0.10.0**  
 2. **Preparar voz** / 1º PTT: download do modelo **small** (~466 MB) se ainda não tiver  
 3. Floating Bar: segurar mic → falar → **texto aparece para conferir** (~3 s) → envia sozinho (Enter agora / Esc cancela / editar cancela auto-envio)  
-4. **“como está o tempo?”** → Windows pode pedir localização → clima da **sua cidade** (não São Paulo fixo)  
-5. Se negar localização → fallback por IP (aproximado); ver privacidade abaixo  
-6. Opens seguros e Floating Bar 0.8.0 continuam iguais
+4. **“toca uma música no Spotify”** → abre o Spotify; se conectado + Premium → tenta play remoto; barra mostra “Abrindo Spotify…”  
+5. **“como está o tempo?”** → Windows pode pedir localização → clima da **sua cidade**  
+6. Opens seguros (“abre o site da Exame” / “abre a pasta Downloads”) e lane C (aba) **em breve**
+
+### Conectar Spotify (Windows)
+
+1. Crie um app em [developer.spotify.com/dashboard](https://developer.spotify.com/dashboard).  
+2. Em Redirect URIs, adicione **exatamente**: `http://127.0.0.1:47821/callback`  
+3. Copie o **Client ID** (não precisa de Client Secret — usamos PKCE).  
+4. No PowerShell, antes do `npm run dev`:
+
+```powershell
+$env:ELIO_SPOTIFY_CLIENT_ID = "seu-client-id"
+npm run dev
+```
+
+5. No Elio: **Configurações → Integrações → Conectar Spotify** (ou diga “conectar Spotify”).  
+6. Faça login no browser; volte ao Elio.  
+7. Abra o app Spotify neste PC. Conta **Premium** é necessária para o play remoto pela API; conta Free → o Elio abre o app e avisa.
+
+Tokens ficam cifrados em `%APPDATA%\elio\secrets\` (Electron `safeStorage`). Nunca vá para o log.
 
 ### Como testar localização no Windows
 
@@ -49,12 +68,12 @@ npm run dev
 
 | Lane | Exemplos | Status |
 |------|----------|--------|
-| **A** PC | abre site / pasta / arquivo / app | ✅ allowlist `openExternal` / `openPath` |
+| **A** PC | abre site / pasta / arquivo / app; **Spotify play/connect** | ✅ allowlist + PKCE |
 | **B** Fato local | hora, clima | ✅ enrich (Open-Meteo + relógio + geo) |
 | **C** Web context | aba aberta, pesquisa web | ⏳ deferred (extensão/CDP) |
 | **D** Chat | conversa geral | ✅ LLM (Ollama / OpenRouter) |
 
-**Não neste PR:** ler aba do browser, BYOK cascade, redesign.
+**Não neste PR:** busca de música na UI, redesenho do Command Center, ler aba do browser, RPA.
 
 ### Clima e fuso
 
@@ -71,6 +90,7 @@ Ordem de resolução:
 | `ELIO_WEATHER_LAT` + `ELIO_WEATHER_LON` | Coordenadas (prioridade sobre cidade) |
 | `ELIO_TIMEZONE` | Fuso IANA (padrão `America/Sao_Paulo`) |
 | `ELIO_WHISPER_MODEL` | `tiny` / `base` / `small` (padrão `small`) |
+| `ELIO_SPOTIFY_CLIENT_ID` | Client ID Spotify (PKCE; sem secret) |
 
 ### Privacidade (localização)
 
@@ -102,7 +122,8 @@ Na próxima preparação o Elio baixa o **small**. Pode apagar os antigos:
 `contextIsolation`, sem `nodeIntegration`, sandbox, Zod IPC.  
 STT: subprocess `whisper-cli` só no main (`shell: false`).  
 Clima: Open-Meteo + cache local; coords não vão ao histórico/LLM.  
-Ver `docs/ADRs/0002-whisper-subprocess.md` e `0006-auto-location-weather.md`.
+Spotify: PKCE + `safeStorage`; opens só `spotify:` / `https://open.spotify.com`.  
+Ver `docs/ADRs/0002-whisper-subprocess.md`, `0006-auto-location-weather.md` e `0007-spotify-voice-pkce.md`.
 
 ## Licença
 

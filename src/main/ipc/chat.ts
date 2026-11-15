@@ -16,6 +16,7 @@ import {
 import { enrichMessagesWithLocalFacts } from '../services/tools/enrich'
 import { classifyUserIntent } from '../services/tools/router'
 import { routeCompletion, getChatStatus } from '../services/router'
+import { runSpotifyIntent } from '../services/spotify'
 import {
   appendMessages,
   createConversation,
@@ -141,6 +142,14 @@ export function registerChatIpc(): void {
       const classified = classifyUserIntent(input.content)
 
       if (classified.lane === 'pc_action') {
+        if (classified.action === 'spotify') {
+          const result = await runSpotifyIntent(classified.spotify)
+          return finishAssistantReply(
+            input.conversationId,
+            result.message,
+            'elio-spotify',
+          )
+        }
         const result = await executeDesktopIntent(
           classified.desktop,
           electronDesktopOpener(),

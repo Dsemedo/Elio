@@ -37,6 +37,10 @@ export type ChatStatus = {
   openRouterConfigured: boolean
   preferredProvider: ProviderKind
   hint: string
+  /** Client ID Spotify (ELIO_SPOTIFY_CLIENT_ID) presente. */
+  spotifyClientConfigured: boolean
+  /** Tokens Spotify cifrados presentes em userData. */
+  spotifyConnected: boolean
 }
 
 export type ChatSendInput = {
