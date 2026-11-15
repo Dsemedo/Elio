@@ -9,7 +9,12 @@ import {
   type ChatUpdatedEvent,
   type Conversation,
 } from '../../shared/ipc'
+import {
+  electronDesktopOpener,
+  executeDesktopIntent,
+} from '../services/tools/desktop'
 import { enrichMessagesWithLocalFacts } from '../services/tools/enrich'
+import { classifyUserIntent } from '../services/tools/router'
 import { routeCompletion, getChatStatus } from '../services/router'
 import {
   appendMessages,
@@ -32,6 +37,27 @@ function broadcastChatUpdated(event: ChatUpdatedEvent): void {
   for (const win of BrowserWindow.getAllWindows()) {
     if (win.isDestroyed()) continue
     win.webContents.send(IpcChannels.CHAT_UPDATED, payload)
+  }
+}
+
+async function finishAssistantReply(
+  conversationId: string,
+  content: string,
+  model: string,
+): Promise<ChatSendResult> {
+  const reply = makeMessage('assistant', content, model)
+  const conversation = appendMessages(conversationId, [reply])
+  broadcastChatUpdated({
+    reason: 'updated',
+    conversationId: conversation.id,
+    conversation,
+  })
+  const status = await getChatStatus()
+  return {
+    conversation,
+    reply,
+    provider: status.preferredProvider,
+    model,
   }
 }
 
@@ -108,6 +134,35 @@ export function registerChatIpc(): void {
     inflight.set(input.conversationId, controller)
 
     try {
+      /**
+       * Router de intents (PT-BR):
+       * A = pc_action · B = local_fact (enrich) · C = web_context (deferred) · D = chat/LLM
+       */
+      const classified = classifyUserIntent(input.content)
+
+      if (classified.lane === 'pc_action') {
+        const result = await executeDesktopIntent(
+          classified.desktop,
+          electronDesktopOpener(),
+          { confirmRisky: classified.confirmRisky },
+        )
+        return finishAssistantReply(
+          input.conversationId,
+          result.message,
+          'elio-desktop',
+        )
+      }
+
+      if (classified.lane === 'web_context') {
+        // C adiado de propósito — sem CDP/extensão neste PR.
+        return finishAssistantReply(
+          input.conversationId,
+          classified.reason,
+          'elio-deferred',
+        )
+      }
+
+      // B (hora/clima) + D (chat): enrich injeta fatos locais quando detectChatToolIntent pede.
       const history = conversation.messages
         .filter((m) => m.role === 'user' || m.role === 'assistant')
         .map((m) => ({ role: m.role, content: m.content }))

@@ -4,19 +4,22 @@ import {
   Loader2,
   Maximize2,
   Mic,
+  MicOff,
   Minimize2,
   MoreHorizontal,
   WifiOff,
 } from 'lucide-react'
 import type { ChatStatus, ShellState } from '@shared/ipc'
 import {
+  isMicMissingMessage,
   micPermissionMessage,
+  probeMicPresence,
   startMicRecording,
   type MicRecorder,
 } from '../lib/recordWav'
 
 export type BarUiState =
-  'idle' | 'listening' | 'transcribing' | 'thinking' | 'error' | 'offline'
+  'idle' | 'listening' | 'transcribing' | 'thinking' | 'error' | 'offline' | 'executing'
 
 type VoicePhase = 'idle' | 'preparing' | 'recording' | 'transcribing'
 
@@ -25,13 +28,14 @@ const STATE_LABEL: Record<BarUiState, string> = {
   listening: 'Ouvindo…',
   transcribing: 'Transcrevendo…',
   thinking: 'Pensando…',
+  executing: 'Abrindo…',
   error: 'Erro',
   offline: 'Sem provedor',
 }
 
 /**
  * Floating Bar — DS v1.1 §3 + UX Douglas (voz primeiro, sem chrome duplo).
- * Identidade: logo + mic PTT. Campo de texto sob demanda (sem placeholder).
+ * Erros ficam DENTRO da cápsula; overlay só para o menu (sem painel fantasma).
  */
 export function FloatingBar(): React.JSX.Element {
   const [shell, setShell] = useState<ShellState | null>(null)
@@ -44,11 +48,13 @@ export function FloatingBar(): React.JSX.Element {
   const [inputActive, setInputActive] = useState(false)
   const [voicePhase, setVoicePhase] = useState<VoicePhase>('idle')
   const [lastReply, setLastReply] = useState<string | null>(null)
+  const [statusLine, setStatusLine] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const recorderRef = useRef<MicRecorder | null>(null)
   const recordingActiveRef = useRef(false)
   const recordStartedAt = useRef(0)
   const menuRef = useRef<HTMLDivElement>(null)
+  const micProbeBusy = useRef(false)
 
   useEffect(() => {
     let cancelled = false
@@ -122,13 +128,55 @@ export function FloatingBar(): React.JSX.Element {
     return () => document.removeEventListener('mousedown', onDoc)
   }, [])
 
+  // Overlay só para o menu — erros NÃO expandem a janela (evita retângulo fantasma).
   useEffect(() => {
-    const needOverlay = menuOpen || (barState === 'error' && !!error)
-    void window.elio.setBarOverlay(needOverlay)
+    void window.elio.setBarOverlay(menuOpen)
     return () => {
-      if (needOverlay) void window.elio.setBarOverlay(false)
+      if (menuOpen) void window.elio.setBarOverlay(false)
     }
-  }, [menuOpen, barState, error])
+  }, [menuOpen])
+
+  /**
+   * Rechecagem silenciosa de mic no foco da janela / devicechange.
+   * Sem alterar layout se o resultado for o mesmo; só limpa erro de mic
+   * quando a lista volta a mostrar um input (mau contato resolvido).
+   */
+  useEffect(() => {
+    const recheck = async (): Promise<void> => {
+      if (micProbeBusy.current) return
+      if (recordingActiveRef.current) return
+      micProbeBusy.current = true
+      try {
+        const presence = await probeMicPresence()
+        setError((current) => {
+          if (!current || !isMicMissingMessage(current)) return current
+          if (presence.listed) {
+            // Device voltou à lista — libera o estado de erro sem thrash visual extra.
+            setBarState((s) => (s === 'error' ? 'idle' : s))
+            return null
+          }
+          // Continua ausente: mantém a mensagem (pode ser mau contato real).
+          return current
+        })
+      } finally {
+        micProbeBusy.current = false
+      }
+    }
+
+    const onFocus = (): void => {
+      void recheck()
+    }
+    const onDeviceChange = (): void => {
+      void recheck()
+    }
+
+    window.addEventListener('focus', onFocus)
+    navigator.mediaDevices?.addEventListener?.('devicechange', onDeviceChange)
+    return () => {
+      window.removeEventListener('focus', onFocus)
+      navigator.mediaDevices?.removeEventListener?.('devicechange', onDeviceChange)
+    }
+  }, [])
 
   const panelOpen = shell?.panelOpen ?? false
   const offline = status?.preferredProvider === 'none'
@@ -137,7 +185,8 @@ export function FloatingBar(): React.JSX.Element {
     if (
       barState === 'listening' ||
       barState === 'transcribing' ||
-      barState === 'thinking'
+      barState === 'thinking' ||
+      barState === 'executing'
     ) {
       return barState
     }
@@ -158,8 +207,13 @@ export function FloatingBar(): React.JSX.Element {
     if (!content) return
     setError(null)
     setLastReply(null)
+    setStatusLine(null)
     setMenuOpen(false)
-    setBarState('thinking')
+    const looksLikeOpen = /^\s*(?:por\s+favor\s+|pf\s+|pode\s+)?(?:abre|abrir|abra|confirma\s+abrir)\b/i.test(
+      content,
+    )
+    setBarState(looksLikeOpen ? 'executing' : 'thinking')
+    if (looksLikeOpen) setStatusLine('Abrindo…')
     setDraft('')
     setInputActive(false)
     try {
@@ -169,8 +223,10 @@ export function FloatingBar(): React.JSX.Element {
       setStatus(nextStatus)
       const replyText = result.reply.content.trim()
       setLastReply(replyText || '(sem texto na resposta)')
+      setStatusLine(null)
       setBarState(nextStatus.preferredProvider === 'none' ? 'offline' : 'idle')
     } catch (err) {
+      setStatusLine(null)
       setError(err instanceof Error ? err.message : 'Não foi possível responder')
       setBarState('error')
       setDraft(content)
@@ -179,18 +235,33 @@ export function FloatingBar(): React.JSX.Element {
   }
 
   const send = async (): Promise<void> => {
-    if (resolvedState === 'thinking' || resolvedState === 'listening') return
+    if (
+      resolvedState === 'thinking' ||
+      resolvedState === 'listening' ||
+      resolvedState === 'executing'
+    ) {
+      return
+    }
     await sendContent(draft)
   }
 
   const beginTalk = async (): Promise<void> => {
-    if (resolvedState === 'thinking' || recordingActiveRef.current) return
+    if (
+      resolvedState === 'thinking' ||
+      resolvedState === 'executing' ||
+      recordingActiveRef.current
+    ) {
+      return
+    }
     setError(null)
     setLastReply(null)
+    setStatusLine(null)
     setMenuOpen(false)
     setInputActive(false)
     setVoicePhase('preparing')
     try {
+      // Rechecagem antes do PTT — mau contato pode ter voltado.
+      await probeMicPresence()
       const voice = await window.elio.ensureVoice()
       if (!voice.ready) {
         setError(voice.hint || 'Voz indisponível')
@@ -206,7 +277,7 @@ export function FloatingBar(): React.JSX.Element {
       setBarState('listening')
     } catch (err) {
       recordingActiveRef.current = false
-      setError(micPermissionMessage(err))
+      setError(await micPermissionMessage(err))
       setBarState('error')
       setVoicePhase('idle')
     }
@@ -252,21 +323,34 @@ export function FloatingBar(): React.JSX.Element {
   const busy =
     resolvedState === 'listening' ||
     resolvedState === 'transcribing' ||
-    resolvedState === 'thinking'
+    resolvedState === 'thinking' ||
+    resolvedState === 'executing'
 
-  const showTextField = busy
+  const showErrorInline = resolvedState === 'error' && !!error
+
+  const showTextField = busy || showErrorInline
     ? false
-    : inputActive || draft.trim().length > 0 || resolvedState === 'error'
+    : inputActive || draft.trim().length > 0
 
   const showLastReply =
-    !busy && !showTextField && !!lastReply && resolvedState === 'idle'
+    !busy && !showTextField && !showErrorInline && !!lastReply && resolvedState === 'idle'
+
+  const showStatusLine =
+    !busy && !showTextField && !showErrorInline && !showLastReply && !!statusLine
 
   const activateInput = (): void => {
     if (busy) return
     setLastReply(null)
+    setStatusLine(null)
+    if (showErrorInline) {
+      setError(null)
+      setBarState(offline ? 'offline' : 'idle')
+    }
     setInputActive(true)
     requestAnimationFrame(() => inputRef.current?.focus())
   }
+
+  const micMissing = isMicMissingMessage(error)
 
   return (
     <div className="fb-root">
@@ -292,7 +376,7 @@ export function FloatingBar(): React.JSX.Element {
           {busy ? (
             <div
               className={
-                resolvedState === 'thinking'
+                resolvedState === 'thinking' || resolvedState === 'executing'
                   ? 'fb-state-inline thinking'
                   : 'fb-state-inline'
               }
@@ -303,7 +387,15 @@ export function FloatingBar(): React.JSX.Element {
               ) : (
                 <Loader2 size={15} className="fb-spin" aria-hidden />
               )}
-              <span>{STATE_LABEL[resolvedState]}</span>
+              <span>
+                {statusLine && resolvedState === 'executing'
+                  ? statusLine
+                  : STATE_LABEL[resolvedState]}
+              </span>
+            </div>
+          ) : showErrorInline ? (
+            <div className="fb-error-inline" role="alert" title={error ?? undefined}>
+              <span className="fb-error-inline-text">{error}</span>
             </div>
           ) : showTextField ? (
             <input
@@ -343,6 +435,10 @@ export function FloatingBar(): React.JSX.Element {
               <span className="fb-reply-label">Elio</span>
               <span className="fb-reply-text">{lastReply}</span>
             </button>
+          ) : showStatusLine ? (
+            <div className="fb-status-inline" aria-live="polite">
+              <span className="fb-status-inline-text">{statusLine}</span>
+            </div>
           ) : (
             <button
               type="button"
@@ -356,146 +452,153 @@ export function FloatingBar(): React.JSX.Element {
           )}
         </div>
 
-        {resolvedState === 'offline' ? (
-          <span className="fb-chip offline" title={status?.hint}>
-            <WifiOff size={14} aria-hidden />
-            <span className="fb-chip-label">offline</span>
-          </span>
-        ) : null}
+        <div className="fb-actions">
+          {resolvedState === 'offline' ? (
+            <span className="fb-chip offline" title={status?.hint}>
+              <WifiOff size={14} aria-hidden />
+              <span className="fb-chip-label">offline</span>
+            </span>
+          ) : null}
 
-        {resolvedState === 'error' && error ? (
-          <span className="fb-chip error" title={error} aria-label={error}>
-            !
-          </span>
-        ) : null}
+          {showErrorInline && !micMissing ? (
+            <span className="fb-chip error" title={error ?? undefined} aria-label={error ?? 'Erro'}>
+              !
+            </span>
+          ) : null}
 
-        <button
-          type="button"
-          className={
-            resolvedState === 'listening' ? 'fb-icon-btn mic active' : 'fb-icon-btn mic'
-          }
-          title={
-            resolvedState === 'listening'
-              ? 'Solte para enviar'
-              : 'Segure para falar (envia ao chat)'
-          }
-          aria-label="Voz"
-          aria-pressed={resolvedState === 'listening'}
-          disabled={resolvedState === 'thinking' || voicePhase === 'transcribing'}
-          onPointerDown={(e) => {
-            e.preventDefault()
-            // Mantém o PTT mesmo se o cursor sair do botão (senão corta cedo).
-            e.currentTarget.setPointerCapture(e.pointerId)
-            void beginTalk()
-          }}
-          onPointerUp={(e) => {
-            if (e.currentTarget.hasPointerCapture(e.pointerId)) {
-              e.currentTarget.releasePointerCapture(e.pointerId)
-            }
-            void endTalk()
-          }}
-          onPointerCancel={() => {
-            recorderRef.current?.cancel()
-            recorderRef.current = null
-            recordingActiveRef.current = false
-            setVoicePhase('idle')
-            setBarState(offline ? 'offline' : 'idle')
-          }}
-        >
-          <Mic size={16} />
-        </button>
-
-        <button
-          type="button"
-          className={panelOpen ? 'fb-icon-btn active' : 'fb-icon-btn'}
-          title={panelOpen ? 'Recolher Command Center' : 'Expandir Command Center'}
-          aria-label={panelOpen ? 'Recolher' : 'Expandir'}
-          aria-expanded={panelOpen}
-          onClick={() => void window.elio.togglePanel()}
-        >
-          {panelOpen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
-        </button>
-
-        <div className="fb-menu" ref={menuRef}>
           <button
             type="button"
-            className="fb-icon-btn"
-            title="Mais opções"
-            aria-label="Menu"
-            aria-haspopup="menu"
-            aria-expanded={menuOpen}
-            onClick={() => setMenuOpen((v) => !v)}
+            className={
+              resolvedState === 'listening'
+                ? 'fb-icon-btn mic active'
+                : micMissing
+                  ? 'fb-icon-btn mic mic-missing'
+                  : 'fb-icon-btn mic'
+            }
+            title={
+              resolvedState === 'listening'
+                ? 'Solte para enviar'
+                : micMissing
+                  ? 'Mic ausente ou sem sinal — segure para tentar de novo'
+                  : 'Segure para falar (envia ao chat)'
+            }
+            aria-label="Voz"
+            aria-pressed={resolvedState === 'listening'}
+            disabled={
+              resolvedState === 'thinking' ||
+              resolvedState === 'executing' ||
+              voicePhase === 'transcribing'
+            }
+            onPointerDown={(e) => {
+              e.preventDefault()
+              // Mantém o PTT mesmo se o cursor sair do botão (senão corta cedo).
+              e.currentTarget.setPointerCapture(e.pointerId)
+              void beginTalk()
+            }}
+            onPointerUp={(e) => {
+              if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+                e.currentTarget.releasePointerCapture(e.pointerId)
+              }
+              void endTalk()
+            }}
+            onPointerCancel={() => {
+              recorderRef.current?.cancel()
+              recorderRef.current = null
+              recordingActiveRef.current = false
+              setVoicePhase('idle')
+              setBarState(offline ? 'offline' : 'idle')
+            }}
           >
-            <MoreHorizontal size={16} />
+            {micMissing ? <MicOff size={16} /> : <Mic size={16} />}
           </button>
-          {menuOpen ? (
-            <div className="fb-menu-pop" role="menu">
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  setMenuOpen(false)
-                  void window.elio.openPanel()
-                }}
-              >
-                Abrir Command Center
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                disabled={draft.trim().length === 0 || resolvedState === 'thinking'}
-                onClick={() => {
-                  setMenuOpen(false)
-                  void send()
-                }}
-              >
-                Enviar mensagem
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  setMenuOpen(false)
-                  void (async () => {
-                    const created = await window.elio.createConversation()
-                    setConversationId(created.id)
-                    setDraft('')
-                    setInputActive(false)
-                    setBarState(offline ? 'offline' : 'idle')
-                  })()
-                }}
-              >
-                Nova conversa
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                disabled
-                title="Em breve"
-                aria-disabled="true"
-              >
-                Palavra de ativação · em breve
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  setMenuOpen(false)
-                  void window.elio.hideShell()
-                }}
-              >
-                Ocultar (bandeja)
-              </button>
-            </div>
-          ) : null}
+
+          <button
+            type="button"
+            className={panelOpen ? 'fb-icon-btn active' : 'fb-icon-btn'}
+            title={panelOpen ? 'Recolher Command Center' : 'Expandir Command Center'}
+            aria-label={panelOpen ? 'Recolher' : 'Expandir'}
+            aria-expanded={panelOpen}
+            onClick={() => void window.elio.togglePanel()}
+          >
+            {panelOpen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+          </button>
+
+          <div className="fb-menu" ref={menuRef}>
+            <button
+              type="button"
+              className="fb-icon-btn"
+              title="Mais opções"
+              aria-label="Menu"
+              aria-haspopup="menu"
+              aria-expanded={menuOpen}
+              onClick={() => setMenuOpen((v) => !v)}
+            >
+              <MoreHorizontal size={16} />
+            </button>
+            {menuOpen ? (
+              <div className="fb-menu-pop" role="menu">
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setMenuOpen(false)
+                    void window.elio.openPanel()
+                  }}
+                >
+                  Abrir Command Center
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  disabled={draft.trim().length === 0 || resolvedState === 'thinking'}
+                  onClick={() => {
+                    setMenuOpen(false)
+                    void send()
+                  }}
+                >
+                  Enviar mensagem
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setMenuOpen(false)
+                    void (async () => {
+                      const created = await window.elio.createConversation()
+                      setConversationId(created.id)
+                      setDraft('')
+                      setInputActive(false)
+                      setError(null)
+                      setBarState(offline ? 'offline' : 'idle')
+                    })()
+                  }}
+                >
+                  Nova conversa
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  disabled
+                  title="Em breve"
+                  aria-disabled="true"
+                >
+                  Palavra de ativação · em breve
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setMenuOpen(false)
+                    void window.elio.hideShell()
+                  }}
+                >
+                  Ocultar (bandeja)
+                </button>
+              </div>
+            ) : null}
+          </div>
         </div>
       </div>
-
-      {error && resolvedState === 'error' ? (
-        <div className="fb-error" role="alert" title={error}>
-          {error}
-        </div>
-      ) : null}
     </div>
   )
 }
