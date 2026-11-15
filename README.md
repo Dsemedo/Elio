@@ -1,7 +1,7 @@
 # Elio
 
 Assistente pessoal de IA para desktop (**JARVIS MVP** — Estágio 1).  
-**v0.6.2** — Fix EPERM no download do modelo (partial travado no Windows); Whisper **base** + envio automático ao chat.
+**v0.6.3** — Floating Bar mostra a resposta após a voz; PTT estável; fix EPERM do modelo no Windows.
 
 Spec UI: [`docs/elio-design-system.md`](./docs/elio-design-system.md)
 
@@ -29,11 +29,10 @@ npm run dev
 
 ### O que Douglas deve ver
 
-1. Selo **v0.6.2**  
-2. **Preparar voz** → progresso (~150 MB) → “Voz pronta” (mesmo se existir `.partial` antigo travado)  
-3. **Floating Bar** — idle “Segure o mic”; segurar → **Ouvindo…** → soltar → **Transcrevendo…** → **Pensando…** → resposta  
-4. Texto da fala **envia sozinho** ao chat  
-5. Se ainda falhar: mensagem sobre antivírus + log `EPERM`; opcional apagar `%APPDATA%\elio\whisper\models\*.partial` e a pasta `tmp`
+1. Selo **v0.6.3**  
+2. Segurar mic → **Ouvindo…** → soltar → **Transcrevendo…** → **Pensando…** → **texto da resposta na barra** (clique abre o Command Center)  
+3. Se aparecer erro em vermelho (áudio curto / sem entender / provedor), leia a mensagem abaixo da barra  
+4. Preparar voz / `.partial` antigo: download em `tmp` com nome único (Windows)
 
 **Não neste PR:** abrir pastas, browser ou ações no desktop (Estágio 2).
 

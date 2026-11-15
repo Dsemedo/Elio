@@ -146,22 +146,30 @@ async function runWhisperCli(wavPath: string, outBase: string): Promise<string> 
     child.on('close', (code) => {
       clearTimeout(timer)
       const txtPath = `${outBase}.txt`
+      const stderrTail = stderr.trim().slice(-500)
       if (code !== 0) {
-        console.error('[elio] voice: whisper-cli exit', { code })
+        console.error('[elio] voice: whisper-cli exit', {
+          code,
+          stderr: stderrTail || undefined,
+        })
         reject(new Error('TRANSCRIBE_FAILED: o Whisper não conseguiu transcrever'))
         return
       }
       if (!existsSync(txtPath)) {
+        console.error('[elio] voice: whisper-cli sem .txt', {
+          stderr: stderrTail || undefined,
+        })
         reject(new Error('TRANSCRIBE_FAILED: saída do Whisper ausente'))
         return
       }
       try {
         const text = readFileSync(txtPath, 'utf8').trim()
         resolve(text)
-      } catch {
+      } catch (readErr) {
+        console.error('[elio] voice: leitura .txt falhou', {
+          name: readErr instanceof Error ? readErr.name : 'Unknown',
+        })
         reject(new Error('TRANSCRIBE_FAILED: não foi possível ler a saída'))
-      } finally {
-        void stderr
       }
     })
   })
@@ -203,7 +211,14 @@ export async function transcribeWavBase64(
     }
     return { text }
   } catch (err) {
-    console.error('[elio] voice: transcribe falhou', { tmp: redactPath(whisperTempDir()) })
+    const detail =
+      err instanceof Error
+        ? { name: err.name, message: err.message.slice(0, 300) }
+        : { name: 'Unknown', message: String(err).slice(0, 300) }
+    console.error('[elio] voice: transcribe falhou', {
+      tmp: redactPath(whisperTempDir()),
+      ...detail,
+    })
     throw err
   } finally {
     rmSync(wavPath, { force: true })
