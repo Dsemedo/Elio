@@ -29,6 +29,9 @@ export const IpcChannels = {
   /** Evento main → renderer (estado da shell). */
   SHELL_STATE_CHANGED: 'shell:stateChanged',
   SYSTEM_GET_SNAPSHOT: 'system:getSnapshot',
+  LOCATION_GET: 'location:get',
+  LOCATION_SAVE_OS: 'location:saveOs',
+  LOCATION_ENSURE_IP_FALLBACK: 'location:ensureIpFallback',
 } as const
 
 export type IpcChannel = (typeof IpcChannels)[keyof typeof IpcChannels]

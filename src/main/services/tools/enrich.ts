@@ -25,9 +25,10 @@ export async function enrichMessagesWithLocalFacts(
   if (intent.needsWeather) {
     try {
       const weather = await getWeatherSnapshot(signal)
+      // Só cidade/nome — sem lat/lon no prompt (evita vazar coords a provedores cloud).
       lines.push(`- ${weather.summary}`)
       lines.push(
-        `- Fonte: Open-Meteo; local resolvido (${weather.location.source}): ${weather.location.name}.`,
+        `- Fonte: Open-Meteo; cidade (${weather.location.source}): ${weather.location.name}.`,
       )
     } catch {
       lines.push(

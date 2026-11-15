@@ -58,7 +58,7 @@ export type ChatUpdatedEvent = {
   conversation?: Conversation
 }
 
-export type VoiceModelId = 'base'
+export type VoiceModelId = 'tiny' | 'base' | 'small'
 
 export type VoiceStatus = {
   ready: boolean
@@ -68,6 +68,22 @@ export type VoiceStatus = {
   whisperVersion: string
   supported: boolean
   hint: string
+}
+
+export type AppLocationSource = 'os' | 'ip' | 'manual'
+
+export type AppLocation = {
+  /** Nome da cidade (seguro para UI / enrich). */
+  name: string
+  source: AppLocationSource
+  updatedAt: string
+  /** true se o usuário negou a permissão OS. */
+  permissionDenied?: boolean
+}
+
+export type LocationSaveOsInput = {
+  latitude: number
+  longitude: number
 }
 
 export type VoiceProgress = {

@@ -4,7 +4,7 @@ import {
   VoiceTranscribeInputSchema,
   type VoiceStatus,
 } from '../../shared/ipc'
-import { MODEL_ID, MODEL_SIZE_HINT_MB, WHISPER_RELEASE } from '../services/voice/constants'
+import { WHISPER_RELEASE, resolveWhisperModel } from '../services/voice/constants'
 import { ensureVoiceAssets, voiceAssetsStatus } from '../services/voice/download'
 import { friendlyVoiceError, logVoiceError } from '../services/voice/errors'
 import { transcribeWavBase64 } from '../services/voice/transcribe'
@@ -18,17 +18,18 @@ function broadcastProgress(progress: VoiceProgress): void {
 
 function toVoiceStatus(): VoiceStatus {
   const assets = voiceAssetsStatus()
+  const model = resolveWhisperModel()
   return {
     ready: assets.ready,
     binaryReady: assets.binaryReady,
     modelReady: assets.modelReady,
-    modelId: MODEL_ID,
+    modelId: model.id,
     whisperVersion: WHISPER_RELEASE,
     supported:
       process.platform === 'win32' || process.platform === 'linux',
     hint: assets.ready
-      ? 'Voz pronta — segure o microfone e fale (envia ao chat).'
-      : `Na primeira vez a gente baixa o Whisper (~${MODEL_SIZE_HINT_MB} MB, modelo base). Precisa de internet uma vez.`,
+      ? 'Voz pronta — segure o microfone, confira o texto e envie.'
+      : `Na primeira vez a gente baixa o Whisper (~${model.sizeHintMb} MB, modelo ${model.id}). Precisa de internet uma vez.`,
   }
 }
 

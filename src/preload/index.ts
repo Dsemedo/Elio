@@ -2,12 +2,14 @@ import { contextBridge, ipcRenderer } from 'electron'
 import { IpcChannels } from '../shared/channels'
 import type {
   AppInfo,
+  AppLocation,
   ChatSendInput,
   ChatSendResult,
   ChatStatus,
   ChatUpdatedEvent,
   Conversation,
   ConversationSummary,
+  LocationSaveOsInput,
   ShellState,
   SystemSnapshot,
   VoiceProgress,
@@ -108,6 +110,15 @@ const elioApi = {
 
   getSystemSnapshot: (): Promise<SystemSnapshot> =>
     ipcRenderer.invoke(IpcChannels.SYSTEM_GET_SNAPSHOT),
+
+  getLocation: (): Promise<AppLocation | null> =>
+    ipcRenderer.invoke(IpcChannels.LOCATION_GET),
+
+  saveOsLocation: (input: LocationSaveOsInput): Promise<AppLocation> =>
+    ipcRenderer.invoke(IpcChannels.LOCATION_SAVE_OS, input),
+
+  ensureIpLocationFallback: (): Promise<AppLocation | null> =>
+    ipcRenderer.invoke(IpcChannels.LOCATION_ENSURE_IP_FALLBACK),
 }
 
 export type ElioApi = typeof elioApi

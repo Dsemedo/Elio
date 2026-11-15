@@ -1,6 +1,7 @@
-import { app, Menu, ipcMain } from 'electron'
+import { app, Menu, ipcMain, session, type Session } from 'electron'
 import { IpcChannels, type AppInfo } from '../shared/ipc'
 import { registerChatIpc } from './ipc/chat'
+import { registerLocationIpc } from './ipc/location'
 import { registerShellIpc } from './ipc/shell'
 import { registerVoiceIpc } from './ipc/voice'
 import { getShellManager } from './shell/manager'
@@ -15,10 +16,30 @@ function registerIpc(): void {
   registerChatIpc()
   registerVoiceIpc()
   registerShellIpc()
+  registerLocationIpc()
+}
+
+/**
+ * Permite o pedido de geolocation do Chromium (Windows Location API).
+ * O SO ainda pode mostrar o diálogo do Windows; sem isto o renderer recebe
+ * PERMISSION_DENIED imediatamente.
+ */
+function allowGeolocationPermission(ses: Session): void {
+  ses.setPermissionRequestHandler((_wc, permission, callback) => {
+    if (permission === 'geolocation') {
+      callback(true)
+      return
+    }
+    callback(false)
+  })
+  ses.setPermissionCheckHandler((_wc, permission) => {
+    return permission === 'geolocation'
+  })
 }
 
 app.whenReady().then(() => {
   Menu.setApplicationMenu(null)
+  allowGeolocationPermission(session.defaultSession)
   registerIpc()
   getShellManager().start()
 

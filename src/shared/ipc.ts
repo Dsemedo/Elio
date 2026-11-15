@@ -13,6 +13,8 @@ import type {
   ProviderKind,
   ShellState,
   SystemSnapshot,
+  AppLocation,
+  LocationSaveOsInput,
   VoiceProgress,
   VoiceStatus,
   VoiceTranscribeInput,
@@ -34,6 +36,8 @@ export type {
   ProviderKind,
   ShellState,
   SystemSnapshot,
+  AppLocation,
+  LocationSaveOsInput,
   VoiceProgress,
   VoiceStatus,
   VoiceTranscribeInput,
@@ -104,10 +108,22 @@ export const VoiceStatusSchema = z.object({
   ready: z.boolean(),
   binaryReady: z.boolean(),
   modelReady: z.boolean(),
-  modelId: z.literal('base'),
+  modelId: z.enum(['tiny', 'base', 'small']),
   whisperVersion: z.string().min(1),
   supported: z.boolean(),
   hint: z.string(),
+})
+
+export const AppLocationSchema = z.object({
+  name: z.string().min(1).max(120),
+  source: z.enum(['os', 'ip', 'manual']),
+  updatedAt: z.string().datetime(),
+  permissionDenied: z.boolean().optional(),
+})
+
+export const LocationSaveOsInputSchema = z.object({
+  latitude: z.number().min(-90).max(90),
+  longitude: z.number().min(-180).max(180),
 })
 
 export const VoiceProgressSchema = z.object({

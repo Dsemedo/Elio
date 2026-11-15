@@ -19,18 +19,15 @@ import {
   DOWNLOAD_MAX_ATTEMPTS,
   DOWNLOAD_RETRY_DELAY_MS,
   DOWNLOAD_TIMEOUT_MS,
-  MODEL_FILE,
-  MODEL_MIN_BYTES,
-  MODEL_SIZE_HINT_MB,
-  MODEL_URL,
   WHISPER_RELEASE,
   binaryArchiveUrl,
   binaryFileName,
+  resolveWhisperModel,
 } from './constants'
 import { hasVoiceErrorPrefix, logVoiceError, normalizeVoiceEnsureError } from './errors'
 import {
   ensureWhisperDirs,
-  hasLegacyTinyModel,
+  hasLegacyModels,
   isBinaryReady,
   isModelReady,
   modelPath,
@@ -461,22 +458,23 @@ async function ensureModel(onProgress?: ProgressEmitter): Promise<void> {
   ensureWhisperDirs()
   sweepStaleDownloadParts()
 
-  const migrating = hasLegacyTinyModel()
+  const model = resolveWhisperModel()
+  const migrating = hasLegacyModels()
   const startMsg = migrating
-    ? `Atualizando modelo de voz (tiny → base, ~${MODEL_SIZE_HINT_MB} MB)…`
-    : `Baixando modelo de voz (base, ~${MODEL_SIZE_HINT_MB} MB)…`
+    ? `Atualizando modelo de voz → ${model.id} (~${model.sizeHintMb} MB)…`
+    : `Baixando modelo de voz (${model.id}, ~${model.sizeHintMb} MB)…`
   emit(onProgress, 'model', 0, startMsg)
 
   let downloaded: string | null = null
   try {
     downloaded = await downloadToUniqueTemp(
-      MODEL_URL,
-      MODEL_FILE,
+      model.url,
+      model.file,
       onProgress,
       'model',
-      'Modelo base',
+      `Modelo ${model.id}`,
     )
-    assertMinFileSize(downloaded, MODEL_MIN_BYTES, 'modelo base')
+    assertMinFileSize(downloaded, model.minBytes, `modelo ${model.id}`)
     installModelFile(downloaded, modelPath())
     downloaded = null
     if (!isModelReady()) {
@@ -487,8 +485,8 @@ async function ensureModel(onProgress?: ProgressEmitter): Promise<void> {
       'model',
       100,
       migrating
-        ? 'Modelo base pronto (pode apagar ggml-tiny.bin em whisper\\models)'
-        : 'Modelo base pronto',
+        ? `Modelo ${model.id} pronto (pode apagar modelos antigos em whisper\\models)`
+        : `Modelo ${model.id} pronto`,
     )
   } catch (err) {
     if (downloaded) safeRm(downloaded)

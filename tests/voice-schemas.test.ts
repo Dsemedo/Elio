@@ -20,12 +20,18 @@ describe('voice IPC contracts', () => {
       ready: false,
       binaryReady: false,
       modelReady: false,
-      modelId: 'base',
+      modelId: 'small',
       whisperVersion: 'v1.9.2',
       supported: true,
       hint: 'baixar',
     })
-    expect(status.modelId).toBe('base')
+    expect(status.modelId).toBe('small')
+  })
+
+  it('expõe canais de localização', () => {
+    expect(IpcChannels.LOCATION_GET).toBe('location:get')
+    expect(IpcChannels.LOCATION_SAVE_OS).toBe('location:saveOs')
+    expect(IpcChannels.LOCATION_ENSURE_IP_FALLBACK).toBe('location:ensureIpFallback')
   })
 
   it('valida progresso', () => {
