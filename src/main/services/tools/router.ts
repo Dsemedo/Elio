@@ -13,6 +13,10 @@
 import { detectChatToolIntent, type ChatToolIntent } from './intent'
 import { parseConfirmOpen, parseDesktopOpenIntent } from './desktop'
 import type { DesktopIntent } from './desktop'
+import {
+  parseSpotifyIntent,
+  type SpotifyIntent,
+} from '../spotify/intent'
 
 export type IntentLane =
   | 'pc_action' // A
@@ -23,9 +27,15 @@ export type IntentLane =
 export type ClassifiedIntent =
   | {
       lane: 'pc_action'
+      action: 'desktop'
       desktop: DesktopIntent
       /** Confirmação explícita de path sensível */
       confirmRisky: boolean
+    }
+  | {
+      lane: 'pc_action'
+      action: 'spotify'
+      spotify: SpotifyIntent
     }
   | {
       lane: 'local_fact'
@@ -46,7 +56,7 @@ const WEB_CONTEXT_RE =
 
 /**
  * Classifica o texto do usuário numa lane.
- * Prioridade: confirmação risky → PC action → web_context (deferred hint) → local_fact → chat.
+ * Prioridade: confirmação risky → Spotify → PC open → web_context → local_fact → chat.
  *
  * web_context NÃO executa nada neste PR — só sinaliza para o caller
  * (hoje cai em chat com honestidade; futuro: extensão/CDP).
@@ -59,13 +69,28 @@ export function classifyUserIntent(text: string): ClassifiedIntent {
   if (confirmTarget) {
     const asOpen = parseDesktopOpenIntent(`abre ${confirmTarget}`)
     if (asOpen) {
-      return { lane: 'pc_action', desktop: asOpen, confirmRisky: true }
+      return {
+        lane: 'pc_action',
+        action: 'desktop',
+        desktop: asOpen,
+        confirmRisky: true,
+      }
     }
+  }
+
+  const spotify = parseSpotifyIntent(content)
+  if (spotify) {
+    return { lane: 'pc_action', action: 'spotify', spotify }
   }
 
   const desktop = parseDesktopOpenIntent(content)
   if (desktop) {
-    return { lane: 'pc_action', desktop, confirmRisky: false }
+    return {
+      lane: 'pc_action',
+      action: 'desktop',
+      desktop,
+      confirmRisky: false,
+    }
   }
 
   // C: detectar e marcar deferred — NÃO implementar leitura de aba aqui.

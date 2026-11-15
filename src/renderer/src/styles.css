@@ -1207,6 +1207,19 @@ textarea {
   color: var(--elio-accent);
 }
 
+.integration-actions {
+  display: grid;
+  gap: 0.45rem;
+  justify-items: start;
+}
+
+.integration-msg {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--elio-text-secondary);
+  line-height: 1.4;
+}
+
 .stat-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));

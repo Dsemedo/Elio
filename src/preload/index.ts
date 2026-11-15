@@ -119,6 +119,32 @@ const elioApi = {
 
   ensureIpLocationFallback: (): Promise<AppLocation | null> =>
     ipcRenderer.invoke(IpcChannels.LOCATION_ENSURE_IP_FALLBACK),
+
+  getSpotifyStatus: (): Promise<{
+    clientConfigured: boolean
+    connected: boolean
+    encryptionAvailable: boolean
+  }> => ipcRenderer.invoke(IpcChannels.SPOTIFY_STATUS),
+
+  connectSpotify: (): Promise<{
+    ok: boolean
+    message: string
+    status: {
+      clientConfigured: boolean
+      connected: boolean
+      encryptionAvailable: boolean
+    }
+  }> => ipcRenderer.invoke(IpcChannels.SPOTIFY_CONNECT),
+
+  disconnectSpotify: (): Promise<{
+    ok: boolean
+    message: string
+    status: {
+      clientConfigured: boolean
+      connected: boolean
+      encryptionAvailable: boolean
+    }
+  }> => ipcRenderer.invoke(IpcChannels.SPOTIFY_DISCONNECT),
 }
 
 export type ElioApi = typeof elioApi

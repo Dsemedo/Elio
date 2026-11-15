@@ -237,8 +237,22 @@ export function FloatingBar(): React.JSX.Element {
     const looksLikeOpen = /^\s*(?:por\s+favor\s+|pf\s+|pode\s+)?(?:abre|abrir|abra|confirma\s+abrir)\b/i.test(
       content,
     )
-    setBarState(looksLikeOpen ? 'executing' : 'thinking')
-    if (looksLikeOpen) setStatusLine('Abrindo…')
+    const looksLikeSpotify =
+      /\bspotify\b/i.test(content) &&
+      /\b(tocar?|toque|play|reproduz|m[uú]sica|conectar|conecte|desconectar|desconecte)\b/i.test(
+        content,
+      )
+    const executing = looksLikeOpen || looksLikeSpotify
+    setBarState(executing ? 'executing' : 'thinking')
+    if (looksLikeSpotify) {
+      setStatusLine(
+        /\b(conectar|conecte)\b/i.test(content)
+          ? 'Conectando Spotify…'
+          : 'Abrindo Spotify…',
+      )
+    } else if (looksLikeOpen) {
+      setStatusLine('Abrindo…')
+    }
     setDraft('')
     setInputActive(false)
     try {

@@ -2,10 +2,12 @@ import type { ChatStatus, ProviderKind } from '../../shared/ipc'
 import { ollamaProvider } from './providers/ollama'
 import { isOpenRouterConfigured, openRouterProvider } from './providers/openrouter'
 import type { ChatCompletionRequest, ChatCompletionResult } from './providers/types'
+import { getSpotifyConnectionStatus } from './spotify'
 
 export async function getChatStatus(): Promise<ChatStatus> {
   const ollamaAvailable = await ollamaProvider.isAvailable()
   const openRouterConfigured = isOpenRouterConfigured()
+  const spotify = await getSpotifyConnectionStatus()
 
   let preferredProvider: ProviderKind = 'none'
   let hint: string
@@ -26,6 +28,8 @@ export async function getChatStatus(): Promise<ChatStatus> {
     openRouterConfigured,
     preferredProvider,
     hint,
+    spotifyClientConfigured: spotify.clientConfigured,
+    spotifyConnected: spotify.connected,
   }
 }
 
