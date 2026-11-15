@@ -1,7 +1,7 @@
 # Elio
 
 Assistente pessoal de IA para desktop (**JARVIS MVP**).  
-**v0.15.4** — Prompt real de mic + chip se negado; Whisper só após falha explícita do Speech (com motivo).
+**v0.16.0** — Automação fatia 1: digitar / Enter·Tab·Esc no app em foco (Windows). Voz: ver 0.15.4+.
 
 Spec UI: [`docs/elio-design-system.md`](./docs/elio-design-system.md) · ADRs: [`docs/ADRs/`](./docs/ADRs/) · Distribuição: [`docs/windows-distribution.md`](./docs/windows-distribution.md)
 
@@ -137,12 +137,14 @@ Tokens ficam cifrados em `%APPDATA%\elio\secrets\` (Electron `safeStorage` **asy
 
 | Lane | Exemplos | Status |
 |------|----------|--------|
-| **A** PC | abre site / pasta / arquivo / app; **Spotify play/connect** | ✅ allowlist + PKCE |
+| **A** PC | abre site / pasta / arquivo / app; **digite …** / **pressiona enter**; Spotify | ✅ allowlist + digitar via clipboard (ADR 0015) |
 | **B** Fato local | hora, clima | ✅ enrich (Open-Meteo + relógio + geo) |
 | **C** Web context | aba aberta; pesquisa web | ✅ aba = status sem extensão; research = open+fetch allowlist (ADR 0013) |
 | **D** Chat | conversa geral | ✅ LLM cascata BYOK → free → Ollama |
 
-**Não neste PR:** extensão Chrome/Edge, CDP, crawl genérico, OAuth ChatGPT/Gemini, TTS, RPA.
+**Como testar digitar (Windows):** foque um Bloco de Notas → no Elio diga/escreva `digite bom dia` → deve colar no app em foco. `pressiona enter` envia Enter. Sem RPA genérico ainda.
+
+**Não neste PR:** extensão Chrome/Edge, CDP, crawl genérico, cliques por coordenada, atalhos arbitrários.
 
 ### Clima e fuso
 
@@ -232,7 +234,7 @@ TTS: SSML escapado; sem shell; edge-tts só Microsoft Speech; texto não vai par
 Pesquisa web: só https; fetch só hosts allowlisted; sem crawl; conteúdo marcado não confiável.  
 Aba ativa: sem extensão = sem leitura (sem CDP).  
 Spotify / OpenRouter: PKCE + `safeStorage`; opens só `spotify:` / `https://open.spotify.com`.  
-Ver `docs/ADRs/0002-whisper-subprocess.md`, `0006-auto-location-weather.md`, `0007-spotify-voice-pkce.md`, `0008-windows-speech-primary-stt.md`, `0009-windows-distribution.md`, `0010-command-center-ux-settings.md`, `0011-ai-cascade-byok.md`, `0012-persistent-memory-settings.md` e `0013-web-context-extension-research.md` e `0014-tts-system-and-edge.md`.
+Ver `docs/ADRs/0002-whisper-subprocess.md`, `0005-desktop-opens-intent-router.md`, `0006-auto-location-weather.md`, `0007-spotify-voice-pkce.md`, `0008-windows-speech-primary-stt.md`, `0009-windows-distribution.md`, `0010-command-center-ux-settings.md`, `0011-ai-cascade-byok.md`, `0012-persistent-memory-settings.md`, `0013-web-context-extension-research.md`, `0014-tts-system-and-edge.md` e `0015-desktop-input-type-keys.md`.
 
 ## Licença
 

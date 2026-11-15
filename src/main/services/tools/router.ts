@@ -14,6 +14,10 @@ import { detectChatToolIntent, type ChatToolIntent } from './intent'
 import { parseConfirmOpen, parseDesktopOpenIntent } from './desktop'
 import type { DesktopIntent } from './desktop'
 import {
+  parseDesktopInputIntent,
+  type DesktopInputIntent,
+} from './desktop/input'
+import {
   parseSpotifyIntent,
   type SpotifyIntent,
 } from '../spotify/intent'
@@ -38,6 +42,11 @@ export type ClassifiedIntent =
     }
   | {
       lane: 'pc_action'
+      action: 'desktop_input'
+      input: DesktopInputIntent
+    }
+  | {
+      lane: 'pc_action'
       action: 'spotify'
       spotify: SpotifyIntent
     }
@@ -55,7 +64,7 @@ export type ClassifiedIntent =
 
 /**
  * Classifica o texto do usuário numa lane.
- * Prioridade: confirmação risky → Spotify → PC open → web_context → local_fact → chat.
+ * Prioridade: confirmação risky → Spotify → digitar/tecla → PC open → web_context → local_fact → chat.
  */
 export function classifyUserIntent(text: string): ClassifiedIntent {
   const content = text.trim()
@@ -77,6 +86,11 @@ export function classifyUserIntent(text: string): ClassifiedIntent {
   const spotify = parseSpotifyIntent(content)
   if (spotify) {
     return { lane: 'pc_action', action: 'spotify', spotify }
+  }
+
+  const input = parseDesktopInputIntent(content)
+  if (input) {
+    return { lane: 'pc_action', action: 'desktop_input', input }
   }
 
   const desktop = parseDesktopOpenIntent(content)

@@ -19,6 +19,18 @@ export { resolveAppId, resolveAppPath } from './apps'
 export { parseConfirmOpen, executeDesktopIntent } from './open'
 export type { DesktopIntent } from './intent'
 export type { DesktopActionResult, DesktopOpener } from './open'
+export {
+  parseDesktopInputIntent,
+  executeDesktopInputIntent,
+  createWindowsInputDriver,
+  sanitizeTypeText,
+  TYPE_TEXT_MAX_CHARS,
+} from './input'
+export type {
+  DesktopInputIntent,
+  DesktopInputDriver,
+  AllowlistedKey,
+} from './input'
 
 export function electronDesktopOpener(): DesktopOpener {
   return {
