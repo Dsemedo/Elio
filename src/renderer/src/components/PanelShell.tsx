@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Activity, Bot, Brain, Home, MessageSquare, Settings } from 'lucide-react'
+import { Home, MessageSquare, Settings } from 'lucide-react'
 import type { ChatStatus, Conversation, ConversationSummary } from '@shared/ipc'
 import { ChatView } from './ChatView'
 import { ComputerView } from './ComputerView'
@@ -17,18 +17,20 @@ export type PanelSection =
   | 'memoria'
   | 'configuracoes'
 
-const NAV: {
+const PRIMARY_NAV: {
   id: PanelSection
   label: string
   icon: typeof Home
-  stub?: boolean
 }[] = [
   { id: 'inicio', label: 'Início', icon: Home },
   { id: 'conversas', label: 'Conversas', icon: MessageSquare },
-  { id: 'atividades', label: 'Atividades', icon: Activity, stub: true },
-  { id: 'agentes', label: 'Agentes', icon: Bot, stub: true },
-  { id: 'memoria', label: 'Memória', icon: Brain, stub: true },
   { id: 'configuracoes', label: 'Configurações', icon: Settings },
+]
+
+const SOON_NAV: { id: PanelSection; label: string }[] = [
+  { id: 'atividades', label: 'Atividades' },
+  { id: 'agentes', label: 'Agentes' },
+  { id: 'memoria', label: 'Memória' },
 ]
 
 export function PanelShell(): React.JSX.Element {
@@ -91,7 +93,6 @@ export function PanelShell(): React.JSX.Element {
 
     void boot()
 
-    // Sync com Floating Bar / outra superfície (voz + texto).
     const unsub = window.elio.onChatUpdated((event) => {
       void (async () => {
         try {
@@ -151,6 +152,11 @@ export function PanelShell(): React.JSX.Element {
     setConvTab('chat')
   }
 
+  const continueLast = (): void => {
+    setSection('conversas')
+    setConvTab('chat')
+  }
+
   const removeConversation = async (id: string): Promise<void> => {
     await window.elio.deleteConversation(id)
     const list = await window.elio.listConversations()
@@ -164,6 +170,12 @@ export function PanelShell(): React.JSX.Element {
         setSummaries(await window.elio.listConversations())
       }
     }
+  }
+
+  const renameConversation = async (id: string, title: string): Promise<void> => {
+    const updated = await window.elio.renameConversation({ conversationId: id, title })
+    if (active?.id === id) setActive(updated)
+    await refreshList()
   }
 
   if (bootError) {
@@ -193,23 +205,49 @@ export function PanelShell(): React.JSX.Element {
           <span className="panel-nav-version">v{appVersion}</span>
         </div>
         <ul>
-          {NAV.map((item) => {
+          {PRIMARY_NAV.map((item) => {
             const Icon = item.icon
+            const activeNav =
+              item.id === 'conversas'
+                ? section === 'conversas' || section === 'historico'
+                : section === item.id
             return (
               <li key={item.id}>
                 <button
                   type="button"
-                  className={section === item.id ? 'nav-item active' : 'nav-item'}
-                  onClick={() => setSection(item.id)}
+                  className={activeNav ? 'nav-item active' : 'nav-item'}
+                  onClick={() => {
+                    setSection(item.id)
+                    if (item.id === 'conversas') setConvTab('chat')
+                  }}
                 >
                   <Icon size={16} aria-hidden />
                   <span>{item.label}</span>
-                  {item.stub ? <span className="nav-soon">em breve</span> : null}
                 </button>
               </li>
             )
           })}
         </ul>
+
+        <div className="panel-nav-soon">
+          <p className="panel-nav-soon-label">Em breve</p>
+          <ul>
+            {SOON_NAV.map((item) => (
+              <li key={item.id}>
+                <button
+                  type="button"
+                  className={
+                    section === item.id ? 'nav-item soon active' : 'nav-item soon'
+                  }
+                  onClick={() => setSection(item.id)}
+                >
+                  <span>{item.label}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+
         <p className="panel-nav-foot">
           Floating Bar no topo. Se sumir, use o ícone na bandeja.
         </p>
@@ -221,15 +259,14 @@ export function PanelShell(): React.JSX.Element {
             status={status}
             appVersion={appVersion}
             summaries={summaries}
-            onOpenConversas={() => {
-              setSection('conversas')
-              setConvTab('chat')
-            }}
+            activeTitle={active.title}
+            onContinue={continueLast}
+            onNew={() => void startNew()}
             onOpenConfig={() => setSection('configuracoes')}
           />
         ) : null}
 
-        {section === 'conversas' ? (
+        {section === 'conversas' || section === 'historico' ? (
           <div className="conversas-wrap">
             <div className="conv-tabs" role="tablist">
               <button
@@ -237,7 +274,10 @@ export function PanelShell(): React.JSX.Element {
                 role="tab"
                 aria-selected={convTab === 'chat'}
                 className={convTab === 'chat' ? 'conv-tab active' : 'conv-tab'}
-                onClick={() => setConvTab('chat')}
+                onClick={() => {
+                  setSection('conversas')
+                  setConvTab('chat')
+                }}
               >
                 Chat
               </button>
@@ -246,7 +286,10 @@ export function PanelShell(): React.JSX.Element {
                 role="tab"
                 aria-selected={convTab === 'historico'}
                 className={convTab === 'historico' ? 'conv-tab active' : 'conv-tab'}
-                onClick={() => setConvTab('historico')}
+                onClick={() => {
+                  setSection('conversas')
+                  setConvTab('historico')
+                }}
               >
                 Histórico
               </button>
@@ -254,10 +297,9 @@ export function PanelShell(): React.JSX.Element {
             {convTab === 'chat' ? (
               <ChatView
                 status={status}
-                appVersion={appVersion}
                 summaries={summaries}
                 conversation={active}
-                showSidebar={false}
+                showSidebar
                 onConversationChange={async (next) => {
                   setActive(next)
                   await refreshList()
@@ -265,6 +307,7 @@ export function PanelShell(): React.JSX.Element {
                 onSelect={selectConversation}
                 onNew={startNew}
                 onDelete={removeConversation}
+                onRename={renameConversation}
                 onStatusRefresh={async () => setStatus(await window.elio.getChatStatus())}
               />
             ) : (
@@ -274,6 +317,7 @@ export function PanelShell(): React.JSX.Element {
                 onSelect={selectConversation}
                 onNew={startNew}
                 onDelete={removeConversation}
+                onRename={renameConversation}
                 onOpenChat={() => setConvTab('chat')}
               />
             )}
@@ -281,26 +325,17 @@ export function PanelShell(): React.JSX.Element {
         ) : null}
 
         {section === 'atividades' ? (
-          <StubSection
-            title="Atividades"
-            lede="Acompanhar o que o Elio está fazendo."
-            detail="Ainda não há trilha de tarefas no núcleo. Esta seção será preenchida quando o assistente passar a executar e registrar ações."
-          />
+          <StubSection title="Atividades" lede="Trilha de tarefas — em breve." />
         ) : null}
 
         {section === 'agentes' ? (
-          <StubSection
-            title="Agentes"
-            lede="Workspace de agentes especializados."
-            detail="Fora da Fase 1. Em breve: criar e gerenciar agentes sem reescrever o chat atual."
-          />
+          <StubSection title="Agentes" lede="Workspace de agentes — em breve." />
         ) : null}
 
         {section === 'memoria' ? (
           <StubSection
             title="Memória"
-            lede="O que o Elio deve lembrar de propósito."
-            detail="Memória explícita ainda não está no MVP. O histórico de conversas já fica em Conversas."
+            lede="Memória explícita — em breve. O histórico já fica em Conversas."
           />
         ) : null}
 

@@ -80,6 +80,27 @@ export function deleteConversation(id: string): boolean {
   return true
 }
 
+export function renameConversation(id: string, title: string): Conversation | null {
+  const trimmed = title.replace(/\s+/g, ' ').trim()
+  if (!trimmed) return null
+  const safeTitle = trimmed.length > 80 ? `${trimmed.slice(0, 77)}…` : trimmed
+
+  const data = readStore()
+  const index = data.conversations.findIndex((c) => c.id === id)
+  if (index < 0) return null
+  const current = data.conversations[index]
+  if (!current) return null
+
+  const updated: Conversation = {
+    ...current,
+    title: safeTitle,
+    updatedAt: nowIso(),
+  }
+  data.conversations[index] = updated
+  writeStore(data)
+  return updated
+}
+
 export function appendMessages(
   conversationId: string,
   messages: ChatMessage[],

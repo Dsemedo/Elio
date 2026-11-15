@@ -157,22 +157,32 @@ export async function geocodeCity(
 }
 
 /**
- * Resolve local para clima. Preferência: env → cache (OS/IP) → IP live → fallback.
+ * Resolve local para clima. Preferência: env → settings UI → cache (OS/IP) → IP live → fallback.
  * Não loga coordenadas precisas.
  */
 export async function resolveWeatherLocation(
   signal?: AbortSignal,
   env: NodeJS.ProcessEnv = process.env,
+  prefs?: { weatherCity?: string },
 ): Promise<WeatherLocation> {
   const fromEnv = resolveWeatherLocationFromEnv(env)
   if (fromEnv?.source === 'env-coords') return fromEnv
 
-  if (fromEnv?.source === 'env-city') {
-    const geo = await geocodeCity(fromEnv.name, signal)
+  const cityFromPrefs = prefs?.weatherCity?.trim()
+  const cityCandidate =
+    fromEnv?.source === 'env-city' ? fromEnv.name : cityFromPrefs || undefined
+
+  if (cityCandidate) {
+    const geo = await geocodeCity(cityCandidate, signal)
     if (geo) {
       return { ...geo, source: 'env-city' }
     }
-    return fromEnv
+    return {
+      name: cityCandidate.slice(0, 80),
+      latitude: FALLBACK_LAT,
+      longitude: FALLBACK_LON,
+      source: 'env-city',
+    }
   }
 
   try {
@@ -212,8 +222,11 @@ export async function resolveWeatherLocation(
   }
 }
 
-export async function getWeatherSnapshot(signal?: AbortSignal): Promise<WeatherSnapshot> {
-  const location = await resolveWeatherLocation(signal)
+export async function getWeatherSnapshot(
+  signal?: AbortSignal,
+  prefs?: { weatherCity?: string },
+): Promise<WeatherSnapshot> {
+  const location = await resolveWeatherLocation(signal, process.env, prefs)
   const params = new URLSearchParams({
     latitude: String(location.latitude),
     longitude: String(location.longitude),

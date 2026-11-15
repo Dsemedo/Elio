@@ -1,7 +1,7 @@
 # Elio
 
 Assistente pessoal de IA para desktop (**JARVIS MVP**).  
-**v0.12.1** — corrige `not-allowed` do Windows Speech (permissão media + fallback Whisper); 0.12.0 trouxe NSIS + auto-update.
+**v0.13.0** — Command Center UX (threads ao lado, histórico com busca/renomear, Ollama/OpenRouter na UI). Inclui fix Speech `not-allowed` (0.12.1), NSIS + auto-update (0.12.0) e Windows Speech (0.11.0).
 
 Spec UI: [`docs/elio-design-system.md`](./docs/elio-design-system.md) · ADRs: [`docs/ADRs/`](./docs/ADRs/) · Distribuição: [`docs/windows-distribution.md`](./docs/windows-distribution.md)
 
@@ -39,16 +39,26 @@ npm run ensure:electron
 npm run dev
 ```
 
-### O que Douglas deve ver (0.12.1)
+### O que Douglas deve ver (0.13.0)
 
-1. Selo **v0.12.1**  
-2. `npm run dist:win` gera `dist\Elio-0.12.1-Setup.exe`; instalar e abrir pelo atalho  
-3. Floating Bar: segurar mic → falar PT-BR → **envia sozinho** (sem tela de conferir/editar)  
-4. STT usa **Windows Speech** (sem baixar Whisper na 1ª vez)  
-5. Se o Windows Speech falhar (incl. permissão): cai no **Whisper** e mostra **“Usando Whisper…”** (pode baixar ~466 MB na 1ª vez do fallback)  
-6. Erro de permissão em PT — **não** `WINDOWS_SPEECH_ERROR:not-allowed`  
-7. **“toca uma música no Spotify”** → abre o Spotify; se conectado + Premium → play remoto  
-8. **“como está o tempo?”** → localização → clima da **sua cidade**
+1. Selo **v0.13.0**  
+2. Command Center → **Conversas**: lista de threads **ao lado** do chat  
+3. Header do chat limpo (título + Nova + status)  
+4. Aba **Histórico**: busca por título, renomear (✎ / duplo clique), confirmar exclusão  
+5. **Início**: Continuar conversa + Nova conversa  
+6. **Configurações → Integrações**: Ollama (verificar) + OpenRouter (salvar chave no cofre) + cidade do clima  
+7. Floating Bar: Windows Speech → **envia sozinho**; se permissão falhar → **“Usando Whisper…”** (sem `WINDOWS_SPEECH_ERROR:not-allowed`)  
+8. `npm run dist:win` gera instalador NSIS; Spotify / clima das versões anteriores continuam ok
+
+### OpenRouter / Ollama na UI
+
+Em **Configurações → Integrações** você pode:
+
+- Ajustar host/modelo do Ollama e clicar **Verificar de novo**  
+- Colar a chave OpenRouter — fica cifrada em `%APPDATA%\elio\secrets\openrouter-key.bin`  
+- Preferências não secretas em `%APPDATA%\elio\elio-settings.json`  
+
+`OPENROUTER_API_KEY` / `OLLAMA_*` no ambiente ainda funcionam e **têm prioridade** sobre o cofre/arquivo.
 
 ### Microfone / fala no Windows (se aparecer permissão negada)
 
@@ -93,16 +103,17 @@ Tokens ficam cifrados em `%APPDATA%\elio\secrets\` (Electron `safeStorage` **asy
 | **C** Web context | aba aberta, pesquisa web | ⏳ deferred (extensão/CDP) |
 | **D** Chat | conversa geral | ✅ LLM (Ollama / OpenRouter) |
 
-**Não neste PR:** busca de música na UI, redesenho do Command Center, ler aba do browser, RPA, correção LLM do transcript.
+**Não neste PR:** TTS, ler aba do browser, BYOK cascade, mudanças de STT/installer (já em main).
 
 ### Clima e fuso
 
 Ordem de resolução:
 
 1. `ELIO_WEATHER_LAT` + `ELIO_WEATHER_LON` (ou `ELIO_WEATHER_CITY`)  
-2. Cache local da localização OS (`elio-location.json`)  
-3. Fallback IP (`ipwho.is`) se a permissão OS for negada/falhar  
-4. Último recurso: São Paulo (`fallback`)
+2. Cidade salva em Configurações (`elio-settings.json`)  
+3. Cache local da localização OS (`elio-location.json`)  
+4. Fallback IP (`ipwho.is`) se a permissão OS for negada/falhar  
+5. Último recurso: São Paulo (`fallback`)
 
 | Variável | Efeito |
 |----------|--------|
@@ -112,6 +123,7 @@ Ordem de resolução:
 | `ELIO_WHISPER_MODEL` | `tiny` / `base` / `small` (padrão `small`; só fallback) |
 | `ELIO_STT_PROVIDER` | `auto` (padrão) / `windows-speech` / `whisper` |
 | `ELIO_SPOTIFY_CLIENT_ID` | Client ID Spotify (PKCE; sem secret) |
+| `OPENROUTER_API_KEY` | Chave nuvem (prioridade sobre cofre da UI) |
 
 ### Privacidade (localização)
 
@@ -132,7 +144,7 @@ Ordem de resolução:
 ### Como testar STT no Windows
 
 1. Confirme idioma de fala pt-BR em **Configurações → Hora e idioma → Fala**  
-2. `npm run dev` → selo **v0.12.0**  
+2. `npm run dev` → selo **v0.13.0**  
 3. Segure o mic na Floating Bar → diga *“Qual é o clima atual do lugar que eu moro?”* → solte  
 4. O texto deve ir **direto** ao chat (sem caixa “Confira o texto”)  
 5. Preferência: “atual” **não** vira “outdoor”  
@@ -141,6 +153,12 @@ Ordem de resolução:
 
 ## Segurança
 
-- Opens de desktop: allowlist + confirmação para paths sensíveis  
-- Spotify: PKCE + `safeStorage` async; opens só `spotify:` / `https://open.spotify.com`  
-- Sem secrets no repo / logs  
+`contextIsolation`, sem `nodeIntegration`, sandbox, Zod IPC.  
+STT: Windows Speech no renderer; Whisper subprocess só no main (`shell: false`).  
+Clima: Open-Meteo + cache local; coords não vão ao histórico/LLM.  
+Spotify / OpenRouter: PKCE + `safeStorage`; opens só `spotify:` / `https://open.spotify.com`.  
+Ver `docs/ADRs/0002-whisper-subprocess.md`, `0006-auto-location-weather.md`, `0007-spotify-voice-pkce.md`, `0008-windows-speech-primary-stt.md`, `0009-windows-distribution.md` e `0010-command-center-ux-settings.md`.
+
+## Licença
+
+UNLICENSED — uso privado por enquanto.

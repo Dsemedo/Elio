@@ -3,6 +3,7 @@ import { IpcChannels } from '../shared/channels'
 import type {
   AppInfo,
   AppLocation,
+  ChatRenameInput,
   ChatSendInput,
   ChatSendResult,
   ChatStatus,
@@ -10,6 +11,9 @@ import type {
   Conversation,
   ConversationSummary,
   LocationSaveOsInput,
+  SettingsOpenRouterKeyInput,
+  SettingsPublic,
+  SettingsUpdateInput,
   ShellState,
   SystemSnapshot,
   VoiceProgress,
@@ -40,8 +44,26 @@ const elioApi = {
   deleteConversation: (conversationId: string): Promise<{ ok: boolean }> =>
     ipcRenderer.invoke(IpcChannels.CHAT_DELETE, { conversationId }),
 
+  renameConversation: (input: ChatRenameInput): Promise<Conversation> =>
+    ipcRenderer.invoke(IpcChannels.CHAT_RENAME, input),
+
   sendMessage: (input: ChatSendInput): Promise<ChatSendResult> =>
     ipcRenderer.invoke(IpcChannels.CHAT_SEND, input),
+
+  getSettings: (): Promise<SettingsPublic> =>
+    ipcRenderer.invoke(IpcChannels.SETTINGS_GET),
+
+  updateSettings: (input: SettingsUpdateInput): Promise<SettingsPublic> =>
+    ipcRenderer.invoke(IpcChannels.SETTINGS_UPDATE, input),
+
+  setOpenRouterKey: (input: SettingsOpenRouterKeyInput): Promise<SettingsPublic> =>
+    ipcRenderer.invoke(IpcChannels.SETTINGS_SET_OPENROUTER_KEY, input),
+
+  clearOpenRouterKey: (): Promise<SettingsPublic> =>
+    ipcRenderer.invoke(IpcChannels.SETTINGS_CLEAR_OPENROUTER_KEY),
+
+  probeOllama: (): Promise<{ ok: boolean; host: string; message: string }> =>
+    ipcRenderer.invoke(IpcChannels.SETTINGS_PROBE_OLLAMA),
 
   cancelReply: (conversationId: string): Promise<{ ok: boolean }> =>
     ipcRenderer.invoke(IpcChannels.CHAT_CANCEL, { conversationId }),

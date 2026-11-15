@@ -29,16 +29,16 @@ import {
 
 type Props = {
   status: ChatStatus
-  /** Versão do package.json — se não for a do PR de voz, ainda está no código antigo. */
-  appVersion: string
   summaries: ConversationSummary[]
   conversation: Conversation
-  /** Sidebar de threads; no painel shell o Histórico cobre isso. */
+  /** Lista de threads ao lado (padrão Command Center). */
   showSidebar?: boolean
+  busyExternal?: boolean
   onConversationChange: (conversation: Conversation) => Promise<void>
   onSelect: (id: string) => Promise<void>
   onNew: () => Promise<void>
   onDelete: (id: string) => Promise<void>
+  onRename?: (id: string, title: string) => Promise<void>
   onStatusRefresh: () => Promise<void>
 }
 
@@ -54,7 +54,6 @@ type ActiveCapture =
 
 export function ChatView({
   status,
-  appVersion,
   summaries,
   conversation,
   showSidebar = true,
@@ -62,12 +61,12 @@ export function ChatView({
   onSelect,
   onNew,
   onDelete,
+  onRename,
   onStatusRefresh,
 }: Props): React.JSX.Element {
   const [draft, setDraft] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [lastModel, setLastModel] = useState<string | null>(null)
   const [voiceStatus, setVoiceStatus] = useState<VoiceStatus | null>(null)
   const [voiceUi, setVoiceUi] = useState<VoiceUiState>('idle')
   const [voiceProgress, setVoiceProgress] = useState<VoiceProgress | null>(null)
@@ -171,7 +170,6 @@ export function ChatView({
         conversationId: conversation.id,
         content,
       })
-      setLastModel(`${result.provider} · ${result.model}`)
       stickToBottomRef.current = true
       await onConversationChange(result.conversation)
       await onStatusRefresh()
@@ -409,12 +407,32 @@ export function ChatView({
                 ? 'Segure para falar (Whisper · envia sozinho)'
                 : 'Segure para falar (baixa Whisper na 1ª vez se precisar)'
 
+  const providerLabel =
+    status.preferredProvider === 'none'
+      ? 'sem provedor'
+      : status.preferredProvider === 'ollama'
+        ? 'Ollama'
+        : 'OpenRouter'
+  const headerStatus = busy
+    ? 'Pensando…'
+    : voiceUi === 'recording'
+      ? 'Ouvindo…'
+      : voiceUi === 'transcribing' || voiceUi === 'preparing'
+        ? 'Voz…'
+        : providerLabel
+
+  const confirmDelete = (id: string, title: string): void => {
+    const ok = window.confirm(`Excluir a conversa “${title}”?`)
+    if (!ok) return
+    void onDelete(id)
+  }
+
   return (
     <div className={showSidebar ? 'chat-app' : 'chat-app chat-app-solo'}>
       {showSidebar ? (
-        <aside className="sidebar">
+        <aside className="sidebar" aria-label="Conversas">
           <div className="sidebar-brand">
-            <span className="sidebar-logo">Elio</span>
+            <span className="sidebar-logo">Conversas</span>
             <button type="button" className="btn ghost" onClick={() => void onNew()}>
               Nova
             </button>
@@ -428,6 +446,11 @@ export function ChatView({
                     item.id === conversation.id ? 'thread-item active' : 'thread-item'
                   }
                   onClick={() => void onSelect(item.id)}
+                  onDoubleClick={() => {
+                    if (!onRename) return
+                    const next = window.prompt('Renomear conversa', item.title)
+                    if (next?.trim()) void onRename(item.id, next.trim())
+                  }}
                 >
                   <span className="thread-title">{item.title}</span>
                   <span className="thread-meta">{item.messageCount} msgs</span>
@@ -436,7 +459,7 @@ export function ChatView({
                   type="button"
                   className="thread-delete"
                   title="Excluir conversa"
-                  onClick={() => void onDelete(item.id)}
+                  onClick={() => confirmDelete(item.id, item.title)}
                 >
                   ×
                 </button>
@@ -449,46 +472,13 @@ export function ChatView({
       <section className="chat-main">
         <header className="chat-header">
           <div>
-            <h1>Conversar</h1>
-            <p className="status-hint">{status.hint}</p>
-            {voiceStatus ? (
-              <p className="status-hint voice-hint">
-                {usingWindowsSpeech
-                  ? voiceStatus.ready
-                    ? 'Windows Speech primário; Whisper pronto como fallback.'
-                    : 'Windows Speech primário (sem download). Whisper opcional como fallback.'
-                  : voiceStatus.ready
-                    ? `Voz pronta (Whisper ${voiceStatus.modelId} local).`
-                    : voiceStatus.hint}
-              </p>
-            ) : null}
+            <h1>{conversation.title}</h1>
+            <p className="status-hint">{headerStatus}</p>
           </div>
           <div className="header-badges">
-            {!showSidebar ? (
-              <button type="button" className="btn ghost" onClick={() => void onNew()}>
-                Nova
-              </button>
-            ) : null}
-            <span className="badge" title="Versão do Elio">
-              v{appVersion}
-            </span>
-            {lastModel ? (
-              <span className="badge ai" title="Modelo de IA">
-                {lastModel}
-              </span>
-            ) : null}
-            <span className="badge muted">
-              {status.preferredProvider === 'none'
-                ? 'sem provedor'
-                : status.preferredProvider}
-            </span>
-            {usingWindowsSpeech ? (
-              <span className="badge accent">voz Windows</span>
-            ) : voiceStatus?.ready ? (
-              <span className="badge accent">voz ok</span>
-            ) : (
-              <span className="badge muted">voz pendente</span>
-            )}
+            <button type="button" className="btn ghost" onClick={() => void onNew()}>
+              Nova
+            </button>
           </div>
         </header>
 
@@ -511,11 +501,18 @@ export function ChatView({
           {conversation.messages.length === 0 && !busy ? (
             <div className="empty-state">
               <p className="empty-title">Olá — sou o Elio.</p>
-              <p>
-                Escreva ou use o microfone. No Windows a fala usa o reconhecimento nativo
-                (pt-BR) e envia sozinha; Whisper fica só como fallback offline. Pergunte a
-                hora ou o tempo — uso o relógio local, Open-Meteo e a localização do PC.
-              </p>
+              <p>Escreva ou fale. Posso ajudar com o dia a dia neste PC.</p>
+              {!usingWindowsSpeech && !voiceStatus?.ready ? (
+                <button
+                  type="button"
+                  className="btn ghost"
+                  style={{ marginTop: '0.75rem' }}
+                  disabled={voiceBusy || busy}
+                  onClick={() => void prepareVoiceClick()}
+                >
+                  Preparar voz
+                </button>
+              ) : null}
             </div>
           ) : null}
 

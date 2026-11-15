@@ -47,6 +47,33 @@ export type ChatStatus = {
   spotifyConnected: boolean
 }
 
+export type ChatRenameInput = {
+  conversationId: string
+  title: string
+}
+
+/** Preferências públicas (sem secrets). */
+export type SettingsPublic = {
+  ollamaHost: string
+  ollamaModel: string
+  openRouterModel: string
+  weatherCity: string
+  openRouterKeyConfigured: boolean
+  openRouterKeySource: 'env' | 'store' | 'none'
+  encryptionAvailable: boolean
+}
+
+export type SettingsUpdateInput = {
+  ollamaHost?: string
+  ollamaModel?: string
+  openRouterModel?: string
+  weatherCity?: string
+}
+
+export type SettingsOpenRouterKeyInput = {
+  apiKey: string
+}
+
 export type ChatSendInput = {
   conversationId: string
   content: string

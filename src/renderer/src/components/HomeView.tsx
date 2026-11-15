@@ -4,7 +4,9 @@ type Props = {
   status: ChatStatus
   appVersion: string
   summaries: ConversationSummary[]
-  onOpenConversas: () => void
+  activeTitle: string | null
+  onContinue: () => void
+  onNew: () => void
   onOpenConfig: () => void
 }
 
@@ -12,7 +14,9 @@ export function HomeView({
   status,
   appVersion,
   summaries,
-  onOpenConversas,
+  activeTitle,
+  onContinue,
+  onNew,
   onOpenConfig,
 }: Props): React.JSX.Element {
   const providerLabel =
@@ -22,42 +26,42 @@ export function HomeView({
         ? 'Ollama'
         : 'OpenRouter'
 
+  const canContinue = summaries.length > 0 && Boolean(activeTitle)
+
   return (
     <section className="panel-section home-view">
       <header className="section-header">
         <div>
           <h1>Início</h1>
-          <p className="section-lede">Resumo rápido do Elio neste PC.</p>
+          <p className="section-lede">Continue de onde parou ou comece outra conversa.</p>
         </div>
         <span className="badge muted">v{appVersion}</span>
       </header>
 
-      <div className="home-grid">
-        <article className="home-tile">
-          <h2>Provedor</h2>
-          <p className="home-value">{providerLabel}</p>
-          <p className="stat-sub">{status.hint}</p>
-          <button type="button" className="btn ghost" onClick={onOpenConfig}>
-            Configurações
-          </button>
-        </article>
+      <div className="home-actions">
+        <button
+          type="button"
+          className="btn primary home-cta"
+          disabled={!canContinue}
+          onClick={onContinue}
+        >
+          Continuar conversa
+          {activeTitle ? <span className="home-cta-sub">{activeTitle}</span> : null}
+        </button>
+        <button type="button" className="btn ghost home-cta" onClick={onNew}>
+          Nova conversa
+        </button>
+      </div>
 
-        <article className="home-tile">
-          <h2>Conversas</h2>
-          <p className="home-value">{summaries.length}</p>
-          <p className="stat-sub">Salvas localmente neste computador.</p>
-          <button type="button" className="btn primary" onClick={onOpenConversas}>
-            Abrir conversas
-          </button>
-        </article>
-
-        <article className="home-tile">
-          <h2>Floating Bar</h2>
-          <p className="stat-sub">
-            Use a barra no topo para perguntar ou falar sem abrir este painel. Expanda
-            pelo ícone □ ou pelo menu.
-          </p>
-        </article>
+      <div className="home-status-row">
+        <p>
+          <span className="home-status-label">Provedor</span>
+          <strong>{providerLabel}</strong>
+        </p>
+        <p className="stat-sub">{status.hint}</p>
+        <button type="button" className="btn ghost" onClick={onOpenConfig}>
+          Configurações
+        </button>
       </div>
     </section>
   )

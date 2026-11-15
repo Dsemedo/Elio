@@ -3,6 +3,7 @@ import { IpcChannels } from './channels'
 import type {
   AppInfo,
   ChatMessage,
+  ChatRenameInput,
   ChatRole,
   ChatSendInput,
   ChatSendResult,
@@ -11,6 +12,9 @@ import type {
   Conversation,
   ConversationSummary,
   ProviderKind,
+  SettingsOpenRouterKeyInput,
+  SettingsPublic,
+  SettingsUpdateInput,
   ShellState,
   SystemSnapshot,
   AppLocation,
@@ -27,6 +31,7 @@ export type { IpcChannel } from './channels'
 export type {
   AppInfo,
   ChatMessage,
+  ChatRenameInput,
   ChatRole,
   ChatSendInput,
   ChatSendResult,
@@ -35,6 +40,9 @@ export type {
   Conversation,
   ConversationSummary,
   ProviderKind,
+  SettingsOpenRouterKeyInput,
+  SettingsPublic,
+  SettingsUpdateInput,
   ShellState,
   SystemSnapshot,
   AppLocation,
@@ -102,10 +110,42 @@ export const ConversationIdSchema = z.object({
   conversationId: z.string().min(1),
 })
 
+export const ChatRenameInputSchema = z.object({
+  conversationId: z.string().min(1),
+  title: z.string().trim().min(1).max(80),
+})
+
 export const ChatUpdatedEventSchema = z.object({
   reason: z.enum(['created', 'updated', 'deleted']),
   conversationId: z.string().min(1),
   conversation: ConversationSchema.optional(),
+})
+
+export const SettingsPublicSchema = z.object({
+  ollamaHost: z.string().min(1),
+  ollamaModel: z.string().min(1),
+  openRouterModel: z.string().min(1),
+  weatherCity: z.string(),
+  openRouterKeyConfigured: z.boolean(),
+  openRouterKeySource: z.enum(['env', 'store', 'none']),
+  encryptionAvailable: z.boolean(),
+})
+
+export const SettingsUpdateInputSchema = z.object({
+  ollamaHost: z.string().max(200).optional(),
+  ollamaModel: z.string().max(80).optional(),
+  openRouterModel: z.string().max(120).optional(),
+  weatherCity: z.string().max(80).optional(),
+})
+
+export const SettingsOpenRouterKeyInputSchema = z.object({
+  apiKey: z.string().trim().min(8).max(500),
+})
+
+export const SettingsProbeOllamaResultSchema = z.object({
+  ok: z.boolean(),
+  host: z.string(),
+  message: z.string(),
 })
 
 export const VoiceStatusSchema = z.object({

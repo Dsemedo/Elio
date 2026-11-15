@@ -1,86 +1,108 @@
-import { useState } from 'react'
-import type { ChatStatus } from '@shared/ipc'
+import { useEffect, useState } from 'react'
+import type { ChatStatus, SettingsPublic } from '@shared/ipc'
 
 type Props = {
   status: ChatStatus
   onStatusRefresh?: () => Promise<void>
 }
 
-type Card = {
-  id: string
-  title: string
-  kind: 'ia' | 'app'
-  status: 'ok' | 'config' | 'soon'
-  detail: string
-}
-
 export function IntegrationsView({ status, onStatusRefresh }: Props): React.JSX.Element {
+  const [settings, setSettings] = useState<SettingsPublic | null>(null)
+  const [ollamaHost, setOllamaHost] = useState('')
+  const [ollamaModel, setOllamaModel] = useState('')
+  const [openRouterModel, setOpenRouterModel] = useState('')
+  const [weatherCity, setWeatherCity] = useState('')
+  const [apiKeyDraft, setApiKeyDraft] = useState('')
+  const [busy, setBusy] = useState(false)
   const [spotifyBusy, setSpotifyBusy] = useState(false)
+  const [message, setMessage] = useState<string | null>(null)
   const [spotifyMsg, setSpotifyMsg] = useState<string | null>(null)
 
-  const spotifyDetail = ((): string => {
-    if (!status.spotifyClientConfigured) {
-      return 'Defina ELIO_SPOTIFY_CLIENT_ID (Dashboard Spotify), redirect http://127.0.0.1:47821/callback, reinicie. Play remoto exige Premium.'
-    }
-    if (status.spotifyConnected) {
-      return 'Conta conectada (tokens cifrados neste PC). Diga “toca uma música no Spotify”. Premium necessário para controle remoto.'
-    }
-    return 'Client ID ok. Clique em Conectar Spotify (OAuth PKCE) ou diga “conectar Spotify”.'
-  })()
+  const loadSettings = async (): Promise<void> => {
+    const next = await window.elio.getSettings()
+    setSettings(next)
+    setOllamaHost(next.ollamaHost)
+    setOllamaModel(next.ollamaModel)
+    setOpenRouterModel(next.openRouterModel)
+    setWeatherCity(next.weatherCity)
+  }
 
-  const cards: Card[] = [
-    {
-      id: 'ollama',
-      title: 'Ollama',
-      kind: 'ia',
-      status: status.ollamaAvailable ? 'ok' : 'config',
-      detail: status.ollamaAvailable
-        ? 'Detectado neste PC — prioridade do roteador.'
-        : 'Não detectado. Instale/abra o Ollama para respostas locais.',
-    },
-    {
-      id: 'openrouter',
-      title: 'OpenRouter',
-      kind: 'ia',
-      status: status.openRouterConfigured ? 'ok' : 'config',
-      detail: status.openRouterConfigured
-        ? 'Chave configurada via ambiente (fallback).'
-        : 'Opcional: defina OPENROUTER_API_KEY no terminal antes do npm run dev.',
-    },
-    {
-      id: 'spotify',
-      title: 'Spotify',
-      kind: 'app',
-      status: status.spotifyConnected
-        ? 'ok'
-        : status.spotifyClientConfigured
-          ? 'config'
-          : 'config',
-      detail: spotifyDetail,
-    },
-    {
-      id: 'weather',
-      title: 'Clima (Open-Meteo)',
-      kind: 'app',
-      status: 'ok',
-      detail:
-        'Sem chave. Na 1ª pergunta de clima pede localização do Windows (cache local). Se negar, usa IP aproximado. Opcional: ELIO_WEATHER_CITY ou ELIO_WEATHER_LAT+LON. Fuso: ELIO_TIMEZONE (padrão America/Sao_Paulo).',
-    },
-    {
-      id: 'slack',
-      title: 'Slack',
-      kind: 'app',
-      status: 'soon',
-      detail: 'Em breve — OAuth e leitura de canais ficam numa fatia seguinte.',
-    },
-    {
-      id: 'jira',
-      title: 'Jira',
-      kind: 'app',
-      status: 'soon',
-      detail: 'Em breve — conexão com projetos e issues ainda não está neste pedaço.',
-    },
-  ]
+  useEffect(() => {
+    void loadSettings().catch((err) => {
+      setMessage(err instanceof Error ? err.message : 'Falha ao carregar configurações')
+    })
+  }, [])
+
+  const savePrefs = async (): Promise<void> => {
+    setBusy(true)
+    setMessage(null)
+    try {
+      const next = await window.elio.updateSettings({
+        ollamaHost,
+        ollamaModel,
+        openRouterModel,
+        weatherCity,
+      })
+      setSettings(next)
+      setMessage('Preferências salvas neste PC.')
+      await onStatusRefresh?.()
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : 'Falha ao salvar')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const probeOllama = async (): Promise<void> => {
+    setBusy(true)
+    setMessage(null)
+    try {
+      await window.elio.updateSettings({ ollamaHost, ollamaModel })
+      const result = await window.elio.probeOllama()
+      setMessage(result.message)
+      await onStatusRefresh?.()
+      await loadSettings()
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : 'Falha ao verificar Ollama')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const saveOpenRouterKey = async (): Promise<void> => {
+    setBusy(true)
+    setMessage(null)
+    try {
+      const next = await window.elio.setOpenRouterKey({ apiKey: apiKeyDraft })
+      setSettings(next)
+      setApiKeyDraft('')
+      setMessage('Chave OpenRouter salva no cofre deste PC.')
+      await onStatusRefresh?.()
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : 'Falha ao salvar chave')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const clearOpenRouterKey = async (): Promise<void> => {
+    setBusy(true)
+    setMessage(null)
+    try {
+      const next = await window.elio.clearOpenRouterKey()
+      setSettings(next)
+      setMessage(
+        next.openRouterKeySource === 'env'
+          ? 'Cofre limpo. Ainda há OPENROUTER_API_KEY no ambiente.'
+          : 'Chave removida do cofre.',
+      )
+      await onStatusRefresh?.()
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : 'Falha ao remover chave')
+    } finally {
+      setBusy(false)
+    }
+  }
 
   const connectSpotify = async (): Promise<void> => {
     setSpotifyBusy(true)
@@ -110,63 +132,248 @@ export function IntegrationsView({ status, onStatusRefresh }: Props): React.JSX.
     }
   }
 
+  const openRouterStatus = settings?.openRouterKeyConfigured
+    ? 'ok'
+    : status.openRouterConfigured
+      ? 'ok'
+      : 'config'
+  const ollamaStatus = status.ollamaAvailable ? 'ok' : 'config'
+
   return (
     <section className="panel-section integrations-view">
       <header className="section-header">
         <div>
           <h1>Integrações</h1>
           <p className="section-lede">
-            Contas de IA e apps. Stubs honestos onde ainda não há OAuth.
+            Configure o cérebro (IA) neste app — sem precisar editar o terminal.
           </p>
         </div>
       </header>
 
+      <h2 className="integrations-band">Cérebro (IA)</h2>
       <div className="integration-grid">
-        {cards.map((card) => (
-          <article key={card.id} className="integration-card">
-            <header>
-              <span className="integration-kind">
-                {card.kind === 'ia' ? 'IA' : 'App'}
-              </span>
-              <h2>{card.title}</h2>
-            </header>
-            <p>{card.detail}</p>
-            {card.id === 'spotify' ? (
-              <div className="integration-actions">
-                {status.spotifyConnected ? (
-                  <button
-                    type="button"
-                    className="btn ghost"
-                    disabled={spotifyBusy}
-                    onClick={() => void disconnectSpotify()}
-                  >
-                    Desconectar
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    className="btn primary"
-                    disabled={spotifyBusy || !status.spotifyClientConfigured}
-                    onClick={() => void connectSpotify()}
-                  >
-                    {spotifyBusy ? 'Aguardando login…' : 'Conectar Spotify'}
-                  </button>
-                )}
-                {spotifyMsg ? <p className="integration-msg">{spotifyMsg}</p> : null}
-              </div>
-            ) : null}
-            <footer>
-              {card.status === 'ok' ? (
-                <span className="badge accent">conectado</span>
-              ) : card.status === 'soon' ? (
-                <span className="badge muted">em breve</span>
-              ) : (
-                <span className="badge muted">configurar</span>
-              )}
-            </footer>
-          </article>
-        ))}
+        <article className="integration-card">
+          <header>
+            <span className="integration-kind">IA</span>
+            <h2>Ollama</h2>
+          </header>
+          <p>
+            {status.ollamaAvailable
+              ? 'Detectado neste PC — prioridade do roteador.'
+              : 'Não detectado. Instale/abra o Ollama e verifique de novo.'}
+          </p>
+          <label className="field">
+            <span>Host</span>
+            <input
+              value={ollamaHost}
+              onChange={(e) => setOllamaHost(e.target.value)}
+              placeholder="http://127.0.0.1:11434"
+              autoComplete="off"
+            />
+          </label>
+          <label className="field">
+            <span>Modelo</span>
+            <input
+              value={ollamaModel}
+              onChange={(e) => setOllamaModel(e.target.value)}
+              placeholder="llama3.2"
+              autoComplete="off"
+            />
+          </label>
+          <div className="integration-actions">
+            <button
+              type="button"
+              className="btn primary"
+              disabled={busy}
+              onClick={() => void probeOllama()}
+            >
+              Verificar de novo
+            </button>
+            <button
+              type="button"
+              className="btn ghost"
+              disabled={busy}
+              onClick={() => void savePrefs()}
+            >
+              Salvar
+            </button>
+          </div>
+          <footer>
+            {ollamaStatus === 'ok' ? (
+              <span className="badge accent">conectado</span>
+            ) : (
+              <span className="badge muted">configurar</span>
+            )}
+          </footer>
+        </article>
+
+        <article className="integration-card">
+          <header>
+            <span className="integration-kind">IA</span>
+            <h2>OpenRouter</h2>
+          </header>
+          <p>
+            {settings?.openRouterKeySource === 'env'
+              ? 'Chave via variável de ambiente (prioridade).'
+              : settings?.openRouterKeyConfigured
+                ? 'Chave no cofre deste PC (safeStorage).'
+                : settings?.encryptionAvailable === false
+                  ? 'Criptografia do SO indisponível — use OPENROUTER_API_KEY no ambiente.'
+                  : 'Fallback na nuvem. Cole a chave aqui para não depender do terminal.'}
+          </p>
+          <label className="field">
+            <span>Modelo</span>
+            <input
+              value={openRouterModel}
+              onChange={(e) => setOpenRouterModel(e.target.value)}
+              placeholder="meta-llama/llama-3.2-3b-instruct:free"
+              autoComplete="off"
+            />
+          </label>
+          <label className="field">
+            <span>API key</span>
+            <input
+              type="password"
+              value={apiKeyDraft}
+              onChange={(e) => setApiKeyDraft(e.target.value)}
+              placeholder={
+                settings?.openRouterKeyConfigured ? '•••••••• (nova chave)' : 'sk-or-…'
+              }
+              autoComplete="off"
+              spellCheck={false}
+            />
+          </label>
+          <div className="integration-actions">
+            <button
+              type="button"
+              className="btn primary"
+              disabled={busy || apiKeyDraft.trim().length < 8}
+              onClick={() => void saveOpenRouterKey()}
+            >
+              Salvar chave
+            </button>
+            <button
+              type="button"
+              className="btn ghost"
+              disabled={busy || settings?.openRouterKeySource === 'env'}
+              onClick={() => void clearOpenRouterKey()}
+            >
+              Remover do cofre
+            </button>
+            <button
+              type="button"
+              className="btn ghost"
+              disabled={busy}
+              onClick={() => void savePrefs()}
+            >
+              Salvar modelo
+            </button>
+          </div>
+          <footer>
+            {openRouterStatus === 'ok' ? (
+              <span className="badge accent">conectado</span>
+            ) : (
+              <span className="badge muted">configurar</span>
+            )}
+          </footer>
+        </article>
       </div>
+
+      <h2 className="integrations-band">Apps</h2>
+      <div className="integration-grid">
+        <article className="integration-card">
+          <header>
+            <span className="integration-kind">App</span>
+            <h2>Spotify</h2>
+          </header>
+          <p>
+            {!status.spotifyClientConfigured
+              ? 'Defina ELIO_SPOTIFY_CLIENT_ID, redirect http://127.0.0.1:47821/callback, reinicie. Play remoto exige Premium.'
+              : status.spotifyConnected
+                ? 'Conta conectada (tokens cifrados neste PC).'
+                : 'Client ID ok. Conecte com OAuth PKCE.'}
+          </p>
+          <div className="integration-actions">
+            {status.spotifyConnected ? (
+              <button
+                type="button"
+                className="btn ghost"
+                disabled={spotifyBusy}
+                onClick={() => void disconnectSpotify()}
+              >
+                Desconectar
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="btn primary"
+                disabled={spotifyBusy || !status.spotifyClientConfigured}
+                onClick={() => void connectSpotify()}
+              >
+                {spotifyBusy ? 'Aguardando login…' : 'Conectar Spotify'}
+              </button>
+            )}
+            {spotifyMsg ? <p className="integration-msg">{spotifyMsg}</p> : null}
+          </div>
+          <footer>
+            {status.spotifyConnected ? (
+              <span className="badge accent">conectado</span>
+            ) : (
+              <span className="badge muted">configurar</span>
+            )}
+          </footer>
+        </article>
+
+        <article className="integration-card">
+          <header>
+            <span className="integration-kind">App</span>
+            <h2>Clima (Open-Meteo)</h2>
+          </header>
+          <p>
+            Sem chave. Preferência de cidade (opcional) — senão usa localização do PC / IP.
+          </p>
+          <label className="field">
+            <span>Cidade preferida</span>
+            <input
+              value={weatherCity}
+              onChange={(e) => setWeatherCity(e.target.value)}
+              placeholder="ex.: Campinas"
+              autoComplete="off"
+            />
+          </label>
+          <div className="integration-actions">
+            <button
+              type="button"
+              className="btn ghost"
+              disabled={busy}
+              onClick={() => void savePrefs()}
+            >
+              Salvar cidade
+            </button>
+          </div>
+          <footer>
+            <span className="badge accent">ok</span>
+          </footer>
+        </article>
+      </div>
+
+      <h2 className="integrations-band quiet">Em breve</h2>
+      <ul className="soon-list">
+        <li>
+          <span>Slack</span>
+          <span className="badge muted">em breve</span>
+        </li>
+        <li>
+          <span>Jira</span>
+          <span className="badge muted">em breve</span>
+        </li>
+      </ul>
+
+      {message ? (
+        <p className="integration-msg" role="status">
+          {message}
+        </p>
+      ) : null}
     </section>
   )
 }

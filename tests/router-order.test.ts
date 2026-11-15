@@ -17,6 +17,14 @@ vi.mock('../src/main/services/providers/openrouter', () => ({
   },
 }))
 
+vi.mock('../src/main/services/spotify', () => ({
+  getSpotifyConnectionStatus: vi.fn(async () => ({
+    clientConfigured: false,
+    connected: false,
+    encryptionAvailable: true,
+  })),
+}))
+
 import { ollamaProvider } from '../src/main/services/providers/ollama'
 import {
   isOpenRouterConfigured,
@@ -76,7 +84,7 @@ describe('smart router v1', () => {
 
   it('status aponta none quando nada está pronto', async () => {
     vi.mocked(ollamaProvider.isAvailable).mockResolvedValue(false)
-    vi.mocked(isOpenRouterConfigured).mockReturnValue(false)
+    vi.mocked(isOpenRouterConfigured).mockResolvedValue(false)
 
     const status = await getChatStatus()
     expect(status.preferredProvider).toBe('none')
