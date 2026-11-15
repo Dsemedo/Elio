@@ -1,12 +1,19 @@
 /** Pin oficial whisper.cpp (release com assets Windows/Linux). */
 export const WHISPER_RELEASE = 'v1.9.2'
 
-export const MODEL_ID = 'tiny' as const
-export const MODEL_FILE = 'ggml-tiny.bin'
+/** Modelo multilíngue padrão — OD-05 fechado para PT-BR (feedback Douglas). */
+export const MODEL_ID = 'base' as const
+export const MODEL_FILE = 'ggml-base.bin'
 
-/** ~75 MB — Hugging Face (ggerganov/whisper.cpp). */
+/** Modelo antigo (v0.3 voz); usuário pode apagar após migrar. */
+export const LEGACY_MODEL_FILE = 'ggml-tiny.bin'
+
+/** ~142 MB — Hugging Face (ggerganov/whisper.cpp). */
 export const MODEL_URL =
-  'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin'
+  'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin'
+
+/** Tamanho aproximado para UX (modelo + binário). */
+export const MODEL_SIZE_HINT_MB = 150
 
 export const MIN_AUDIO_MS = 400
 export const MAX_AUDIO_BYTES = 8 * 1024 * 1024

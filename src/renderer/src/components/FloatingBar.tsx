@@ -125,9 +125,9 @@ export function FloatingBar(): React.JSX.Element {
     return created.id
   }
 
-  const send = async (): Promise<void> => {
-    const content = draft.trim()
-    if (!content || resolvedState === 'thinking' || resolvedState === 'listening') return
+  const sendContent = async (raw: string): Promise<void> => {
+    const content = raw.trim()
+    if (!content) return
     setError(null)
     setMenuOpen(false)
     setBarState('thinking')
@@ -145,6 +145,11 @@ export function FloatingBar(): React.JSX.Element {
       setDraft(content)
       setInputActive(true)
     }
+  }
+
+  const send = async (): Promise<void> => {
+    if (resolvedState === 'thinking' || resolvedState === 'listening') return
+    await sendContent(draft)
   }
 
   const beginTalk = async (): Promise<void> => {
@@ -189,17 +194,21 @@ export function FloatingBar(): React.JSX.Element {
       }
       const audioBase64 = await recorder.stop()
       const { text } = await window.elio.transcribeVoice({ audioBase64 })
-      setDraft((prev) => {
-        const trimmed = prev.trim()
-        return trimmed ? `${trimmed} ${text}` : text
-      })
-      setInputActive(true)
-      setBarState(offline ? 'offline' : 'idle')
-      inputRef.current?.focus()
+      const trimmed = text.trim()
+      if (!trimmed) {
+        setError('Não deu para entender — tente falar de novo.')
+        setBarState('error')
+        setVoicePhase('idle')
+        return
+      }
+      // Junta com rascunho já digitado (se houver) e envia ao chat — MVP: fala = agir.
+      const existing = draft.trim()
+      const content = existing ? `${existing} ${trimmed}` : trimmed
+      setVoicePhase('idle')
+      await sendContent(content)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Falha na transcrição')
       setBarState('error')
-    } finally {
       setVoicePhase('idle')
     }
   }
@@ -315,7 +324,9 @@ export function FloatingBar(): React.JSX.Element {
             resolvedState === 'listening' ? 'fb-icon-btn mic active' : 'fb-icon-btn mic'
           }
           title={
-            resolvedState === 'listening' ? 'Solte para transcrever' : 'Segure para falar'
+            resolvedState === 'listening'
+              ? 'Solte para enviar'
+              : 'Segure para falar (envia ao chat)'
           }
           aria-label="Voz"
           aria-pressed={resolvedState === 'listening'}

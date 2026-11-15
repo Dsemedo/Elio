@@ -96,7 +96,7 @@ export const VoiceStatusSchema = z.object({
   ready: z.boolean(),
   binaryReady: z.boolean(),
   modelReady: z.boolean(),
-  modelId: z.literal('tiny'),
+  modelId: z.literal('base'),
   whisperVersion: z.string().min(1),
   supported: z.boolean(),
   hint: z.string(),

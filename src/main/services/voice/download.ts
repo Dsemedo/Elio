@@ -7,6 +7,7 @@ import { Readable } from 'node:stream'
 import {
   DOWNLOAD_TIMEOUT_MS,
   MODEL_FILE,
+  MODEL_SIZE_HINT_MB,
   MODEL_URL,
   WHISPER_RELEASE,
   binaryArchiveUrl,
@@ -14,6 +15,7 @@ import {
 } from './constants'
 import {
   ensureWhisperDirs,
+  hasLegacyTinyModel,
   isBinaryReady,
   isModelReady,
   modelPath,
@@ -192,14 +194,25 @@ async function ensureModel(onProgress?: ProgressEmitter): Promise<void> {
   const partial = join(whisperModelDir(), `${MODEL_FILE}.partial`)
   rmSync(partial, { force: true })
 
-  emit(onProgress, 'model', 0, 'Baixando modelo de voz (tiny, ~75 MB)…')
+  const migrating = hasLegacyTinyModel()
+  const startMsg = migrating
+    ? `Atualizando modelo de voz (tiny → base, ~${MODEL_SIZE_HINT_MB} MB)…`
+    : `Baixando modelo de voz (base, ~${MODEL_SIZE_HINT_MB} MB)…`
+  emit(onProgress, 'model', 0, startMsg)
   try {
-    await downloadToFile(MODEL_URL, partial, onProgress, 'model', 'Modelo tiny')
+    await downloadToFile(MODEL_URL, partial, onProgress, 'model', 'Modelo base')
     renameSync(partial, modelPath())
     if (!isModelReady()) {
       throw new Error('MODEL_MISSING: modelo não ficou disponível após o download')
     }
-    emit(onProgress, 'model', 100, 'Modelo pronto')
+    emit(
+      onProgress,
+      'model',
+      100,
+      migrating
+        ? 'Modelo base pronto (pode apagar ggml-tiny.bin em whisper\\models)'
+        : 'Modelo base pronto',
+    )
   } catch (err) {
     rmSync(partial, { force: true })
     console.error('[elio] voice: download modelo falhou', { where: redactPath(whisperModelDir()) })

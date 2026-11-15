@@ -20,12 +20,12 @@ describe('voice IPC contracts', () => {
       ready: false,
       binaryReady: false,
       modelReady: false,
-      modelId: 'tiny',
+      modelId: 'base',
       whisperVersion: 'v1.9.2',
       supported: true,
       hint: 'baixar',
     })
-    expect(status.modelId).toBe('tiny')
+    expect(status.modelId).toBe('base')
   })
 
   it('valida progresso', () => {
