@@ -43,8 +43,10 @@ export function FloatingBar(): React.JSX.Element {
   const [menuOpen, setMenuOpen] = useState(false)
   const [inputActive, setInputActive] = useState(false)
   const [voicePhase, setVoicePhase] = useState<VoicePhase>('idle')
+  const [lastReply, setLastReply] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const recorderRef = useRef<MicRecorder | null>(null)
+  const recordingActiveRef = useRef(false)
   const recordStartedAt = useRef(0)
   const menuRef = useRef<HTMLDivElement>(null)
 
@@ -129,15 +131,18 @@ export function FloatingBar(): React.JSX.Element {
     const content = raw.trim()
     if (!content) return
     setError(null)
+    setLastReply(null)
     setMenuOpen(false)
     setBarState('thinking')
     setDraft('')
     setInputActive(false)
     try {
       const id = await ensureConversation()
-      await window.elio.sendMessage({ conversationId: id, content })
+      const result = await window.elio.sendMessage({ conversationId: id, content })
       const nextStatus = await window.elio.getChatStatus()
       setStatus(nextStatus)
+      const replyText = result.reply.content.trim()
+      setLastReply(replyText || '(sem texto na resposta)')
       setBarState(nextStatus.preferredProvider === 'none' ? 'offline' : 'idle')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Não foi possível responder')
@@ -153,8 +158,9 @@ export function FloatingBar(): React.JSX.Element {
   }
 
   const beginTalk = async (): Promise<void> => {
-    if (resolvedState === 'thinking' || voicePhase === 'recording') return
+    if (resolvedState === 'thinking' || recordingActiveRef.current) return
     setError(null)
+    setLastReply(null)
     setMenuOpen(false)
     setInputActive(false)
     setVoicePhase('preparing')
@@ -168,10 +174,12 @@ export function FloatingBar(): React.JSX.Element {
       }
       const recorder = await startMicRecording()
       recorderRef.current = recorder
+      recordingActiveRef.current = true
       recordStartedAt.current = Date.now()
       setVoicePhase('recording')
       setBarState('listening')
     } catch (err) {
+      recordingActiveRef.current = false
       setError(micPermissionMessage(err))
       setBarState('error')
       setVoicePhase('idle')
@@ -180,8 +188,10 @@ export function FloatingBar(): React.JSX.Element {
 
   const endTalk = async (): Promise<void> => {
     const recorder = recorderRef.current
-    if (!recorder || voicePhase !== 'recording') return
+    // Ref (não state): evita race do pointerUp antes do React aplicar 'recording'.
+    if (!recorder || !recordingActiveRef.current) return
     recorderRef.current = null
+    recordingActiveRef.current = false
     setVoicePhase('transcribing')
     setBarState('transcribing')
     try {
@@ -222,8 +232,12 @@ export function FloatingBar(): React.JSX.Element {
     ? false
     : inputActive || draft.trim().length > 0 || resolvedState === 'error'
 
+  const showLastReply =
+    !busy && !showTextField && !!lastReply && resolvedState === 'idle'
+
   const activateInput = (): void => {
     if (busy) return
+    setLastReply(null)
     setInputActive(true)
     requestAnimationFrame(() => inputRef.current?.focus())
   }
@@ -292,6 +306,17 @@ export function FloatingBar(): React.JSX.Element {
                 }
               }}
             />
+          ) : showLastReply ? (
+            <button
+              type="button"
+              className="fb-reply"
+              title={lastReply ?? undefined}
+              aria-label="Resposta do Elio — clique para abrir o Command Center"
+              onClick={() => void window.elio.openPanel()}
+            >
+              <span className="fb-reply-label">Elio</span>
+              <span className="fb-reply-text">{lastReply}</span>
+            </button>
           ) : (
             <button
               type="button"
@@ -333,15 +358,20 @@ export function FloatingBar(): React.JSX.Element {
           disabled={resolvedState === 'thinking' || voicePhase === 'transcribing'}
           onPointerDown={(e) => {
             e.preventDefault()
+            // Mantém o PTT mesmo se o cursor sair do botão (senão corta cedo).
+            e.currentTarget.setPointerCapture(e.pointerId)
             void beginTalk()
           }}
-          onPointerUp={() => void endTalk()}
-          onPointerLeave={() => {
-            if (voicePhase === 'recording') void endTalk()
+          onPointerUp={(e) => {
+            if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+              e.currentTarget.releasePointerCapture(e.pointerId)
+            }
+            void endTalk()
           }}
           onPointerCancel={() => {
             recorderRef.current?.cancel()
             recorderRef.current = null
+            recordingActiveRef.current = false
             setVoicePhase('idle')
             setBarState(offline ? 'offline' : 'idle')
           }}
