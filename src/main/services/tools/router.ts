@@ -2,9 +2,9 @@
  * Intent router (PT-BR) — modelo de produto confirmado por Douglas:
  *
  *   voz/texto → classificar →
- *     (A) ação no PC (abrir site/pasta/arquivo/app) — Estágio 2 neste PR
- *     (B) fato local/tempo real (hora, clima) — já via enrich
- *     (C) ler aba do browser / pesquisa web — ADIADO (extensão/CDP)
+ *     (A) ação no PC (abrir site/pasta/arquivo/app) — allowlist
+ *     (B) fato local/tempo real (hora, clima) — enrich
+ *     (C) ler aba / pesquisa web leve — aba = extensão; research = open+fetch allowlist
  *     (D) conversa geral → LLM
  *
  * Sem multi-agente: um classificador leve + handlers allowlisted.
@@ -17,11 +17,15 @@ import {
   parseSpotifyIntent,
   type SpotifyIntent,
 } from '../spotify/intent'
+import {
+  parseWebContextIntent,
+  type WebContextIntent,
+} from './web'
 
 export type IntentLane =
   | 'pc_action' // A
   | 'local_fact' // B
-  | 'web_context' // C — reserved, not implemented
+  | 'web_context' // C
   | 'chat' // D
 
 export type ClassifiedIntent =
@@ -43,23 +47,15 @@ export type ClassifiedIntent =
     }
   | {
       lane: 'web_context'
-      /** Sempre deferred até extensão/CDP */
-      deferred: true
-      reason: string
+      web: WebContextIntent
     }
   | {
       lane: 'chat'
     }
 
-const WEB_CONTEXT_RE =
-  /\b(aba\s+(aberta|atual)|p[aá]gina\s+(aberta|atual)|o\s+que\s+(est[aá]|tem)\s+(n[ao]\s+)?(navegador|chrome|edge|browser)|l[eê]\s+(a\s+)?(aba|p[aá]gina)|pesquisa\s+(na\s+)?web|pesquisa\s+no\s+google|busca\s+na\s+internet)\b/i
-
 /**
  * Classifica o texto do usuário numa lane.
  * Prioridade: confirmação risky → Spotify → PC open → web_context → local_fact → chat.
- *
- * web_context NÃO executa nada neste PR — só sinaliza para o caller
- * (hoje cai em chat com honestidade; futuro: extensão/CDP).
  */
 export function classifyUserIntent(text: string): ClassifiedIntent {
   const content = text.trim()
@@ -93,14 +89,9 @@ export function classifyUserIntent(text: string): ClassifiedIntent {
     }
   }
 
-  // C: detectar e marcar deferred — NÃO implementar leitura de aba aqui.
-  if (WEB_CONTEXT_RE.test(content)) {
-    return {
-      lane: 'web_context',
-      deferred: true,
-      reason:
-        'Ler a aba aberta / pesquisa web ainda não está disponível (precisa de extensão do navegador ou CDP). Por enquanto posso abrir um site se você pedir “abre o site …”.',
-    }
+  const web = parseWebContextIntent(content)
+  if (web) {
+    return { lane: 'web_context', web }
   }
 
   const tools = detectChatToolIntent(content)
@@ -118,7 +109,7 @@ export function laneLabel(lane: IntentLane): string {
     case 'local_fact':
       return 'Fato local'
     case 'web_context':
-      return 'Contexto web (em breve)'
+      return 'Contexto web'
     case 'chat':
       return 'Conversa'
   }

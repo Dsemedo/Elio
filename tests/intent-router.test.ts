@@ -44,16 +44,23 @@ describe('classifyUserIntent — lanes A/B/C/D', () => {
     }
   })
 
-  it('C: web_context fica deferred (sem ler aba)', () => {
+  it('C: aba ativa (precisa extensão)', () => {
     const tab = classifyUserIntent('o que está na aba aberta?')
     expect(tab.lane).toBe('web_context')
     if (tab.lane === 'web_context') {
-      expect(tab.deferred).toBe(true)
-      expect(tab.reason).toMatch(/extensão|CDP/i)
+      expect(tab.web.kind).toBe('active_tab')
     }
+  })
 
+  it('C: pesquisa web leve', () => {
     const research = classifyUserIntent('pesquisa na web sobre Elio')
     expect(research.lane).toBe('web_context')
+    if (research.lane === 'web_context') {
+      expect(research.web.kind).toBe('web_research')
+      if (research.web.kind === 'web_research') {
+        expect(research.web.query.toLowerCase()).toContain('elio')
+      }
+    }
   })
 
   it('D: conversa geral', () => {
@@ -63,6 +70,6 @@ describe('classifyUserIntent — lanes A/B/C/D', () => {
 
   it('labels amigáveis', () => {
     expect(laneLabel('pc_action')).toContain('PC')
-    expect(laneLabel('web_context')).toMatch(/em breve/i)
+    expect(laneLabel('web_context')).toBe('Contexto web')
   })
 })

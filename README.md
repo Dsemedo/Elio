@@ -1,7 +1,7 @@
 # Elio
 
 Assistente pessoal de IA para desktop (**JARVIS MVP**).  
-**v0.14.1** — Memória persistente + export/delete-all; cascata BYOK (0.14.0); Command Center UX (0.13.0).
+**v0.15.0** — Lane C: aba ativa (status honesto sem extensão) + pesquisa web (open https + fetch allowlist). Base 0.14.1: memória + cascata BYOK.
 
 Spec UI: [`docs/elio-design-system.md`](./docs/elio-design-system.md) · ADRs: [`docs/ADRs/`](./docs/ADRs/) · Distribuição: [`docs/windows-distribution.md`](./docs/windows-distribution.md)
 
@@ -11,7 +11,7 @@ Spec UI: [`docs/elio-design-system.md`](./docs/elio-design-system.md) · ADRs: [
 - **Node.js 22.12+** (só para desenvolvimento)  
 - Microfone (voz)  
 - Pacote de idioma de fala **pt-BR** do Windows (reconhecimento nativo)  
-- Internet: OpenRouter (se usar BYOK/cota), Whisper na 1ª vez do fallback (~**466 MB**), clima  
+- Internet: OpenRouter (se usar BYOK/cota); pesquisa web (open/fetch allowlist); Whisper na 1ª vez do fallback (~**466 MB**); clima  
 - Localização do Windows (opcional; se negar, usa IP aproximado)  
 - (Opcional) chave [OpenRouter](https://openrouter.ai) — BYOK e/ou modelos `:free`  
 - (Opcional) [Ollama](https://ollama.com) com um modelo (ex.: `llama3.2`) — fallback local  
@@ -40,19 +40,16 @@ npm run ensure:electron
 npm run dev
 ```
 
-### O que Douglas deve ver (0.14.1)
+### O que Douglas deve ver (0.15.0)
 
-1. Selo **v0.14.1**  
-2. **Memória** no Command Center: salvar / editar / excluir (entram no system prompt)  
-3. Configurações com abas Integrações | Computador | **Dados** (export JSON / apagar tudo; OpenRouter na Integrações — sem UI duplicada)  
-4. Cascata BYOK → cota `:free` → Ollama (status no chat)  
-2. Status do chat / bolha: quem respondeu (`OpenRouter (BYOK|cota grátis)` ou `Ollama (local)`)  
-3. Cascata: modelo pago OpenRouter = BYOK → `:free` = cota → Ollama  
-4. Command Center (0.13.0): threads ao lado, histórico com busca/renomear, Início Continuar/Nova  
-5. **Configurações → Integrações**: chave OpenRouter no cofre + modelo; ChatGPT/Gemini direto = “em breve”  
-6. Floating Bar: Windows Speech → auto-envio; permissão falha → “Usando Whisper…” (sem `WINDOWS_SPEECH_ERROR:not-allowed`)  
-7. `npm run dist:win` gera instalador NSIS; Spotify / clima ok  
-
+1. Selo **v0.15.0**  
+2. **“o que está na aba aberta?”** → resposta honesta: precisa de extensão (ainda não incluída)  
+3. **“pesquisa na web sobre Elio”** → abre busca https no navegador (sem crawl genérico)  
+4. **“resume https://pt.wikipedia.org/wiki/Electron”** → abre + lê trecho público (allowlist) e resume via LLM (cascata)  
+5. Memória (0.14.1): criar/listar/apagar; export/delete-all em Configurações  
+6. Cascata BYOK → free → Ollama; Command Center threads/histórico  
+7. Floating Bar: Windows Speech → auto-envio; permissão falha → “Usando Whisper…”  
+8. `npm run dist:win` gera instalador NSIS; Spotify / clima ok  
 ### Cascata de IAs (BYOK → free → Ollama)
 
 Ordem automática ([ADR 0011](./docs/ADRs/0011-ai-cascade-byok.md)):
@@ -126,10 +123,10 @@ Tokens ficam cifrados em `%APPDATA%\elio\secrets\` (Electron `safeStorage` **asy
 |------|----------|--------|
 | **A** PC | abre site / pasta / arquivo / app; **Spotify play/connect** | ✅ allowlist + PKCE |
 | **B** Fato local | hora, clima | ✅ enrich (Open-Meteo + relógio + geo) |
-| **C** Web context | aba aberta, pesquisa web | ⏳ deferred (extensão/CDP) |
+| **C** Web context | aba aberta; pesquisa web | ✅ aba = status sem extensão; research = open+fetch allowlist (ADR 0013) |
 | **D** Chat | conversa geral | ✅ LLM cascata BYOK → free → Ollama |
 
-**Não neste PR:** OAuth ChatGPT/Gemini, TTS, ler aba do browser, busca de música.
+**Não neste PR:** extensão Chrome/Edge, CDP, crawl genérico, OAuth ChatGPT/Gemini, TTS, RPA.
 
 ### Clima e fuso
 
@@ -173,7 +170,7 @@ Ordem de resolução:
 ### Como testar STT no Windows
 
 1. Confirme idioma de fala pt-BR em **Configurações → Hora e idioma → Fala**  
-2. `npm run dev` → selo **v0.14.1**  
+2. `npm run dev` → selo **v0.15.0**  
 3. Segure o mic na Floating Bar → diga *“Qual é o clima atual do lugar que eu moro?”* → solte  
 4. O texto deve ir **direto** ao chat (sem caixa “Confira o texto”)  
 5. Preferência: “atual” **não** vira “outdoor”  
@@ -191,8 +188,10 @@ Ordem de resolução:
 `contextIsolation`, sem `nodeIntegration`, sandbox, Zod IPC.  
 STT: Windows Speech no renderer; Whisper subprocess só no main (`shell: false`).  
 Clima: Open-Meteo + cache local; coords não vão ao histórico/LLM.  
+Pesquisa web: só https; fetch só hosts allowlisted; sem crawl; conteúdo marcado não confiável.  
+Aba ativa: sem extensão = sem leitura (sem CDP).  
 Spotify / OpenRouter: PKCE + `safeStorage`; opens só `spotify:` / `https://open.spotify.com`.  
-Ver `docs/ADRs/0002-whisper-subprocess.md`, `0006-auto-location-weather.md`, `0007-spotify-voice-pkce.md`, `0008-windows-speech-primary-stt.md`, `0009-windows-distribution.md` e `0010-command-center-ux-settings.md`, `0011-ai-cascade-byok.md`, `0012-persistent-memory-settings.md`.
+Ver `docs/ADRs/0002-whisper-subprocess.md`, `0006-auto-location-weather.md`, `0007-spotify-voice-pkce.md`, `0008-windows-speech-primary-stt.md`, `0009-windows-distribution.md`, `0010-command-center-ux-settings.md`, `0011-ai-cascade-byok.md`, `0012-persistent-memory-settings.md` e `0013-web-context-extension-research.md`.
 
 ## Licença
 
