@@ -1,15 +1,16 @@
 import { app, BrowserWindow, Menu, ipcMain, shell } from 'electron'
 import { join } from 'node:path'
 import { IpcChannels, type AppInfo } from '../shared/ipc'
+import { registerChatIpc } from './ipc/chat'
 
 const isDev = !app.isPackaged
 
 function createWindow(): BrowserWindow {
   const mainWindow = new BrowserWindow({
-    width: 960,
-    height: 640,
-    minWidth: 720,
-    minHeight: 480,
+    width: 1100,
+    height: 720,
+    minWidth: 800,
+    minHeight: 560,
     show: false,
     title: 'Elio',
     backgroundColor: '#0c1222',
@@ -61,10 +62,10 @@ function registerIpc(): void {
     electron: process.versions.electron,
     platform: process.platform,
   }))
+  registerChatIpc()
 }
 
 app.whenReady().then(() => {
-  // Sem menu File/Edit padrão — menos ruído para quem não é desenvolvedor.
   Menu.setApplicationMenu(null)
   registerIpc()
   createWindow()
