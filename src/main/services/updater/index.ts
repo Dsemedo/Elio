@@ -1,11 +1,16 @@
 import { app } from 'electron'
-import { autoUpdater, type NsisUpdater } from 'electron-updater'
+// electron-updater é CJS; named import de autoUpdater quebra no main ESM
+// (Node: "Named export 'autoUpdater' not found"). Default + destructure.
+import electronUpdater from 'electron-updater'
+import type { NsisUpdater } from 'electron-updater'
 import { VERIFY_UPDATE_SIGNATURE } from './constants'
 import {
   getUpdateCheckIntervalMs,
   shouldEnableAutoUpdater,
   updateDownloadedNotification,
 } from './policy'
+
+const { autoUpdater } = electronUpdater
 
 let started = false
 let intervalHandle: ReturnType<typeof setInterval> | null = null

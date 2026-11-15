@@ -37,6 +37,23 @@ if (!pkg.dependencies?.['electron-updater']) {
   errors.push('package.json: electron-updater deve estar em dependencies (runtime)')
 }
 
+// Main é ESM + deps externalizadas: named import de autoUpdater (getter CJS) crasha no boot.
+const updaterSrcPath = join(root, 'src/main/services/updater/index.ts')
+const updaterSrc = readFileSync(updaterSrcPath, 'utf8')
+if (/import\s*\{[^}]*\bautoUpdater\b[^}]*\}\s*from\s*['"]electron-updater['"]/.test(updaterSrc)) {
+  errors.push(
+    'updater/index.ts: não use named import de autoUpdater (CJS); use default import + destructure',
+  )
+}
+if (
+  !/import\s+\w+\s+from\s*['"]electron-updater['"]/.test(updaterSrc) ||
+  !/const\s*\{\s*autoUpdater\s*\}\s*=/.test(updaterSrc)
+) {
+  errors.push(
+    'updater/index.ts: espere `import … from \'electron-updater\'` + `const { autoUpdater } = …`',
+  )
+}
+
 for (const script of ['dist', 'dist:win', 'release:win', 'check:builder']) {
   if (typeof pkg.scripts?.[script] !== 'string') {
     errors.push(`package.json: script ausente — ${script}`)
