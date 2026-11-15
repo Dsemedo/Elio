@@ -1,7 +1,7 @@
 # Elio
 
 Assistente pessoal de IA para desktop (**JARVIS MVP**).  
-**v0.15.1** — TTS opcional (system/SAPI + edge-tts); Lane C aba/pesquisa (0.15.0); memória (0.14.1).
+**v0.15.2** — fix crash `electron-updater` ESM/CJS no `npm run dev`; TTS (0.15.1); Lane C (0.15.0).
 
 Spec UI: [`docs/elio-design-system.md`](./docs/elio-design-system.md) · ADRs: [`docs/ADRs/`](./docs/ADRs/) · Distribuição: [`docs/windows-distribution.md`](./docs/windows-distribution.md)
 
@@ -40,9 +40,10 @@ npm run ensure:electron
 npm run dev
 ```
 
-### O que Douglas deve ver (0.15.1)
+### O que Douglas deve ver (0.15.2)
 
-1. Selo **v0.15.1**  
+1. Selo **v0.15.2** — `npm run dev` sobe sem `Named export 'autoUpdater'`  
+
 2. **“o que está na aba aberta?”** → resposta honesta: precisa de extensão (ainda não incluída)  
 3. **“pesquisa na web sobre Elio”** → abre busca https no navegador (sem crawl genérico)  
 4. **“resume https://pt.wikipedia.org/wiki/Electron”** → abre + lê trecho público (allowlist) e resume via LLM (cascata)  
