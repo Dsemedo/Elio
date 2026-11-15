@@ -6,6 +6,7 @@ import type {
   VoiceProgress,
   VoiceStatus,
 } from '@shared/ipc'
+import { isNearBottom, shouldAutoScrollToBottom } from '@shared/chatScroll'
 import {
   micPermissionMessage,
   startMicRecording,
@@ -49,16 +50,30 @@ export function ChatView({
   const [voiceUi, setVoiceUi] = useState<VoiceUiState>('idle')
   const [voiceProgress, setVoiceProgress] = useState<VoiceProgress | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
+  const messagesRef = useRef<HTMLDivElement>(null)
+  const stickToBottomRef = useRef(true)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const recorderRef = useRef<MicRecorder | null>(null)
   const recordingActiveRef = useRef(false)
   const recordStartedAt = useRef(0)
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [conversation.messages, busy])
+    const el = messagesRef.current
+    if (!el) return
+    if (
+      !shouldAutoScrollToBottom({
+        wasNearBottom: stickToBottomRef.current,
+        forceStick: busy,
+      })
+    ) {
+      return
+    }
+    bottomRef.current?.scrollIntoView({ behavior: busy ? 'auto' : 'smooth' })
+    stickToBottomRef.current = true
+  }, [conversation.messages, busy, conversation.id])
 
   useEffect(() => {
+    stickToBottomRef.current = true
     inputRef.current?.focus()
   }, [conversation.id])
 
@@ -82,10 +97,27 @@ export function ChatView({
     const content = raw.trim()
     if (!content || busy) return
 
+    stickToBottomRef.current = true
     setBusy(true)
     setVoiceUi('thinking')
     setError(null)
     setDraft('')
+
+    // Optimistic: mostra a mensagem do usuário enquanto “Pensando…”.
+    const optimisticId = `local-${Date.now()}`
+    await onConversationChange({
+      ...conversation,
+      updatedAt: new Date().toISOString(),
+      messages: [
+        ...conversation.messages,
+        {
+          id: optimisticId,
+          role: 'user',
+          content,
+          createdAt: new Date().toISOString(),
+        },
+      ],
+    })
 
     try {
       const result = await window.elio.sendMessage({
@@ -93,6 +125,7 @@ export function ChatView({
         content,
       })
       setLastModel(`${result.provider} · ${result.model}`)
+      stickToBottomRef.current = true
       await onConversationChange(result.conversation)
       await onStatusRefresh()
     } catch (err) {
@@ -307,14 +340,29 @@ export function ChatView({
           </div>
         </header>
 
-        <div className="messages" role="log" aria-live="polite">
+        <div
+          className="messages"
+          role="log"
+          aria-live="polite"
+          tabIndex={0}
+          ref={messagesRef}
+          onScroll={() => {
+            const el = messagesRef.current
+            if (!el) return
+            stickToBottomRef.current = isNearBottom(
+              el.scrollTop,
+              el.clientHeight,
+              el.scrollHeight,
+            )
+          }}
+        >
           {conversation.messages.length === 0 && !busy ? (
             <div className="empty-state">
               <p className="empty-title">Olá — sou o Elio.</p>
               <p>
                 Escreva ou use o microfone. Ao soltar o mic, o texto vai direto ao chat.
-                Na primeira vez a voz baixa o Whisper (~150 MB, modelo base). O áudio fica
-                só neste PC.
+                Pergunte a hora ou o tempo — uso o relógio local e Open-Meteo. Na primeira
+                vez a voz baixa o Whisper (~150 MB, modelo base). O áudio fica só neste PC.
               </p>
             </div>
           ) : null}
@@ -343,92 +391,94 @@ export function ChatView({
           <div ref={bottomRef} />
         </div>
 
-        {error ? (
-          <div className="error-banner" role="alert">
-            {error}
-          </div>
-        ) : null}
-
-        {voiceProgress && voiceUi === 'preparing' ? (
-          <div className="voice-progress" role="status">
-            <div className="voice-progress-bar">
-              <div
-                className="voice-progress-fill"
-                style={{ width: `${voiceProgress.percent}%` }}
-              />
+        <div className="chat-footer">
+          {error ? (
+            <div className="error-banner" role="alert">
+              {error}
             </div>
-            <span>{voiceProgress.message}</span>
-          </div>
-        ) : null}
+          ) : null}
 
-        <footer className="composer">
-          <textarea
-            ref={inputRef}
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={onKeyDown}
-            placeholder="Escreva ou segure o microfone… (voz envia sozinha)"
-            rows={3}
-            disabled={busy || voiceUi === 'recording' || voiceUi === 'transcribing'}
-          />
-          <div className="composer-actions">
-            {!voiceStatus?.ready ? (
+          {voiceProgress && voiceUi === 'preparing' ? (
+            <div className="voice-progress" role="status">
+              <div className="voice-progress-bar">
+                <div
+                  className="voice-progress-fill"
+                  style={{ width: `${voiceProgress.percent}%` }}
+                />
+              </div>
+              <span>{voiceProgress.message}</span>
+            </div>
+          ) : null}
+
+          <footer className="composer">
+            <textarea
+              ref={inputRef}
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={onKeyDown}
+              placeholder="Escreva ou segure o microfone… (voz envia sozinha)"
+              rows={3}
+              disabled={busy || voiceUi === 'recording' || voiceUi === 'transcribing'}
+            />
+            <div className="composer-actions">
+              {!voiceStatus?.ready ? (
+                <button
+                  type="button"
+                  className="btn ghost"
+                  disabled={voiceBusy || busy}
+                  onClick={() => void prepareVoiceClick()}
+                >
+                  Preparar voz
+                </button>
+              ) : null}
               <button
                 type="button"
-                className="btn ghost"
-                disabled={voiceBusy || busy}
-                onClick={() => void prepareVoiceClick()}
+                className={voiceUi === 'recording' ? 'btn mic recording' : 'btn mic'}
+                disabled={busy || voiceBusy}
+                aria-pressed={voiceUi === 'recording'}
+                title={micLabel}
+                onPointerDown={(e) => {
+                  e.preventDefault()
+                  e.currentTarget.setPointerCapture(e.pointerId)
+                  void beginTalk()
+                }}
+                onPointerUp={(e) => {
+                  if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+                    e.currentTarget.releasePointerCapture(e.pointerId)
+                  }
+                  void endTalk()
+                }}
+                onPointerCancel={() => {
+                  recorderRef.current?.cancel()
+                  recorderRef.current = null
+                  recordingActiveRef.current = false
+                  setVoiceUi('idle')
+                }}
               >
-                Preparar voz
+                {voiceUi === 'recording'
+                  ? 'Ouvindo…'
+                  : voiceUi === 'transcribing'
+                    ? 'Transcrevendo…'
+                    : voiceUi === 'thinking'
+                      ? 'Pensando…'
+                      : 'Falar'}
               </button>
-            ) : null}
-            <button
-              type="button"
-              className={voiceUi === 'recording' ? 'btn mic recording' : 'btn mic'}
-              disabled={busy || voiceBusy}
-              aria-pressed={voiceUi === 'recording'}
-              title={micLabel}
-              onPointerDown={(e) => {
-                e.preventDefault()
-                e.currentTarget.setPointerCapture(e.pointerId)
-                void beginTalk()
-              }}
-              onPointerUp={(e) => {
-                if (e.currentTarget.hasPointerCapture(e.pointerId)) {
-                  e.currentTarget.releasePointerCapture(e.pointerId)
-                }
-                void endTalk()
-              }}
-              onPointerCancel={() => {
-                recorderRef.current?.cancel()
-                recorderRef.current = null
-                recordingActiveRef.current = false
-                setVoiceUi('idle')
-              }}
-            >
-              {voiceUi === 'recording'
-                ? 'Ouvindo…'
-                : voiceUi === 'transcribing'
-                  ? 'Transcrevendo…'
-                  : voiceUi === 'thinking'
-                    ? 'Pensando…'
-                    : 'Falar'}
-            </button>
-            {busy ? (
-              <button type="button" className="btn ghost" onClick={() => void cancel()}>
-                Cancelar
+              {busy ? (
+                <button type="button" className="btn ghost" onClick={() => void cancel()}>
+                  Cancelar
+                </button>
+              ) : null}
+              <button
+                type="button"
+                className="btn primary"
+                disabled={busy || draft.trim().length === 0 || voiceUi === 'recording'}
+                onClick={() => void send()}
+              >
+                {busy ? 'Enviando…' : 'Enviar'}
               </button>
-            ) : null}
-            <button
-              type="button"
-              className="btn primary"
-              disabled={busy || draft.trim().length === 0 || voiceUi === 'recording'}
-              onClick={() => void send()}
-            >
-              {busy ? 'Enviando…' : 'Enviar'}
-            </button>
-          </div>
-        </footer>
+            </div>
+          </footer>
+        </div>
       </section>
     </div>
   )

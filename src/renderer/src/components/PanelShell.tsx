@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Activity, Bot, Brain, Home, MessageSquare, Settings } from 'lucide-react'
 import type { ChatStatus, Conversation, ConversationSummary } from '@shared/ipc'
 import { ChatView } from './ChatView'
@@ -39,10 +39,15 @@ export function PanelShell(): React.JSX.Element {
   const [active, setActive] = useState<Conversation | null>(null)
   const [appVersion, setAppVersion] = useState<string | null>(null)
   const [bootError, setBootError] = useState<string | null>(null)
+  const activeIdRef = useRef<string | null>(null)
 
   const refreshList = useCallback(async () => {
     setSummaries(await window.elio.listConversations())
   }, [])
+
+  useEffect(() => {
+    activeIdRef.current = active?.id ?? null
+  }, [active?.id])
 
   useEffect(() => {
     let cancelled = false
@@ -81,8 +86,52 @@ export function PanelShell(): React.JSX.Element {
     }
 
     void boot()
+
+    // Sync com Floating Bar / outra superfície (voz + texto).
+    const unsub = window.elio.onChatUpdated((event) => {
+      void (async () => {
+        try {
+          const list = await window.elio.listConversations()
+          if (cancelled) return
+          setSummaries(list)
+          const currentId = activeIdRef.current
+
+          if (event.reason === 'deleted') {
+            if (currentId === event.conversationId || !currentId) {
+              if (list[0]) {
+                const next = await window.elio.getConversation(list[0].id)
+                if (!cancelled) setActive(next)
+              } else {
+                const created = await window.elio.createConversation()
+                if (!cancelled) {
+                  setActive(created)
+                  setSummaries(await window.elio.listConversations())
+                }
+              }
+            }
+            return
+          }
+
+          if (event.conversation) {
+            if (!currentId || currentId === event.conversationId) {
+              setActive(event.conversation)
+            }
+            return
+          }
+
+          if (currentId === event.conversationId) {
+            const fresh = await window.elio.getConversation(event.conversationId)
+            if (!cancelled) setActive(fresh)
+          }
+        } catch {
+          /* ignore sync transitório */
+        }
+      })()
+    })
+
     return () => {
       cancelled = true
+      unsub()
     }
   }, [])
 

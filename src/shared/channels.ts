@@ -11,6 +11,8 @@ export const IpcChannels = {
   CHAT_CANCEL: 'chat:cancel',
   CHAT_DELETE: 'chat:delete',
   CHAT_STATUS: 'chat:status',
+  /** Evento main → renderer: conversa criada/atualizada/apagada (sync Bar ↔ Painel). */
+  CHAT_UPDATED: 'chat:updated',
   VOICE_GET_STATUS: 'voice:getStatus',
   VOICE_ENSURE: 'voice:ensure',
   VOICE_TRANSCRIBE: 'voice:transcribe',

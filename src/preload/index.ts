@@ -5,6 +5,7 @@ import type {
   ChatSendInput,
   ChatSendResult,
   ChatStatus,
+  ChatUpdatedEvent,
   Conversation,
   ConversationSummary,
   ShellState,
@@ -42,6 +43,19 @@ const elioApi = {
 
   cancelReply: (conversationId: string): Promise<{ ok: boolean }> =>
     ipcRenderer.invoke(IpcChannels.CHAT_CANCEL, { conversationId }),
+
+  onChatUpdated: (handler: (event: ChatUpdatedEvent) => void): (() => void) => {
+    const listener = (
+      _event: Electron.IpcRendererEvent,
+      payload: ChatUpdatedEvent,
+    ): void => {
+      handler(payload)
+    }
+    ipcRenderer.on(IpcChannels.CHAT_UPDATED, listener)
+    return () => {
+      ipcRenderer.removeListener(IpcChannels.CHAT_UPDATED, listener)
+    }
+  },
 
   getVoiceStatus: (): Promise<VoiceStatus> =>
     ipcRenderer.invoke(IpcChannels.VOICE_GET_STATUS),

@@ -79,10 +79,36 @@ export function FloatingBar(): React.JSX.Element {
       }
     }
     void boot()
-    const unsub = window.elio.onShellState((s) => setShell(s))
+    const unsubShell = window.elio.onShellState((s) => setShell(s))
+    const unsubChat = window.elio.onChatUpdated((event) => {
+      if (cancelled) return
+      if (event.reason === 'deleted') {
+        setConversationId((current) =>
+          current === event.conversationId ? null : current,
+        )
+        return
+      }
+      if (event.reason === 'created') {
+        setConversationId((current) => current ?? event.conversationId)
+        return
+      }
+      if (event.reason === 'updated' && event.conversation) {
+        setConversationId((current) => {
+          // Outra superfície falando na mesma thread (ou ainda sem id): espelha resposta.
+          if (current && current !== event.conversationId) return current
+          const msgs = event.conversation?.messages ?? []
+          const lastAssistant = [...msgs].reverse().find((m) => m.role === 'assistant')
+          if (lastAssistant?.content.trim()) {
+            setLastReply(lastAssistant.content.trim())
+          }
+          return current ?? event.conversationId
+        })
+      }
+    })
     return () => {
       cancelled = true
-      unsub()
+      unsubShell()
+      unsubChat()
       recorderRef.current?.cancel()
       void window.elio.setBarOverlay(false)
     }
