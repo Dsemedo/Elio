@@ -7,6 +7,8 @@ import type {
 
 type Props = {
   status: ChatStatus
+  /** Versão do package.json — se não for v0.2.0+, ainda está no código antigo. */
+  appVersion: string
   summaries: ConversationSummary[]
   conversation: Conversation
   onConversationChange: (conversation: Conversation) => Promise<void>
@@ -18,6 +20,7 @@ type Props = {
 
 export function ChatView({
   status,
+  appVersion,
   summaries,
   conversation,
   onConversationChange,
@@ -126,6 +129,9 @@ export function ChatView({
             <p className="status-hint">{status.hint}</p>
           </div>
           <div className="header-badges">
+            <span className="badge" title="Versão do Elio">
+              v{appVersion}
+            </span>
             {lastModel ? <span className="badge">{lastModel}</span> : null}
             <span className="badge muted">
               {status.preferredProvider === 'none'
