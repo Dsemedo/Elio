@@ -1,6 +1,8 @@
+import type { BudgetSnapshot } from './aiBudget'
+import type { RouteTier } from './aiRoute'
 import type { SttPreference } from './sttPolicy'
 
-export type { SttPreference }
+export type { BudgetSnapshot, RouteTier, SttPreference }
 
 export type AppInfo = {
   name: string
@@ -40,7 +42,13 @@ export type ChatStatus = {
   ollamaAvailable: boolean
   openRouterConfigured: boolean
   preferredProvider: ProviderKind
+  /** Camada preferida da cascata (BYOK → free → local). */
+  preferredTier: RouteTier | 'none'
+  /** Ordem documentada da cascata automática. */
+  cascadeOrder: Array<'byok' | 'free' | 'local'>
   hint: string
+  /** Contadores/limites stub (sem enforcement por padrão). */
+  budget: BudgetSnapshot
   /** Client ID Spotify (ELIO_SPOTIFY_CLIENT_ID) presente. */
   spotifyClientConfigured: boolean
   /** Tokens Spotify cifrados presentes em userData. */
@@ -84,6 +92,9 @@ export type ChatSendResult = {
   reply: ChatMessage
   provider: ProviderKind
   model: string
+  routeTier: RouteTier
+  /** Rótulo amigável: quem serviu a resposta. */
+  servedByLabel: string
 }
 
 /** Evento de sync entre Floating Bar e Command Center. */

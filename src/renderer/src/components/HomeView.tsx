@@ -22,9 +22,17 @@ export function HomeView({
   const providerLabel =
     status.preferredProvider === 'none'
       ? 'Nenhum provedor'
-      : status.preferredProvider === 'ollama'
-        ? 'Ollama'
-        : 'OpenRouter'
+      : status.preferredTier === 'byok'
+        ? 'OpenRouter (BYOK)'
+        : status.preferredTier === 'free'
+          ? 'OpenRouter (cota grátis)'
+          : status.preferredProvider === 'ollama'
+            ? 'Ollama (local)'
+            : 'OpenRouter'
+
+  const budgetLine = status.budget.enforce
+    ? `Cotas ativas — free ${status.budget.freeUsed}/${status.budget.freeLimit ?? '∞'} · BYOK ${status.budget.byokUsed}/${status.budget.byokLimit ?? '∞'}`
+    : `Cascata ${status.cascadeOrder.join(' → ')} · contadores stub (sem bloqueio)`
 
   const canContinue = summaries.length > 0 && Boolean(activeTitle)
 
@@ -59,6 +67,7 @@ export function HomeView({
           <strong>{providerLabel}</strong>
         </p>
         <p className="stat-sub">{status.hint}</p>
+        <p className="stat-sub">{budgetLine}</p>
         <button type="button" className="btn ghost" onClick={onOpenConfig}>
           Configurações
         </button>

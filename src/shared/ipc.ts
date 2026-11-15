@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { IpcChannels } from './channels'
 import type {
   AppInfo,
+  BudgetSnapshot,
   ChatMessage,
   ChatRenameInput,
   ChatRole,
@@ -12,6 +13,7 @@ import type {
   Conversation,
   ConversationSummary,
   ProviderKind,
+  RouteTier,
   SettingsOpenRouterKeyInput,
   SettingsPublic,
   SettingsUpdateInput,
@@ -40,6 +42,8 @@ export type {
   Conversation,
   ConversationSummary,
   ProviderKind,
+  RouteTier,
+  BudgetSnapshot,
   SettingsOpenRouterKeyInput,
   SettingsPublic,
   SettingsUpdateInput,
@@ -81,11 +85,30 @@ export const ConversationSchema = z.object({
 
 export const ProviderKindSchema = z.enum(['ollama', 'openrouter', 'none'])
 
+export const RouteTierSchema = z.enum(['byok', 'free', 'local', 'tool'])
+
+export const BudgetSnapshotSchema = z.object({
+  byokUsed: z.number().int().nonnegative(),
+  freeUsed: z.number().int().nonnegative(),
+  localUsed: z.number().int().nonnegative(),
+  byokLimit: z.number().int().nonnegative().nullable(),
+  freeLimit: z.number().int().nonnegative().nullable(),
+  localLimit: z.number().int().nonnegative().nullable(),
+  enforce: z.boolean(),
+})
+
 export const ChatStatusSchema = z.object({
   ollamaAvailable: z.boolean(),
   openRouterConfigured: z.boolean(),
   preferredProvider: ProviderKindSchema,
+  preferredTier: z.union([RouteTierSchema, z.literal('none')]),
+  cascadeOrder: z.tuple([
+    z.literal('byok'),
+    z.literal('free'),
+    z.literal('local'),
+  ]),
   hint: z.string(),
+  budget: BudgetSnapshotSchema,
   spotifyClientConfigured: z.boolean(),
   spotifyConnected: z.boolean(),
 })
@@ -100,6 +123,8 @@ export const ChatSendResultSchema = z.object({
   reply: ChatMessageSchema,
   provider: ProviderKindSchema,
   model: z.string(),
+  routeTier: RouteTierSchema,
+  servedByLabel: z.string().min(1),
 })
 
 export const ChatCancelInputSchema = z.object({

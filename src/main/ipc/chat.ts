@@ -48,7 +48,8 @@ async function finishAssistantReply(
   content: string,
   model: string,
 ): Promise<ChatSendResult> {
-  const reply = makeMessage('assistant', content, model)
+  const servedByLabel = `Elio · ${model}`
+  const reply = makeMessage('assistant', content, servedByLabel)
   const conversation = appendMessages(conversationId, [reply])
   broadcastChatUpdated({
     reason: 'updated',
@@ -61,6 +62,8 @@ async function finishAssistantReply(
     reply,
     provider: status.preferredProvider,
     model,
+    routeTier: 'tool',
+    servedByLabel,
   }
 }
 
@@ -199,7 +202,10 @@ export function registerChatIpc(): void {
         signal: controller.signal,
       })
 
-      const reply = makeMessage('assistant', completion.content, completion.model)
+      const servedByLabel =
+        completion.servedByLabel ??
+        `${completion.provider} · ${completion.model}`
+      const reply = makeMessage('assistant', completion.content, servedByLabel)
       conversation = appendMessages(input.conversationId, [reply])
       broadcastChatUpdated({
         reason: 'updated',
@@ -212,6 +218,8 @@ export function registerChatIpc(): void {
         reply,
         provider: completion.provider,
         model: completion.model,
+        routeTier: completion.routeTier ?? 'local',
+        servedByLabel,
       }
     } catch (err) {
       if (controller.signal.aborted) {
