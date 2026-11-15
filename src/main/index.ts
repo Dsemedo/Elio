@@ -5,6 +5,7 @@ import { registerLocationIpc } from './ipc/location'
 import { registerShellIpc } from './ipc/shell'
 import { registerSpotifyIpc } from './ipc/spotify'
 import { registerVoiceIpc } from './ipc/voice'
+import { startAutoUpdater } from './services/updater'
 import { getShellManager } from './shell/manager'
 
 function registerIpc(): void {
@@ -44,6 +45,7 @@ app.whenReady().then(() => {
   allowGeolocationPermission(session.defaultSession)
   registerIpc()
   getShellManager().start()
+  startAutoUpdater()
 
   app.on('activate', () => {
     getShellManager().showShell()

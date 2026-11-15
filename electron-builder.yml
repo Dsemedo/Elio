@@ -1,6 +1,9 @@
 appId: com.elio.app
 productName: Elio
 copyright: Copyright © 2026 Douglas Semedo Neto
+# Unsigned local/CI builds must succeed. When CSC_LINK (+ CSC_KEY_PASSWORD)
+# are set, electron-builder signs automatically; without them, skip signing.
+forceCodeSigning: false
 directories:
   output: dist
   buildResources: resources
@@ -10,18 +13,36 @@ extraResources:
   - from: resources/tray-icon.png
     to: tray-icon.png
 asar: true
+publish:
+  provider: github
+  owner: Dsemedo
+  repo: Elio
+  # Douglas revisa o draft no GitHub Releases antes de publicar.
+  releaseType: draft
 win:
   target:
     - target: nsis
       arch:
         - x64
   artifactName: ${productName}-${version}-Setup.${ext}
+  # CSC_LINK / WIN_CSC_LINK (arquivo ou base64) + CSC_KEY_PASSWORD — opcionais.
+  # Sem cert: build unsigned OK (SmartScreen pode avisar usuários).
 nsis:
   oneClick: false
+  perMachine: false
+  allowElevation: true
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
   createStartMenuShortcut: true
   shortcutName: Elio
+  runAfterFinish: true
+  deleteAppDataOnUninstall: false
+  installerLanguages:
+    - PortugueseBR
+    - English
+  # 1046 = Portuguese (Brazil)
+  language: 1046
+  displayLanguageSelector: false
 linux:
   target:
     - AppImage
