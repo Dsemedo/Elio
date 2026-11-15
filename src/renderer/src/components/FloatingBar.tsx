@@ -11,7 +11,12 @@ import {
 } from 'lucide-react'
 import type { ChatStatus, ShellState, SttPreference } from '@shared/ipc'
 import { detectChatToolIntent } from '@shared/chatIntent'
-import { resolveSttBackend, shouldFallbackToWhisper } from '@shared/sttPolicy'
+import {
+  extractWindowsSpeechErrorCode,
+  resolveSttBackend,
+  shouldFallbackToWhisper,
+  windowsSpeechUserMessage,
+} from '@shared/sttPolicy'
 import {
   isMicMissingMessage,
   micPermissionMessage,
@@ -23,7 +28,6 @@ import { ensureAppLocation } from '../lib/geolocation'
 import {
   isWindowsSpeechAvailable,
   startWindowsSpeech,
-  windowsSpeechErrorMessage,
   type WindowsSpeechSession,
 } from '../lib/windowsSpeech'
 
@@ -354,17 +358,17 @@ export function FloatingBar(): React.JSX.Element {
           setBarState('listening')
           return
         } catch (err) {
-          // Indisponível / erro no start → Whisper.
-          if (
-            !shouldFallbackToWhisper(
-              err instanceof Error ? err.message.split(':').pop() : 'unknown',
-            )
-          ) {
-            setError(await micPermissionMessage(err).catch(() => windowsSpeechErrorMessage(err)))
+          // Indisponível / erro no start (incl. not-allowed) → Whisper.
+          const code = extractWindowsSpeechErrorCode(
+            err instanceof Error ? err.message : String(err),
+          )
+          if (!shouldFallbackToWhisper(code)) {
+            setError(await micPermissionMessage(err).catch(() => windowsSpeechUserMessage(err)))
             setBarState('error')
             setVoicePhase('idle')
             return
           }
+          setStatusLine('Usando Whisper…')
         }
       }
 
@@ -404,6 +408,7 @@ export function FloatingBar(): React.JSX.Element {
         } else {
           capture.recorder.cancel()
         }
+        setStatusLine(null)
         setError('Áudio muito curto — segure e fale um pouco mais.')
         setBarState('error')
         setVoicePhase('idle')
@@ -421,7 +426,7 @@ export function FloatingBar(): React.JSX.Element {
         } catch (err) {
           speechFailed = true
           const msg = err instanceof Error ? err.message : ''
-          speechErrorCode = msg.includes(':') ? msg.split(':').pop() ?? msg : msg
+          speechErrorCode = extractWindowsSpeechErrorCode(msg)
         }
 
         if (speechText) {
@@ -431,14 +436,20 @@ export function FloatingBar(): React.JSX.Element {
           capture.recorder &&
           (!speechFailed || shouldFallbackToWhisper(speechErrorCode))
         ) {
+          setStatusLine('Usando Whisper…')
           trimmed = await transcribeWithWhisper(capture.recorder)
         } else {
           capture.recorder?.cancel()
-          if (speechFailed && !shouldFallbackToWhisper(speechErrorCode)) {
-            setError(windowsSpeechErrorMessage(new Error(`WINDOWS_SPEECH_ERROR:${speechErrorCode}`)))
+          if (speechFailed) {
+            setError(
+              windowsSpeechUserMessage(
+                new Error(`WINDOWS_SPEECH_ERROR:${speechErrorCode ?? 'unknown'}`),
+              ),
+            )
           } else {
             setError('Não deu para entender — tente falar de novo.')
           }
+          setStatusLine(null)
           setBarState('error')
           setVoicePhase('idle')
           return
@@ -448,6 +459,7 @@ export function FloatingBar(): React.JSX.Element {
       }
 
       if (!trimmed) {
+        setStatusLine(null)
         setError('Não deu para entender — tente falar de novo.')
         setBarState('error')
         setVoicePhase('idle')
@@ -455,9 +467,11 @@ export function FloatingBar(): React.JSX.Element {
       }
 
       // Auto-envio imediato (sem gate de confirmar/editar).
+      setStatusLine(null)
       setVoicePhase('idle')
       await sendContent(trimmed)
     } catch (err) {
+      setStatusLine(null)
       setError(err instanceof Error ? err.message : 'Falha na transcrição')
       setBarState('error')
       setVoicePhase('idle')
@@ -538,7 +552,8 @@ export function FloatingBar(): React.JSX.Element {
                 <Loader2 size={15} className="fb-spin" aria-hidden />
               )}
               <span>
-                {statusLine && resolvedState === 'executing'
+                {statusLine &&
+                (resolvedState === 'executing' || resolvedState === 'transcribing')
                   ? statusLine
                   : STATE_LABEL[resolvedState]}
               </span>
@@ -664,6 +679,7 @@ export function FloatingBar(): React.JSX.Element {
               }
               captureRef.current = null
               recordingActiveRef.current = false
+              setStatusLine(null)
               setVoicePhase('idle')
               setBarState(offline ? 'offline' : 'idle')
             }}

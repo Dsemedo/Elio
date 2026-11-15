@@ -5,6 +5,7 @@ import { registerLocationIpc } from './ipc/location'
 import { registerShellIpc } from './ipc/shell'
 import { registerSpotifyIpc } from './ipc/spotify'
 import { registerVoiceIpc } from './ipc/voice'
+import { isAppPermissionAllowed } from './sessionPermissions'
 import { startAutoUpdater } from './services/updater'
 import { getShellManager } from './shell/manager'
 
@@ -23,26 +24,23 @@ function registerIpc(): void {
 }
 
 /**
- * Permite o pedido de geolocation do Chromium (Windows Location API).
+ * Concede geolocation + media/mic ao origin do app.
  * O SO ainda pode mostrar o diálogo do Windows; sem isto o renderer recebe
- * PERMISSION_DENIED imediatamente.
+ * PERMISSION_DENIED / SpeechRecognition `not-allowed` imediatamente.
+ * (0.9 só liberava geolocation — isso bloqueava Web Speech / getUserMedia.)
  */
-function allowGeolocationPermission(ses: Session): void {
+function allowAppMediaAndLocationPermissions(ses: Session): void {
   ses.setPermissionRequestHandler((_wc, permission, callback) => {
-    if (permission === 'geolocation') {
-      callback(true)
-      return
-    }
-    callback(false)
+    callback(isAppPermissionAllowed(permission))
   })
   ses.setPermissionCheckHandler((_wc, permission) => {
-    return permission === 'geolocation'
+    return isAppPermissionAllowed(permission)
   })
 }
 
 app.whenReady().then(() => {
   Menu.setApplicationMenu(null)
-  allowGeolocationPermission(session.defaultSession)
+  allowAppMediaAndLocationPermissions(session.defaultSession)
   registerIpc()
   getShellManager().start()
   startAutoUpdater()

@@ -34,11 +34,41 @@ export function resolveSttBackend(input: {
   return 'whisper'
 }
 
+/**
+ * Extrai o código da Web Speech API de `WINDOWS_SPEECH_ERROR:not-allowed`
+ * (ou devolve o texto cru em minúsculas).
+ */
+export function extractWindowsSpeechErrorCode(
+  raw: string | undefined | null,
+): string | null {
+  if (!raw) return null
+  const trimmed = raw.trim()
+  const prefix = 'WINDOWS_SPEECH_ERROR:'
+  const idx = trimmed.toUpperCase().indexOf(prefix)
+  if (idx >= 0) {
+    return trimmed.slice(idx + prefix.length).trim().toLowerCase() || null
+  }
+  return trimmed.toLowerCase()
+}
+
 /** Erros da Web Speech API que justificam cair no Whisper (áudio paralelo). */
 export function shouldFallbackToWhisper(errorCode: string | undefined | null): boolean {
   if (!errorCode) return true
-  const code = errorCode.toLowerCase()
-  // Permissão negada: Whisper também precisa do mic — não adianta.
-  if (code === 'not-allowed' || code === 'service-not-allowed') return false
+  // Inclui not-allowed / service-not-allowed: no Electron o Speech pode
+  // falhar por permissão de sessão enquanto getUserMedia (Whisper) ainda
+  // funciona — e o produto precisa continuar útil nesse PTT.
   return true
+}
+
+/** Mensagem curta em PT para a barra (sem códigos crus que truncam). */
+export function windowsSpeechUserMessage(err: unknown): string {
+  const raw = err instanceof Error ? err.message : String(err)
+  const code = extractWindowsSpeechErrorCode(raw) ?? raw.toLowerCase()
+  if (code.includes('not-allowed') || code.includes('service-not-allowed')) {
+    return 'Permissão de microfone/fala negada — ative em Configurações do Windows ou tente de novo'
+  }
+  if (raw.includes('WINDOWS_SPEECH_UNAVAILABLE') || code.includes('unavailable')) {
+    return 'Reconhecimento de fala do Windows indisponível neste ambiente.'
+  }
+  return 'Falha no reconhecimento de fala do Windows.'
 }

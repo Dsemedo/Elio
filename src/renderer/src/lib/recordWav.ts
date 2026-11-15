@@ -1,6 +1,7 @@
 /** Grava PCM do microfone e devolve WAV 16 kHz mono 16-bit (base64). */
 
 import { isMicMissingMessage } from '@shared/micMessages'
+import { windowsSpeechUserMessage } from '@shared/sttPolicy'
 
 export { isMicMissingMessage }
 
@@ -174,9 +175,12 @@ export async function startMicRecording(): Promise<MicRecorder> {
  * Se a lista ainda mostra um input, sugere contato/uso/bloqueio.
  */
 export async function micPermissionMessage(err: unknown): Promise<string> {
+  if (err instanceof Error && /WINDOWS_SPEECH/i.test(err.message)) {
+    return windowsSpeechUserMessage(err)
+  }
   if (err instanceof DOMException) {
     if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-      return 'Sem permissão de microfone. Libere o mic nas configurações do Windows / do app e tente de novo.'
+      return 'Permissão de microfone/fala negada — ative em Configurações do Windows ou tente de novo'
     }
     if (err.name === 'NotFoundError') {
       const presence = await probeMicPresence()
