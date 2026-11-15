@@ -1,7 +1,8 @@
 # Elio
 
 Assistente pessoal de IA para desktop (**JARVIS MVP** — Estágio 1).  
-Produto: **Elio**. Conversa por **texto** e **voz → texto** (Whisper local via `whisper-cli`).
+Produto: **Elio**. Conversa por **texto** e **voz → texto** (Whisper local).  
+**v0.4.0** — shell com **barrinha flutuante** + **painel** (Conversar, Histórico, Integrações, Computador).
 
 ## Requisitos
 
@@ -27,46 +28,50 @@ npm run ensure:electron
 npm run dev
 ```
 
-Deve abrir a janela **Elio** com o chat e o selo **v0.3.0**.
+Deve aparecer:
+
+1. Uma **barrinha** no topo (~20% da largura) com o nome **Elio**  
+2. Um ícone do Elio na **bandeja** (canto da barra de tarefas)  
+3. Ao **clicar na barrinha**, o **painel** abre/fecha  
+
+Confirme o selo **v0.4.0** no painel (nav à esquerda).
+
+### O que testar no painel
+
+| Seção | O que deve funcionar |
+|-------|----------------------|
+| **Conversar** | Chat por texto + botão **Falar** (voz → texto), igual às versões anteriores |
+| **Histórico** | Lista de conversas; clicar abre em Conversar; excluir / nova |
+| **Integrações** | Status de Ollama / OpenRouter; Slack e Jira como **em breve** (ainda sem login) |
+| **Computador** | Memória, CPU aproximada, SO — atualiza sozinho; **não** lista apps que mais pesam |
+
+### Barrinha some / como voltar
+
+- Se você focar **outro app**, a barrinha e o painel **tendem a sumir** (best-effort no Windows).  
+- Para **voltar**: clique no ícone do Elio na **bandeja** → **Mostrar Elio**.  
+- Atalho de teclado global ainda **não** está definido (decisão OD-20 aberta).  
+- Limitações: ver `docs/ADRs/0003-shell-overlay.md`.
 
 ### Testar a voz (STT)
 
-1. Clique em **Preparar voz** (ou segure **Falar** — na primeira vez baixa sozinho).  
+1. Em **Conversar**, clique em **Preparar voz** (ou segure **Falar** — na primeira vez baixa sozinho).  
 2. Espere o progresso (~80 MB: binário + modelo `tiny`).  
 3. **Segure** o botão **Falar**, diga uma frase em português, **solte**.  
-4. O texto deve aparecer na caixa de mensagem. Revise e clique **Enviar**.
-
-**O que é baixado (1ª vez, pasta local do app):**
-
-- `whisper-cli` (whisper.cpp **v1.9.2**)  
-- modelo **`ggml-tiny.bin`** (multilíngue)  
+4. O texto deve aparecer na caixa. Revise e clique **Enviar**.
 
 Tudo fica em `%APPDATA%\elio\whisper\` — **áudio e texto da fala não saem deste PC**.
 
-**Erros comuns**
-
-| Situação | O que fazer |
-|----------|-------------|
-| Sem permissão de mic | Windows → Configurações → Privacidade → Microfone → permitir para o terminal/Electron |
-| Áudio muito curto | Segure o botão e fale pelo menos ~1 segundo |
-| Whisper / download falhou | Confira internet; clique **Preparar voz** de novo |
-| Sem Ollama / sem chave | A voz ainda preenche o texto; para **responder**, use Ollama ou OpenRouter |
-
 ### Testar o chat por texto
 
-1. **Com Ollama (recomendado, sem chave):**  
-   - Instale e abra o Ollama.  
-   - `ollama pull llama3.2`  
-   - Envie uma mensagem no Elio.
-
-2. **Sem Ollama, com OpenRouter:**  
+1. **Com Ollama (recomendado, sem chave):** instale/abra o Ollama, `ollama pull llama3.2`, envie uma mensagem.  
+2. **Com OpenRouter:**
 
 ```powershell
 $env:OPENROUTER_API_KEY="sk-or-v1-SUA_CHAVE"
 npm run dev
 ```
 
-3. **Sem Ollama e sem chave:** o app abre; ao enviar, aviso para configurar. Nada secreto vai para o log.
+3. **Sem provedor:** o app abre; ao enviar, aviso para configurar.
 
 ### Se algo falhar no Windows
 
@@ -81,6 +86,7 @@ npm run dev
 2. Feche janelas do Elio / Electron.
 3. Antivírus: permita `node_modules\electron\dist\` e `%APPDATA%\elio\whisper\`.
 4. Use terminal **fora** do WSL.
+5. Se a barrinha não voltar: bandeja → **Mostrar Elio** ou **Sair** e `npm run dev` de novo.
 
 ## Scripts úteis
 
@@ -97,8 +103,8 @@ npm run dev
 
 - `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`
 - Preload mínimo (CJS) via `contextBridge`
-- IPC com canais fixos + validação **Zod** no main
-- Subprocess Whisper **só no main** (`shell: false`); renderer nunca vê o path do binário
+- IPC com canais fixos + validação **Zod** no main (chat, voz, shell, sistema)
+- Subprocess Whisper **só no main** (`shell: false`)
 - Chaves só por variável de ambiente neste pedaço (keytar depois); **não** vão para logs
 - Logs sem conteúdo de fala e sem path completo do usuário
 
@@ -110,12 +116,13 @@ npm run dev
 ## Versão do Electron
 
 Pin: **45.3.2** — ver `docs/ADRs/0001-electron-version.md`.  
-STT: subprocess `whisper-cli` — ver `docs/ADRs/0002-whisper-subprocess.md`.
+STT: subprocess `whisper-cli` — ver `docs/ADRs/0002-whisper-subprocess.md`.  
+Shell overlay: `docs/ADRs/0003-shell-overlay.md`.
 
-## Escopo atual
+## Escopo atual (v0.4.0)
 
-Incluído: chat texto, threads, cancelar resposta, roteador Ollama→OpenRouter, **voz → texto (PTT)**.  
-Fora deste pedaço: TTS completo, atalho global minimizado, keytar UI, budget cap completo, memória explícita.
+**Funciona:** barrinha + painel, chat, voz→texto, histórico, status IA, snapshot básico do PC, bandeja.  
+**Stub / depois:** OAuth Slack/Jira, análise profunda de desempenho, atalho global (OD-20), abrir apps/pastas.
 
 ## Licença
 

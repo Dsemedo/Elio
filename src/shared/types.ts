@@ -76,3 +76,25 @@ export type VoiceTranscribeInput = {
 export type VoiceTranscribeResult = {
   text: string
 }
+
+export type ShellState = {
+  panelOpen: boolean
+  barVisible: boolean
+  hiddenByFocus: boolean
+}
+
+export type SystemSnapshot = {
+  platform: NodeJS.Platform
+  release: string
+  arch: string
+  hostname: string
+  uptimeSec: number
+  totalMemBytes: number
+  freeMemBytes: number
+  usedMemBytes: number
+  memUsedPercent: number
+  cpuModel: string
+  cpuCount: number
+  cpuLoadPercent: number | null
+  note: string
+}
