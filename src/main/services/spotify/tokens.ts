@@ -2,7 +2,7 @@ import { mkdir, readFile, writeFile, rm } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 
 /**
- * Tokens Spotify cifrados com safeStorage em userData.
+ * Tokens Spotify cifrados com safeStorage (API async) em userData.
  * Nunca logar access/refresh tokens.
  */
 
@@ -14,10 +14,11 @@ export type SpotifyTokenSet = {
   scope: string
 }
 
+/** Abstração async — alinha com safeStorage.isAsyncEncryptionAvailable / *Async. */
 export type SecretCrypto = {
-  isEncryptionAvailable: () => boolean
-  encryptString: (plain: string) => Buffer
-  decryptString: (encrypted: Buffer) => string
+  isEncryptionAvailable: () => Promise<boolean>
+  encryptString: (plain: string) => Promise<Buffer>
+  decryptString: (encrypted: Buffer) => Promise<string>
 }
 
 export type TokenPaths = {
@@ -34,7 +35,7 @@ export async function saveSpotifyTokens(
   crypto: SecretCrypto,
   paths: TokenPaths,
 ): Promise<{ ok: true } | { ok: false; reason: string }> {
-  if (!crypto.isEncryptionAvailable()) {
+  if (!(await crypto.isEncryptionAvailable())) {
     return {
       ok: false,
       reason:
@@ -50,7 +51,7 @@ export async function saveSpotifyTokens(
     scope: tokens.scope,
   })
 
-  const encrypted = crypto.encryptString(payload)
+  const encrypted = await crypto.encryptString(payload)
   await mkdir(dirname(paths.filePath), { recursive: true })
   await writeFile(paths.filePath, encrypted)
 
@@ -61,7 +62,7 @@ export async function loadSpotifyTokens(
   crypto: SecretCrypto,
   paths: TokenPaths,
 ): Promise<SpotifyTokenSet | null> {
-  if (!crypto.isEncryptionAvailable()) return null
+  if (!(await crypto.isEncryptionAvailable())) return null
 
   let raw: Buffer
   try {
@@ -71,7 +72,7 @@ export async function loadSpotifyTokens(
   }
 
   try {
-    const plain = crypto.decryptString(raw)
+    const plain = await crypto.decryptString(raw)
     const data = JSON.parse(plain) as Partial<SpotifyTokenSet>
     if (
       typeof data.accessToken !== 'string' ||

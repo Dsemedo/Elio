@@ -13,7 +13,7 @@ Douglas pediu: voz/texto (“Elio, tocar música no Spotify” / “toca uma mú
 1. **Preferido:** Spotify Web API (Authorization Code + **PKCE**, client público). Escopos mínimos: `user-modify-playback-state`, `user-read-playback-state`, `user-read-recently-played`. Sem client secret no app.
 2. **Playback:** `PUT /v1/me/player/play` (retomar) ou, se vazio, primeira faixa de *recently played*. Requer **Spotify Premium** para controle remoto na maioria dos dispositivos — se a API devolver `PREMIUM_REQUIRED` / 403, mensagem clara em PT e o app já foi aberto.
 3. **Fallback / ativação:** sempre tenta abrir via allowlist `spotify:` ou `https://open.spotify.com` com `shell.openExternal` (mesmo padrão do ADR 0005). Sem PowerShell/`child_process.exec`.
-4. **Segredos:** access/refresh tokens só no main, arquivo binário sob `userData`, cifrado com `safeStorage` do Electron. Nunca logar tokens; se criptografia indisponível, não gravar em texto puro.
+4. **Segredos:** access/refresh tokens só no main, arquivo binário sob `userData`, cifrado com `safeStorage` **async** do Electron (`isAsyncEncryptionAvailable` / `encryptStringAsync` / `decryptStringAsync` — sync deprecado no 45). Nunca logar tokens; se criptografia indisponível, não gravar em texto puro.
 5. **Client ID:** `ELIO_SPOTIFY_CLIENT_ID` (Dashboard Spotify do Douglas). Redirect loopback `http://127.0.0.1:47821/callback`.
 6. **Router:** lane A (`pc_action`) com intents `spotify_play` / `spotify_connect`, no mesmo fluxo da PR #15.
 7. **UI:** Floating Bar mostra “Abrindo Spotify…”; Integrações ganha stub “Conectar Spotify”.

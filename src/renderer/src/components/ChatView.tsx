@@ -3,11 +3,13 @@ import type {
   ChatStatus,
   Conversation,
   ConversationSummary,
+  SttPreference,
   VoiceProgress,
   VoiceStatus,
 } from '@shared/ipc'
 import { isNearBottom, shouldAutoScrollToBottom } from '@shared/chatScroll'
 import { detectChatToolIntent } from '@shared/chatIntent'
+import { resolveSttBackend, shouldFallbackToWhisper } from '@shared/sttPolicy'
 import {
   micPermissionMessage,
   startMicRecording,
@@ -15,9 +17,11 @@ import {
 } from '../lib/recordWav'
 import { ensureAppLocation } from '../lib/geolocation'
 import {
-  armVoiceConfirmSend,
-  type VoiceConfirmController,
-} from '@shared/voiceConfirm'
+  isWindowsSpeechAvailable,
+  startWindowsSpeech,
+  windowsSpeechErrorMessage,
+  type WindowsSpeechSession,
+} from '../lib/windowsSpeech'
 
 type Props = {
   status: ChatStatus
@@ -35,6 +39,14 @@ type Props = {
 }
 
 type VoiceUiState = 'idle' | 'preparing' | 'recording' | 'transcribing' | 'thinking'
+
+type ActiveCapture =
+  | {
+      kind: 'windows-speech'
+      session: WindowsSpeechSession
+      recorder: MicRecorder | null
+    }
+  | { kind: 'whisper'; recorder: MicRecorder }
 
 export function ChatView({
   status,
@@ -55,18 +67,13 @@ export function ChatView({
   const [voiceStatus, setVoiceStatus] = useState<VoiceStatus | null>(null)
   const [voiceUi, setVoiceUi] = useState<VoiceUiState>('idle')
   const [voiceProgress, setVoiceProgress] = useState<VoiceProgress | null>(null)
-  const [voiceConfirmHint, setVoiceConfirmHint] = useState<string | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const messagesRef = useRef<HTMLDivElement>(null)
   const stickToBottomRef = useRef(true)
   const inputRef = useRef<HTMLTextAreaElement>(null)
-  const recorderRef = useRef<MicRecorder | null>(null)
+  const captureRef = useRef<ActiveCapture | null>(null)
   const recordingActiveRef = useRef(false)
   const recordStartedAt = useRef(0)
-  const draftRef = useRef('')
-  const voiceConfirmRef = useRef<VoiceConfirmController | null>(null)
-
-  draftRef.current = draft
 
   useEffect(() => {
     const el = messagesRef.current
@@ -99,22 +106,30 @@ export function ChatView({
     return () => {
       cancelled = true
       unsubscribe()
-      recorderRef.current?.cancel()
-      recorderRef.current = null
+      const capture = captureRef.current
+      if (capture?.kind === 'windows-speech') {
+        capture.session.cancel()
+        capture.recorder?.cancel()
+      } else if (capture?.kind === 'whisper') {
+        capture.recorder.cancel()
+      }
+      captureRef.current = null
     }
   }, [])
 
-  const cancelVoiceConfirm = (): void => {
-    voiceConfirmRef.current?.cancel()
-    voiceConfirmRef.current = null
-    setVoiceConfirmHint(null)
-  }
+  const sttPreference: SttPreference = voiceStatus?.sttPreference ?? 'auto'
+  const platform = voiceStatus?.platform ?? 'win32'
+  const usingWindowsSpeech =
+    resolveSttBackend({
+      platform,
+      speechRecognitionAvailable: isWindowsSpeechAvailable(),
+      preference: sttPreference,
+    }) === 'windows-speech'
 
   const sendContent = async (raw: string): Promise<void> => {
     const content = raw.trim()
     if (!content || busy) return
 
-    cancelVoiceConfirm()
     stickToBottomRef.current = true
     setBusy(true)
     setVoiceUi('thinking')
@@ -170,7 +185,6 @@ export function ChatView({
   }
 
   const send = async (): Promise<void> => {
-    cancelVoiceConfirm()
     await sendContent(draft)
   }
 
@@ -183,11 +197,6 @@ export function ChatView({
     shiftKey: boolean
     preventDefault: () => void
   }): void => {
-    if (event.key === 'Escape') {
-      event.preventDefault()
-      cancelVoiceConfirm()
-      return
-    }
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault()
       void send()
@@ -215,6 +224,16 @@ export function ChatView({
     if (ok) setVoiceUi('idle')
   }
 
+  const startWhisperCapture = async (): Promise<void> => {
+    const ready = await ensureVoiceReady()
+    if (!ready) return
+    const recorder = await startMicRecording()
+    captureRef.current = { kind: 'whisper', recorder }
+    recordingActiveRef.current = true
+    recordStartedAt.current = Date.now()
+    setVoiceUi('recording')
+  }
+
   const beginTalk = async (): Promise<void> => {
     if (
       busy ||
@@ -225,63 +244,128 @@ export function ChatView({
       return
     }
     setError(null)
-
-    const ready = await ensureVoiceReady()
-    if (!ready) return
+    setVoiceUi('preparing')
 
     try {
-      const recorder = await startMicRecording()
-      recorderRef.current = recorder
-      recordingActiveRef.current = true
-      recordStartedAt.current = Date.now()
-      setVoiceUi('recording')
+      const backend = resolveSttBackend({
+        platform,
+        speechRecognitionAvailable: isWindowsSpeechAvailable(),
+        preference: sttPreference,
+      })
+
+      if (backend === 'windows-speech') {
+        try {
+          const session = await startWindowsSpeech({ lang: 'pt-BR' })
+          let recorder: MicRecorder | null = null
+          try {
+            recorder = await startMicRecording()
+          } catch {
+            /* ok — fallback Whisper indisponível neste PTT */
+          }
+          captureRef.current = { kind: 'windows-speech', session, recorder }
+          recordingActiveRef.current = true
+          recordStartedAt.current = Date.now()
+          setVoiceUi('recording')
+          return
+        } catch (err) {
+          if (
+            !shouldFallbackToWhisper(
+              err instanceof Error ? err.message.split(':').pop() : 'unknown',
+            )
+          ) {
+            setError(await micPermissionMessage(err).catch(() => windowsSpeechErrorMessage(err)))
+            setVoiceUi('idle')
+            return
+          }
+        }
+      }
+
+      await startWhisperCapture()
     } catch (err) {
       recordingActiveRef.current = false
+      captureRef.current = null
       setError(await micPermissionMessage(err))
       setVoiceUi('idle')
     }
   }
 
+  const transcribeWithWhisper = async (recorder: MicRecorder): Promise<string> => {
+    const ready = await ensureVoiceReady()
+    if (!ready) throw new Error('Whisper indisponível')
+    const audioBase64 = await recorder.stop()
+    const { text } = await window.elio.transcribeVoice({ audioBase64 })
+    setVoiceStatus(await window.elio.getVoiceStatus())
+    setVoiceProgress(null)
+    return text.trim()
+  }
+
   const endTalk = async (): Promise<void> => {
-    const recorder = recorderRef.current
-    if (!recorder || !recordingActiveRef.current) return
-    recorderRef.current = null
+    const capture = captureRef.current
+    if (!capture || !recordingActiveRef.current) return
+    captureRef.current = null
     recordingActiveRef.current = false
     setVoiceUi('transcribing')
 
     try {
       const elapsed = Date.now() - recordStartedAt.current
       if (elapsed < 400) {
-        recorder.cancel()
+        if (capture.kind === 'windows-speech') {
+          capture.session.cancel()
+          capture.recorder?.cancel()
+        } else {
+          capture.recorder.cancel()
+        }
         setError('Áudio muito curto — segure o botão e fale um pouco mais.')
         setVoiceUi('idle')
         return
       }
 
-      const audioBase64 = await recorder.stop()
-      const { text } = await window.elio.transcribeVoice({ audioBase64 })
-      const trimmed = text.trim()
+      let trimmed = ''
+
+      if (capture.kind === 'windows-speech') {
+        let speechText = ''
+        let speechFailed = false
+        let speechErrorCode: string | null = null
+        try {
+          speechText = (await capture.session.stop()).trim()
+        } catch (err) {
+          speechFailed = true
+          const msg = err instanceof Error ? err.message : ''
+          speechErrorCode = msg.includes(':') ? msg.split(':').pop() ?? msg : msg
+        }
+
+        if (speechText) {
+          capture.recorder?.cancel()
+          trimmed = speechText
+        } else if (
+          capture.recorder &&
+          (!speechFailed || shouldFallbackToWhisper(speechErrorCode))
+        ) {
+          trimmed = await transcribeWithWhisper(capture.recorder)
+        } else {
+          capture.recorder?.cancel()
+          if (speechFailed && !shouldFallbackToWhisper(speechErrorCode)) {
+            setError(windowsSpeechErrorMessage(new Error(`WINDOWS_SPEECH_ERROR:${speechErrorCode}`)))
+          } else {
+            setError('Não deu para entender — tente falar de novo.')
+          }
+          setVoiceUi('idle')
+          setVoiceProgress(null)
+          return
+        }
+      } else {
+        trimmed = await transcribeWithWhisper(capture.recorder)
+      }
+
       if (!trimmed) {
         setError('Não deu para entender — tente falar de novo.')
         setVoiceUi('idle')
         setVoiceProgress(null)
         return
       }
-      setVoiceStatus(await window.elio.getVoiceStatus())
-      setVoiceProgress(null)
-      const existing = draftRef.current.trim()
-      const content = existing ? `${existing} ${trimmed}` : trimmed
-      cancelVoiceConfirm()
-      setDraft(content)
-      setVoiceUi('idle')
-      setVoiceConfirmHint('Confira o texto — envia sozinho em instantes (Enter agora, Esc cancela)')
-      requestAnimationFrame(() => inputRef.current?.focus())
-      voiceConfirmRef.current = armVoiceConfirmSend(() => {
-        voiceConfirmRef.current = null
-        setVoiceConfirmHint(null)
-        const latest = draftRef.current.trim()
-        if (latest) void sendContent(latest)
-      })
+
+      // Auto-envio imediato (sem gate de confirmar/editar).
+      await sendContent(trimmed)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Falha na transcrição')
       setVoiceUi('idle')
@@ -302,9 +386,11 @@ export function ChatView({
           ? 'Transcrevendo…'
           : voiceUi === 'thinking'
             ? 'Pensando…'
-            : voiceStatus?.ready
-              ? 'Segure para falar (confira o texto antes de enviar)'
-              : 'Segure para falar (baixa Whisper na 1ª vez)'
+            : usingWindowsSpeech
+              ? 'Segure para falar (Windows Speech · envia sozinho)'
+              : voiceStatus?.ready
+                ? 'Segure para falar (Whisper · envia sozinho)'
+                : 'Segure para falar (baixa Whisper na 1ª vez se precisar)'
 
   return (
     <div className={showSidebar ? 'chat-app' : 'chat-app chat-app-solo'}>
@@ -350,9 +436,13 @@ export function ChatView({
             <p className="status-hint">{status.hint}</p>
             {voiceStatus ? (
               <p className="status-hint voice-hint">
-                {voiceStatus.ready
-                  ? `Voz pronta (Whisper ${voiceStatus.modelId} local).`
-                  : voiceStatus.hint}
+                {usingWindowsSpeech
+                  ? voiceStatus.ready
+                    ? 'Windows Speech primário; Whisper pronto como fallback.'
+                    : 'Windows Speech primário (sem download). Whisper opcional como fallback.'
+                  : voiceStatus.ready
+                    ? `Voz pronta (Whisper ${voiceStatus.modelId} local).`
+                    : voiceStatus.hint}
               </p>
             ) : null}
           </div>
@@ -375,7 +465,9 @@ export function ChatView({
                 ? 'sem provedor'
                 : status.preferredProvider}
             </span>
-            {voiceStatus?.ready ? (
+            {usingWindowsSpeech ? (
+              <span className="badge accent">voz Windows</span>
+            ) : voiceStatus?.ready ? (
               <span className="badge accent">voz ok</span>
             ) : (
               <span className="badge muted">voz pendente</span>
@@ -403,10 +495,9 @@ export function ChatView({
             <div className="empty-state">
               <p className="empty-title">Olá — sou o Elio.</p>
               <p>
-                Escreva ou use o microfone. Após a fala, confira o texto na caixa (envia
-                sozinho em instantes). Pergunte a hora ou o tempo — uso o relógio local,
-                Open-Meteo e a localização do PC (com permissão). Na primeira vez a voz
-                baixa o Whisper (~466 MB, modelo small). O áudio fica só neste PC.
+                Escreva ou use o microfone. No Windows a fala usa o reconhecimento nativo
+                (pt-BR) e envia sozinha; Whisper fica só como fallback offline. Pergunte a
+                hora ou o tempo — uso o relógio local, Open-Meteo e a localização do PC.
               </p>
             </div>
           ) : null}
@@ -442,12 +533,6 @@ export function ChatView({
             </div>
           ) : null}
 
-          {voiceConfirmHint ? (
-            <div className="voice-hint" role="status">
-              {voiceConfirmHint}
-            </div>
-          ) : null}
-
           {voiceProgress && voiceUi === 'preparing' ? (
             <div className="voice-progress" role="status">
               <div className="voice-progress-bar">
@@ -466,12 +551,9 @@ export function ChatView({
               value={draft}
               onChange={(e) => {
                 setDraft(e.target.value)
-                if (voiceConfirmRef.current?.isArmed()) {
-                  cancelVoiceConfirm()
-                }
               }}
               onKeyDown={onKeyDown}
-              placeholder="Escreva ou segure o microfone… (confira o texto antes de enviar)"
+              placeholder="Escreva ou segure o microfone… (envia sozinho após a fala)"
               rows={3}
               disabled={busy || voiceUi === 'recording' || voiceUi === 'transcribing'}
             />
@@ -482,8 +564,9 @@ export function ChatView({
                   className="btn ghost"
                   disabled={voiceBusy || busy}
                   onClick={() => void prepareVoiceClick()}
+                  title="Baixa o Whisper para usar se o Windows Speech falhar (offline)"
                 >
-                  Preparar voz
+                  {usingWindowsSpeech ? 'Preparar fallback' : 'Preparar voz'}
                 </button>
               ) : null}
               <button
@@ -504,8 +587,14 @@ export function ChatView({
                   void endTalk()
                 }}
                 onPointerCancel={() => {
-                  recorderRef.current?.cancel()
-                  recorderRef.current = null
+                  const capture = captureRef.current
+                  if (capture?.kind === 'windows-speech') {
+                    capture.session.cancel()
+                    capture.recorder?.cancel()
+                  } else if (capture?.kind === 'whisper') {
+                    capture.recorder.cancel()
+                  }
+                  captureRef.current = null
                   recordingActiveRef.current = false
                   setVoiceUi('idle')
                 }}

@@ -1,7 +1,7 @@
 # Elio
 
 Assistente pessoal de IA para desktop (**JARVIS MVP**).  
-**v0.10.0** — Spotify por voz (PKCE + fallback URI); inclui Whisper **small**, confirmação STT e localização automática do clima (0.9.0).
+**v0.11.0** — Windows Speech STT primário (pt-BR) + Whisper fallback; auto-envio após fala; Spotify PKCE (0.10.0).
 
 Spec UI: [`docs/elio-design-system.md`](./docs/elio-design-system.md) · ADRs: [`docs/ADRs/`](./docs/ADRs/)
 
@@ -10,7 +10,8 @@ Spec UI: [`docs/elio-design-system.md`](./docs/elio-design-system.md) · ADRs: [
 - **Windows 10/11 (x64)**  
 - **Node.js 22.12+**  
 - Microfone (voz)  
-- Internet: 1ª vez da voz (~**466 MB** Whisper **small**) e clima (Open-Meteo + opcional IP geo)  
+- Pacote de idioma de fala **pt-BR** do Windows (reconhecimento nativo)  
+- Internet: só se o fallback Whisper for usado na 1ª vez (~**466 MB**) e para clima  
 - Localização do Windows (opcional; se negar, usa IP aproximado)  
 - (Opcional) [Ollama](https://ollama.com) com um modelo (ex.: `llama3.2`)  
 - (Opcional) Spotify Premium + Client ID para play remoto por API
@@ -29,14 +30,15 @@ npm run ensure:electron
 npm run dev
 ```
 
-### O que Douglas deve ver (0.10.0)
+### O que Douglas deve ver (0.11.0)
 
-1. Selo **v0.10.0**  
-2. **Preparar voz** / 1º PTT: download do modelo **small** (~466 MB) se ainda não tiver  
-3. Floating Bar: segurar mic → falar → **texto aparece para conferir** (~3 s) → envia sozinho (Enter agora / Esc cancela / editar cancela auto-envio)  
-4. **“toca uma música no Spotify”** → abre o Spotify; se conectado + Premium → tenta play remoto; barra mostra “Abrindo Spotify…”  
-5. **“como está o tempo?”** → Windows pode pedir localização → clima da **sua cidade**  
-6. Opens seguros (“abre o site da Exame” / “abre a pasta Downloads”) e lane C (aba) **em breve**
+1. Selo **v0.11.0**  
+2. Floating Bar: segurar mic → falar PT-BR → **envia sozinho** (sem tela de conferir/editar)  
+3. STT usa **Windows Speech** (sem baixar Whisper na 1ª vez)  
+4. Se o Windows Speech falhar: cai no **Whisper** (pode baixar ~466 MB na 1ª vez do fallback)  
+5. **“toca uma música no Spotify”** → abre o Spotify; se conectado + Premium → play remoto  
+6. **“como está o tempo?”** → localização → clima da **sua cidade**  
+7. Sem warning de `safeStorage.isEncryptionAvailable` no console (API async)
 
 ### Conectar Spotify (Windows)
 
@@ -54,7 +56,7 @@ npm run dev
 6. Faça login no browser; volte ao Elio.  
 7. Abra o app Spotify neste PC. Conta **Premium** é necessária para o play remoto pela API; conta Free → o Elio abre o app e avisa.
 
-Tokens ficam cifrados em `%APPDATA%\elio\secrets\` (Electron `safeStorage`). Nunca vá para o log.
+Tokens ficam cifrados em `%APPDATA%\elio\secrets\` (Electron `safeStorage` **async**). Nunca vão para o log.
 
 ### Como testar localização no Windows
 
@@ -73,7 +75,7 @@ Tokens ficam cifrados em `%APPDATA%\elio\secrets\` (Electron `safeStorage`). Nun
 | **C** Web context | aba aberta, pesquisa web | ⏳ deferred (extensão/CDP) |
 | **D** Chat | conversa geral | ✅ LLM (Ollama / OpenRouter) |
 
-**Não neste PR:** busca de música na UI, redesenho do Command Center, ler aba do browser, RPA.
+**Não neste PR:** busca de música na UI, redesenho do Command Center, ler aba do browser, RPA, correção LLM do transcript.
 
 ### Clima e fuso
 
@@ -89,7 +91,8 @@ Ordem de resolução:
 | `ELIO_WEATHER_CITY` | Cidade (geocode Open-Meteo), ex.: `Campinas` |
 | `ELIO_WEATHER_LAT` + `ELIO_WEATHER_LON` | Coordenadas (prioridade sobre cidade) |
 | `ELIO_TIMEZONE` | Fuso IANA (padrão `America/Sao_Paulo`) |
-| `ELIO_WHISPER_MODEL` | `tiny` / `base` / `small` (padrão `small`) |
+| `ELIO_WHISPER_MODEL` | `tiny` / `base` / `small` (padrão `small`; só fallback) |
+| `ELIO_STT_PROVIDER` | `auto` (padrão) / `windows-speech` / `whisper` |
 | `ELIO_SPOTIFY_CLIENT_ID` | Client ID Spotify (PKCE; sem secret) |
 
 ### Privacidade (localização)
@@ -99,32 +102,27 @@ Ordem de resolução:
 - O LLM recebe **só o nome da cidade**, não lat/lon.  
 - Cache fica só em `%APPDATA%\elio\` neste PC.
 
-## Voz (Whisper local)
+## Voz (Windows Speech + Whisper fallback)
 
-- Binário: `whisper-cli` (whisper.cpp **v1.9.2**)  
-- Modelo: **`ggml-small.bin`** (~466 MB, multilíngue) com **`-l pt`** e **`--prompt`** PT-BR  
-- Override: `$env:ELIO_WHISPER_MODEL = "base"`  
-- Pasta: `%APPDATA%\elio\whisper\`  
-- Após STT: confirmação breve na barra/composer antes do auto-envio  
-- Áudio e texto da fala **não saem deste PC**
+- **Primário (Windows):** Web Speech API no renderer → Windows Speech Runtime, `lang: pt-BR` (ADR 0008)  
+- **Fallback:** `whisper-cli` (whisper.cpp **v1.9.2**) + `ggml-small.bin` (~466 MB) com `-l pt` (ADR 0002)  
+- Override STT: `$env:ELIO_STT_PROVIDER = "whisper"` força só Whisper  
+- Após STT: **auto-envio** (sem confirmar/editar)  
+- Pasta Whisper: `%APPDATA%\elio\whisper\`  
+- Áudio/texto **não vão para servidor nosso**
 
-### Migração de modelos antigos
+### Como testar STT no Windows
 
-Na próxima preparação o Elio baixa o **small**. Pode apagar os antigos:
-
-```text
-%APPDATA%\elio\whisper\models\ggml-tiny.bin
-%APPDATA%\elio\whisper\models\ggml-base.bin
-```
+1. Confirme idioma de fala pt-BR em **Configurações → Hora e idioma → Fala**  
+2. `npm run dev` → selo **v0.11.0**  
+3. Segure o mic na Floating Bar → diga *“Qual é o clima atual do lugar que eu moro?”* → solte  
+4. O texto deve ir **direto** ao chat (sem caixa “Confira o texto”)  
+5. Preferência: “atual” **não** vira “outdoor”  
+6. (Opcional) forçar Whisper: `$env:ELIO_STT_PROVIDER = "whisper"` e repetir  
+7. (Opcional) “Preparar fallback” no Command Center baixa o Whisper sem falar
 
 ## Segurança
 
-`contextIsolation`, sem `nodeIntegration`, sandbox, Zod IPC.  
-STT: subprocess `whisper-cli` só no main (`shell: false`).  
-Clima: Open-Meteo + cache local; coords não vão ao histórico/LLM.  
-Spotify: PKCE + `safeStorage`; opens só `spotify:` / `https://open.spotify.com`.  
-Ver `docs/ADRs/0002-whisper-subprocess.md`, `0006-auto-location-weather.md` e `0007-spotify-voice-pkce.md`.
-
-## Licença
-
-UNLICENSED — uso privado por enquanto.
+- Opens de desktop: allowlist + confirmação para paths sensíveis  
+- Spotify: PKCE + `safeStorage` async; opens só `spotify:` / `https://open.spotify.com`  
+- Sem secrets no repo / logs  

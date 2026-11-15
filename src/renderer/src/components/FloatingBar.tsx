@@ -9,8 +9,9 @@ import {
   MoreHorizontal,
   WifiOff,
 } from 'lucide-react'
-import type { ChatStatus, ShellState } from '@shared/ipc'
+import type { ChatStatus, ShellState, SttPreference } from '@shared/ipc'
 import { detectChatToolIntent } from '@shared/chatIntent'
+import { resolveSttBackend, shouldFallbackToWhisper } from '@shared/sttPolicy'
 import {
   isMicMissingMessage,
   micPermissionMessage,
@@ -20,14 +21,25 @@ import {
 } from '../lib/recordWav'
 import { ensureAppLocation } from '../lib/geolocation'
 import {
-  armVoiceConfirmSend,
-  type VoiceConfirmController,
-} from '@shared/voiceConfirm'
+  isWindowsSpeechAvailable,
+  startWindowsSpeech,
+  windowsSpeechErrorMessage,
+  type WindowsSpeechSession,
+} from '../lib/windowsSpeech'
 
 export type BarUiState =
   'idle' | 'listening' | 'transcribing' | 'thinking' | 'error' | 'offline' | 'executing'
 
 type VoicePhase = 'idle' | 'preparing' | 'recording' | 'transcribing'
+
+type ActiveCapture =
+  | {
+      kind: 'windows-speech'
+      session: WindowsSpeechSession
+      /** WAV paralelo para fallback Whisper se o Speech falhar/vazio. */
+      recorder: MicRecorder | null
+    }
+  | { kind: 'whisper'; recorder: MicRecorder }
 
 const STATE_LABEL: Record<BarUiState, string> = {
   idle: '',
@@ -55,30 +67,31 @@ export function FloatingBar(): React.JSX.Element {
   const [voicePhase, setVoicePhase] = useState<VoicePhase>('idle')
   const [lastReply, setLastReply] = useState<string | null>(null)
   const [statusLine, setStatusLine] = useState<string | null>(null)
-  const [voiceConfirming, setVoiceConfirming] = useState(false)
+  const [sttPreference, setSttPreference] = useState<SttPreference>('auto')
+  const [platform, setPlatform] = useState<string>('win32')
   const inputRef = useRef<HTMLInputElement>(null)
-  const recorderRef = useRef<MicRecorder | null>(null)
+  const captureRef = useRef<ActiveCapture | null>(null)
   const recordingActiveRef = useRef(false)
   const recordStartedAt = useRef(0)
   const menuRef = useRef<HTMLDivElement>(null)
   const micProbeBusy = useRef(false)
-  const draftRef = useRef('')
-  const voiceConfirmRef = useRef<VoiceConfirmController | null>(null)
-
-  draftRef.current = draft
 
   useEffect(() => {
     let cancelled = false
     async function boot(): Promise<void> {
       try {
-        const [shellState, chatStatus, list] = await Promise.all([
+        const [shellState, chatStatus, list, voice, appInfo] = await Promise.all([
           window.elio.getShellState(),
           window.elio.getChatStatus(),
           window.elio.listConversations(),
+          window.elio.getVoiceStatus(),
+          window.elio.getAppInfo(),
         ])
         if (cancelled) return
         setShell(shellState)
         setStatus(chatStatus)
+        setSttPreference(voice.sttPreference)
+        setPlatform(voice.platform || appInfo.platform)
         if (list[0]) {
           setConversationId(list[0].id)
         } else {
@@ -126,7 +139,14 @@ export function FloatingBar(): React.JSX.Element {
       cancelled = true
       unsubShell()
       unsubChat()
-      recorderRef.current?.cancel()
+      const capture = captureRef.current
+      if (capture?.kind === 'windows-speech') {
+        capture.session.cancel()
+        capture.recorder?.cancel()
+      } else if (capture?.kind === 'whisper') {
+        capture.recorder.cancel()
+      }
+      captureRef.current = null
       void window.elio.setBarOverlay(false)
     }
   }, [])
@@ -213,16 +233,9 @@ export function FloatingBar(): React.JSX.Element {
     return created.id
   }
 
-  const cancelVoiceConfirm = (): void => {
-    voiceConfirmRef.current?.cancel()
-    voiceConfirmRef.current = null
-    setVoiceConfirming(false)
-  }
-
   const sendContent = async (raw: string): Promise<void> => {
     const content = raw.trim()
     if (!content) return
-    cancelVoiceConfirm()
     setError(null)
     setLastReply(null)
     setStatusLine(null)
@@ -281,8 +294,26 @@ export function FloatingBar(): React.JSX.Element {
     ) {
       return
     }
-    cancelVoiceConfirm()
     await sendContent(draft)
+  }
+
+  const startWhisperCapture = async (): Promise<void> => {
+    setVoicePhase('preparing')
+    const voice = await window.elio.ensureVoice()
+    setSttPreference(voice.sttPreference)
+    setPlatform(voice.platform)
+    if (!voice.ready) {
+      setError(voice.hint || 'Voz indisponível')
+      setBarState('error')
+      setVoicePhase('idle')
+      return
+    }
+    const recorder = await startMicRecording()
+    captureRef.current = { kind: 'whisper', recorder }
+    recordingActiveRef.current = true
+    recordStartedAt.current = Date.now()
+    setVoicePhase('recording')
+    setBarState('listening')
   }
 
   const beginTalk = async (): Promise<void> => {
@@ -300,72 +331,132 @@ export function FloatingBar(): React.JSX.Element {
     setInputActive(false)
     setVoicePhase('preparing')
     try {
-      // Rechecagem antes do PTT — mau contato pode ter voltado.
       await probeMicPresence()
-      const voice = await window.elio.ensureVoice()
-      if (!voice.ready) {
-        setError(voice.hint || 'Voz indisponível')
-        setBarState('error')
-        setVoicePhase('idle')
-        return
+      const backend = resolveSttBackend({
+        platform,
+        speechRecognitionAvailable: isWindowsSpeechAvailable(),
+        preference: sttPreference,
+      })
+
+      if (backend === 'windows-speech') {
+        try {
+          const session = await startWindowsSpeech({ lang: 'pt-BR' })
+          let recorder: MicRecorder | null = null
+          try {
+            recorder = await startMicRecording()
+          } catch {
+            /* Speech sozinho ainda funciona; fallback Whisper fica indisponível neste PTT */
+          }
+          captureRef.current = { kind: 'windows-speech', session, recorder }
+          recordingActiveRef.current = true
+          recordStartedAt.current = Date.now()
+          setVoicePhase('recording')
+          setBarState('listening')
+          return
+        } catch (err) {
+          // Indisponível / erro no start → Whisper.
+          if (
+            !shouldFallbackToWhisper(
+              err instanceof Error ? err.message.split(':').pop() : 'unknown',
+            )
+          ) {
+            setError(await micPermissionMessage(err).catch(() => windowsSpeechErrorMessage(err)))
+            setBarState('error')
+            setVoicePhase('idle')
+            return
+          }
+        }
       }
-      const recorder = await startMicRecording()
-      recorderRef.current = recorder
-      recordingActiveRef.current = true
-      recordStartedAt.current = Date.now()
-      setVoicePhase('recording')
-      setBarState('listening')
+
+      await startWhisperCapture()
     } catch (err) {
       recordingActiveRef.current = false
+      captureRef.current = null
       setError(await micPermissionMessage(err))
       setBarState('error')
       setVoicePhase('idle')
     }
   }
 
+  const transcribeWithWhisper = async (recorder: MicRecorder): Promise<string> => {
+    const voice = await window.elio.ensureVoice()
+    if (!voice.ready) {
+      throw new Error(voice.hint || 'Whisper indisponível')
+    }
+    const audioBase64 = await recorder.stop()
+    const { text } = await window.elio.transcribeVoice({ audioBase64 })
+    return text.trim()
+  }
+
   const endTalk = async (): Promise<void> => {
-    const recorder = recorderRef.current
+    const capture = captureRef.current
     // Ref (não state): evita race do pointerUp antes do React aplicar 'recording'.
-    if (!recorder || !recordingActiveRef.current) return
-    recorderRef.current = null
+    if (!capture || !recordingActiveRef.current) return
+    captureRef.current = null
     recordingActiveRef.current = false
     setVoicePhase('transcribing')
     setBarState('transcribing')
     try {
       if (Date.now() - recordStartedAt.current < 400) {
-        recorder.cancel()
+        if (capture.kind === 'windows-speech') {
+          capture.session.cancel()
+          capture.recorder?.cancel()
+        } else {
+          capture.recorder.cancel()
+        }
         setError('Áudio muito curto — segure e fale um pouco mais.')
         setBarState('error')
         setVoicePhase('idle')
         return
       }
-      const audioBase64 = await recorder.stop()
-      const { text } = await window.elio.transcribeVoice({ audioBase64 })
-      const trimmed = text.trim()
+
+      let trimmed = ''
+
+      if (capture.kind === 'windows-speech') {
+        let speechText = ''
+        let speechFailed = false
+        let speechErrorCode: string | null = null
+        try {
+          speechText = (await capture.session.stop()).trim()
+        } catch (err) {
+          speechFailed = true
+          const msg = err instanceof Error ? err.message : ''
+          speechErrorCode = msg.includes(':') ? msg.split(':').pop() ?? msg : msg
+        }
+
+        if (speechText) {
+          capture.recorder?.cancel()
+          trimmed = speechText
+        } else if (
+          capture.recorder &&
+          (!speechFailed || shouldFallbackToWhisper(speechErrorCode))
+        ) {
+          trimmed = await transcribeWithWhisper(capture.recorder)
+        } else {
+          capture.recorder?.cancel()
+          if (speechFailed && !shouldFallbackToWhisper(speechErrorCode)) {
+            setError(windowsSpeechErrorMessage(new Error(`WINDOWS_SPEECH_ERROR:${speechErrorCode}`)))
+          } else {
+            setError('Não deu para entender — tente falar de novo.')
+          }
+          setBarState('error')
+          setVoicePhase('idle')
+          return
+        }
+      } else {
+        trimmed = await transcribeWithWhisper(capture.recorder)
+      }
+
       if (!trimmed) {
         setError('Não deu para entender — tente falar de novo.')
         setBarState('error')
         setVoicePhase('idle')
         return
       }
-      // Confirmação breve na barra — evita disparar intent errado (PJ-25).
-      const existing = draftRef.current.trim()
-      const content = existing ? `${existing} ${trimmed}` : trimmed
-      cancelVoiceConfirm()
-      setDraft(content)
-      setInputActive(true)
+
+      // Auto-envio imediato (sem gate de confirmar/editar).
       setVoicePhase('idle')
-      setBarState(offline ? 'offline' : 'idle')
-      setVoiceConfirming(true)
-      setLastReply(null)
-      setError(null)
-      requestAnimationFrame(() => inputRef.current?.focus())
-      voiceConfirmRef.current = armVoiceConfirmSend(() => {
-        voiceConfirmRef.current = null
-        setVoiceConfirming(false)
-        const latest = draftRef.current.trim()
-        if (latest) void sendContent(latest)
-      })
+      await sendContent(trimmed)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Falha na transcrição')
       setBarState('error')
@@ -404,6 +495,12 @@ export function FloatingBar(): React.JSX.Element {
   }
 
   const micMissing = isMicMissingMessage(error)
+  const usingWindowsSpeech =
+    resolveSttBackend({
+      platform,
+      speechRecognitionAvailable: isWindowsSpeechAvailable(),
+      preference: sttPreference,
+    }) === 'windows-speech'
 
   return (
     <div className="fb-root">
@@ -451,49 +548,33 @@ export function FloatingBar(): React.JSX.Element {
               <span className="fb-error-inline-text">{error}</span>
             </div>
           ) : showTextField ? (
-            <div className={voiceConfirming ? 'fb-confirm-wrap' : undefined}>
-              <input
-                ref={inputRef}
-                className="fb-input"
-                value={draft}
-                placeholder={
-                  voiceConfirming
-                    ? 'Confira · envia sozinho · Enter agora · Esc cancela'
-                    : ''
+            <input
+              ref={inputRef}
+              className="fb-input"
+              value={draft}
+              placeholder=""
+              aria-label="Mensagem para o Elio"
+              onChange={(e) => {
+                setDraft(e.target.value)
+                if (barState === 'error') setBarState(offline ? 'offline' : 'idle')
+              }}
+              onBlur={() => {
+                if (!draft.trim()) setInputActive(false)
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  void send()
                 }
-                aria-label="Mensagem para o Elio"
-                onChange={(e) => {
-                  setDraft(e.target.value)
-                  if (voiceConfirming) {
-                    cancelVoiceConfirm()
-                    setStatusLine(null)
-                  }
-                  if (barState === 'error') setBarState(offline ? 'offline' : 'idle')
-                }}
-                onBlur={() => {
-                  if (!draft.trim() && !voiceConfirming) setInputActive(false)
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault()
-                    void send()
-                  }
-                  if (e.key === 'Escape') {
-                    e.preventDefault()
-                    cancelVoiceConfirm()
-                    setDraft('')
-                    setInputActive(false)
-                    setStatusLine(null)
-                    inputRef.current?.blur()
-                  }
-                }}
-              />
-              {voiceConfirming ? (
-                <span className="fb-confirm-hint" aria-live="polite">
-                  Confira o texto
-                </span>
-              ) : null}
-            </div>
+                if (e.key === 'Escape') {
+                  e.preventDefault()
+                  setDraft('')
+                  setInputActive(false)
+                  setStatusLine(null)
+                  inputRef.current?.blur()
+                }
+              }}
+            />
           ) : showLastReply ? (
             <button
               type="button"
@@ -550,7 +631,9 @@ export function FloatingBar(): React.JSX.Element {
                 ? 'Solte para transcrever'
                 : micMissing
                   ? 'Mic ausente ou sem sinal — segure para tentar de novo'
-                  : 'Segure para falar (confira o texto antes de enviar)'
+                  : usingWindowsSpeech
+                    ? 'Segure para falar (Windows Speech · envia sozinho)'
+                    : 'Segure para falar (Whisper · envia sozinho)'
             }
             aria-label="Voz"
             aria-pressed={resolvedState === 'listening'}
@@ -572,8 +655,14 @@ export function FloatingBar(): React.JSX.Element {
               void endTalk()
             }}
             onPointerCancel={() => {
-              recorderRef.current?.cancel()
-              recorderRef.current = null
+              const capture = captureRef.current
+              if (capture?.kind === 'windows-speech') {
+                capture.session.cancel()
+                capture.recorder?.cancel()
+              } else if (capture?.kind === 'whisper') {
+                capture.recorder.cancel()
+              }
+              captureRef.current = null
               recordingActiveRef.current = false
               setVoicePhase('idle')
               setBarState(offline ? 'offline' : 'idle')

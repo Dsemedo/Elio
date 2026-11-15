@@ -1,3 +1,7 @@
+import type { SttPreference } from './sttPolicy'
+
+export type { SttPreference }
+
 export type AppInfo = {
   name: string
   version: string
@@ -72,6 +76,13 @@ export type VoiceStatus = {
   whisperVersion: string
   supported: boolean
   hint: string
+  /**
+   * Preferência de provedor STT (main lê ELIO_STT_PROVIDER).
+   * O renderer combina com disponibilidade de SpeechRecognition.
+   */
+  sttPreference: SttPreference
+  /** Plataforma do processo main — renderer usa para política win32-first. */
+  platform: NodeJS.Platform
 }
 
 export type AppLocationSource = 'os' | 'ip' | 'manual'

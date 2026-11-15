@@ -112,9 +112,9 @@ describe('handleSpotifyIntent — fallback open sem client id', () => {
     const dir = await mkdtemp(join(tmpdir(), 'elio-spotify-'))
     const opened: string[] = []
     const crypto: SecretCrypto = {
-      isEncryptionAvailable: () => true,
-      encryptString: (p) => Buffer.from(p, 'utf8'),
-      decryptString: (b) => b.toString('utf8'),
+      isEncryptionAvailable: async () => true,
+      encryptString: async (p) => Buffer.from(p, 'utf8'),
+      decryptString: async (b) => b.toString('utf8'),
     }
     try {
       const result = await handleSpotifyIntent(

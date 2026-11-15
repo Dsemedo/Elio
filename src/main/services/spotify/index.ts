@@ -36,17 +36,59 @@ function resolveUserDataPath(): string | null {
   return null
 }
 
+/**
+ * Wrapper Electron safeStorage (API async — sync deprecado no 45, removido no 46).
+ * Tokens antigos cifrados com encryptString sync ainda descriptografam via decryptStringAsync.
+ */
 export function electronSecretCrypto(): SecretCrypto {
   return {
-    isEncryptionAvailable: () => {
+    isEncryptionAvailable: async () => {
       try {
-        return Boolean(safeStorage?.isEncryptionAvailable?.())
+        const asyncFn = (
+          safeStorage as unknown as {
+            isAsyncEncryptionAvailable?: () => Promise<boolean>
+          }
+        ).isAsyncEncryptionAvailable
+        if (typeof asyncFn === 'function') {
+          return Boolean(await asyncFn.call(safeStorage))
+        }
+        // Fallback só se build antigo sem API async (não deve ocorrer no pin 45.3.x).
+        return Boolean(
+          (
+            safeStorage as unknown as {
+              isEncryptionAvailable?: () => boolean
+            }
+          ).isEncryptionAvailable?.(),
+        )
       } catch {
         return false
       }
     },
-    encryptString: (plain) => safeStorage.encryptString(plain),
-    decryptString: (encrypted) => safeStorage.decryptString(encrypted),
+    encryptString: async (plain) => {
+      const asyncFn = (
+        safeStorage as unknown as {
+          encryptStringAsync?: (s: string) => Promise<Buffer>
+        }
+      ).encryptStringAsync
+      if (typeof asyncFn === 'function') {
+        return asyncFn.call(safeStorage, plain)
+      }
+      return safeStorage.encryptString(plain)
+    },
+    decryptString: async (encrypted) => {
+      const asyncFn = (
+        safeStorage as unknown as {
+          decryptStringAsync?: (
+            buf: Buffer,
+          ) => Promise<{ result: string; shouldReEncrypt?: boolean }>
+        }
+      ).decryptStringAsync
+      if (typeof asyncFn === 'function') {
+        const out = await asyncFn.call(safeStorage, encrypted)
+        return out.result
+      }
+      return safeStorage.decryptString(encrypted)
+    },
   }
 }
 
@@ -91,7 +133,7 @@ export async function getSpotifyConnectionStatus(
   return {
     clientConfigured,
     connected: Boolean(tokens),
-    encryptionAvailable: crypto.isEncryptionAvailable(),
+    encryptionAvailable: await crypto.isEncryptionAvailable(),
   }
 }
 
