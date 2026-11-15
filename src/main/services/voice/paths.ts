@@ -1,7 +1,7 @@
-import { existsSync, mkdirSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync } from 'node:fs'
 import { join, resolve, sep } from 'node:path'
 import { app } from 'electron'
-import { LEGACY_MODEL_FILE, MODEL_FILE, binaryFileName } from './constants'
+import { LEGACY_MODEL_FILES, binaryFileName, resolveWhisperModel } from './constants'
 
 /**
  * Tudo sob userData (OD-18). Paths nunca são expostos ao renderer.
@@ -23,16 +23,39 @@ export function whisperTempDir(): string {
 }
 
 export function modelPath(): string {
-  return join(whisperModelDir(), MODEL_FILE)
+  const { file } = resolveWhisperModel()
+  return join(whisperModelDir(), file)
 }
 
-/** Modelo tiny antigo — só para UX de migração; não é usado na transcrição. */
-export function legacyModelPath(): string {
-  return join(whisperModelDir(), LEGACY_MODEL_FILE)
+/** Modelos antigos no disco — só UX de migração; não usados na transcrição. */
+export function listLegacyModelFilesOnDisk(): string[] {
+  const dir = whisperModelDir()
+  if (!existsSync(dir)) return []
+  const current = resolveWhisperModel().file
+  const found: string[] = []
+  try {
+    for (const name of readdirSync(dir)) {
+      if (name === current) continue
+      if (
+        (LEGACY_MODEL_FILES as readonly string[]).includes(name) ||
+        /^ggml-.+\.bin$/i.test(name)
+      ) {
+        found.push(name)
+      }
+    }
+  } catch {
+    return []
+  }
+  return found
 }
 
+export function hasLegacyModels(): boolean {
+  return listLegacyModelFilesOnDisk().length > 0
+}
+
+/** @deprecated use hasLegacyModels — mantido p/ imports antigos em testes. */
 export function hasLegacyTinyModel(): boolean {
-  return existsSync(legacyModelPath())
+  return existsSync(join(whisperModelDir(), 'ggml-tiny.bin'))
 }
 
 export function binaryPath(): string {

@@ -261,6 +261,30 @@ textarea {
   color: transparent;
 }
 
+.fb-confirm-wrap .fb-input::placeholder {
+  color: var(--elio-text-secondary);
+  opacity: 0.9;
+}
+
+.fb-confirm-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  width: 100%;
+  min-width: 0;
+  gap: 0.05rem;
+}
+
+.fb-confirm-hint {
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: var(--elio-accent);
+  line-height: 1.2;
+  padding: 0 0.25rem;
+}
+
 /* Idle voz-primeiro: sem “Pergunte ao Elio…” como identidade. */
 .fb-voice-idle {
   display: flex;

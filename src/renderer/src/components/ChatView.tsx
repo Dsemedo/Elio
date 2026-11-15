@@ -7,11 +7,17 @@ import type {
   VoiceStatus,
 } from '@shared/ipc'
 import { isNearBottom, shouldAutoScrollToBottom } from '@shared/chatScroll'
+import { detectChatToolIntent } from '@shared/chatIntent'
 import {
   micPermissionMessage,
   startMicRecording,
   type MicRecorder,
 } from '../lib/recordWav'
+import { ensureAppLocation } from '../lib/geolocation'
+import {
+  armVoiceConfirmSend,
+  type VoiceConfirmController,
+} from '@shared/voiceConfirm'
 
 type Props = {
   status: ChatStatus
@@ -49,6 +55,7 @@ export function ChatView({
   const [voiceStatus, setVoiceStatus] = useState<VoiceStatus | null>(null)
   const [voiceUi, setVoiceUi] = useState<VoiceUiState>('idle')
   const [voiceProgress, setVoiceProgress] = useState<VoiceProgress | null>(null)
+  const [voiceConfirmHint, setVoiceConfirmHint] = useState<string | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const messagesRef = useRef<HTMLDivElement>(null)
   const stickToBottomRef = useRef(true)
@@ -56,6 +63,10 @@ export function ChatView({
   const recorderRef = useRef<MicRecorder | null>(null)
   const recordingActiveRef = useRef(false)
   const recordStartedAt = useRef(0)
+  const draftRef = useRef('')
+  const voiceConfirmRef = useRef<VoiceConfirmController | null>(null)
+
+  draftRef.current = draft
 
   useEffect(() => {
     const el = messagesRef.current
@@ -93,15 +104,30 @@ export function ChatView({
     }
   }, [])
 
+  const cancelVoiceConfirm = (): void => {
+    voiceConfirmRef.current?.cancel()
+    voiceConfirmRef.current = null
+    setVoiceConfirmHint(null)
+  }
+
   const sendContent = async (raw: string): Promise<void> => {
     const content = raw.trim()
     if (!content || busy) return
 
+    cancelVoiceConfirm()
     stickToBottomRef.current = true
     setBusy(true)
     setVoiceUi('thinking')
     setError(null)
     setDraft('')
+
+    if (detectChatToolIntent(content).needsWeather) {
+      try {
+        await ensureAppLocation()
+      } catch {
+        /* main resolve IP/fallback */
+      }
+    }
 
     // Optimistic: mostra a mensagem do usuário enquanto “Pensando…”.
     const optimisticId = `local-${Date.now()}`
@@ -144,6 +170,7 @@ export function ChatView({
   }
 
   const send = async (): Promise<void> => {
+    cancelVoiceConfirm()
     await sendContent(draft)
   }
 
@@ -156,6 +183,11 @@ export function ChatView({
     shiftKey: boolean
     preventDefault: () => void
   }): void => {
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      cancelVoiceConfirm()
+      return
+    }
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault()
       void send()
@@ -237,10 +269,19 @@ export function ChatView({
       }
       setVoiceStatus(await window.elio.getVoiceStatus())
       setVoiceProgress(null)
-      // Junta com rascunho e envia — ouvindo → transcrevendo → pensando.
-      const existing = draft.trim()
+      const existing = draftRef.current.trim()
       const content = existing ? `${existing} ${trimmed}` : trimmed
-      await sendContent(content)
+      cancelVoiceConfirm()
+      setDraft(content)
+      setVoiceUi('idle')
+      setVoiceConfirmHint('Confira o texto — envia sozinho em instantes (Enter agora, Esc cancela)')
+      requestAnimationFrame(() => inputRef.current?.focus())
+      voiceConfirmRef.current = armVoiceConfirmSend(() => {
+        voiceConfirmRef.current = null
+        setVoiceConfirmHint(null)
+        const latest = draftRef.current.trim()
+        if (latest) void sendContent(latest)
+      })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Falha na transcrição')
       setVoiceUi('idle')
@@ -254,7 +295,7 @@ export function ChatView({
     voiceUi === 'thinking'
   const micLabel =
     voiceUi === 'recording'
-      ? 'Solte para enviar'
+      ? 'Solte para transcrever'
       : voiceUi === 'preparing'
         ? 'Preparando voz…'
         : voiceUi === 'transcribing'
@@ -262,7 +303,7 @@ export function ChatView({
           : voiceUi === 'thinking'
             ? 'Pensando…'
             : voiceStatus?.ready
-              ? 'Segure para falar (envia ao chat)'
+              ? 'Segure para falar (confira o texto antes de enviar)'
               : 'Segure para falar (baixa Whisper na 1ª vez)'
 
   return (
@@ -309,7 +350,9 @@ export function ChatView({
             <p className="status-hint">{status.hint}</p>
             {voiceStatus ? (
               <p className="status-hint voice-hint">
-                {voiceStatus.ready ? 'Voz pronta (Whisper local).' : voiceStatus.hint}
+                {voiceStatus.ready
+                  ? `Voz pronta (Whisper ${voiceStatus.modelId} local).`
+                  : voiceStatus.hint}
               </p>
             ) : null}
           </div>
@@ -360,9 +403,10 @@ export function ChatView({
             <div className="empty-state">
               <p className="empty-title">Olá — sou o Elio.</p>
               <p>
-                Escreva ou use o microfone. Ao soltar o mic, o texto vai direto ao chat.
-                Pergunte a hora ou o tempo — uso o relógio local e Open-Meteo. Na primeira
-                vez a voz baixa o Whisper (~150 MB, modelo base). O áudio fica só neste PC.
+                Escreva ou use o microfone. Após a fala, confira o texto na caixa (envia
+                sozinho em instantes). Pergunte a hora ou o tempo — uso o relógio local,
+                Open-Meteo e a localização do PC (com permissão). Na primeira vez a voz
+                baixa o Whisper (~466 MB, modelo small). O áudio fica só neste PC.
               </p>
             </div>
           ) : null}
@@ -398,6 +442,12 @@ export function ChatView({
             </div>
           ) : null}
 
+          {voiceConfirmHint ? (
+            <div className="voice-hint" role="status">
+              {voiceConfirmHint}
+            </div>
+          ) : null}
+
           {voiceProgress && voiceUi === 'preparing' ? (
             <div className="voice-progress" role="status">
               <div className="voice-progress-bar">
@@ -414,9 +464,14 @@ export function ChatView({
             <textarea
               ref={inputRef}
               value={draft}
-              onChange={(e) => setDraft(e.target.value)}
+              onChange={(e) => {
+                setDraft(e.target.value)
+                if (voiceConfirmRef.current?.isArmed()) {
+                  cancelVoiceConfirm()
+                }
+              }}
               onKeyDown={onKeyDown}
-              placeholder="Escreva ou segure o microfone… (voz envia sozinha)"
+              placeholder="Escreva ou segure o microfone… (confira o texto antes de enviar)"
               rows={3}
               disabled={busy || voiceUi === 'recording' || voiceUi === 'transcribing'}
             />

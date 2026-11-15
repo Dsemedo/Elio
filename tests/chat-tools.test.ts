@@ -19,6 +19,9 @@ describe('detectChatToolIntent', () => {
     expect(detectChatToolIntent('como está o tempo?').needsWeather).toBe(true)
     expect(detectChatToolIntent('qual a temperatura hoje').needsWeather).toBe(true)
     expect(detectChatToolIntent('está chovendo?').needsWeather).toBe(true)
+    expect(detectChatToolIntent('Oi, qual é o clima e o horário de agora').needsWeather).toBe(
+      true,
+    )
     expect(detectChatToolIntent('me conte uma piada').needsWeather).toBe(false)
   })
 })
@@ -53,16 +56,15 @@ describe('weather helpers', () => {
       ELIO_WEATHER_LON: '-47.06',
       ELIO_WEATHER_CITY: 'Campinas',
     } as NodeJS.ProcessEnv)
-    expect(loc.source).toBe('env-coords')
-    expect(loc.name).toBe('Campinas')
-    expect(loc.latitude).toBeCloseTo(-22.9)
-    expect(loc.longitude).toBeCloseTo(-47.06)
+    expect(loc?.source).toBe('env-coords')
+    expect(loc?.name).toBe('Campinas')
+    expect(loc?.latitude).toBeCloseTo(-22.9)
+    expect(loc?.longitude).toBeCloseTo(-47.06)
   })
 
-  it('usa São Paulo como padrão', () => {
+  it('sem env não força São Paulo (deixa cache/IP/fallback no resolve async)', () => {
     const loc = resolveWeatherLocationFromEnv({} as NodeJS.ProcessEnv)
-    expect(loc.source).toBe('default')
-    expect(loc.name).toBe('São Paulo')
+    expect(loc).toBeNull()
   })
 })
 

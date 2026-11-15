@@ -1,13 +1,28 @@
 /**
  * Clima via Open-Meteo (sem API key).
- * Local: ELIO_WEATHER_LAT+LON → ELIO_WEATHER_CITY (geocode) → São Paulo.
+ * Local: ELIO_WEATHER_LAT+LON → ELIO_WEATHER_CITY → cache OS/IP → IP live → fallback.
  */
+
+import {
+  readCachedLocation,
+  writeCachedLocation,
+  type CachedLocation,
+} from '../location/cache'
+import { resolveLocationFromIp } from '../location/ip'
+
+export type WeatherLocationSource =
+  | 'env-coords'
+  | 'env-city'
+  | 'cache-os'
+  | 'cache-ip'
+  | 'ip'
+  | 'fallback'
 
 export type WeatherLocation = {
   name: string
   latitude: number
   longitude: number
-  source: 'env-coords' | 'env-city' | 'default'
+  source: WeatherLocationSource
 }
 
 export type WeatherSnapshot = {
@@ -21,9 +36,10 @@ export type WeatherSnapshot = {
   summary: string
 }
 
-const DEFAULT_CITY = 'São Paulo'
-const DEFAULT_LAT = -23.5505
-const DEFAULT_LON = -46.6333
+/** Último recurso se env/cache/IP falharem — não é o destino “certo” do Douglas. */
+const FALLBACK_CITY = 'São Paulo'
+const FALLBACK_LAT = -23.5505
+const FALLBACK_LON = -46.6333
 const GEOCODE_URL = 'https://geocoding-api.open-meteo.com/v1/search'
 const FORECAST_URL = 'https://api.open-meteo.com/v1/forecast'
 const FETCH_TIMEOUT_MS = 8_000
@@ -70,11 +86,11 @@ function parseCoord(raw: string | undefined): number | null {
 
 export function resolveWeatherLocationFromEnv(
   env: NodeJS.ProcessEnv = process.env,
-): WeatherLocation {
+): WeatherLocation | null {
   const lat = parseCoord(env['ELIO_WEATHER_LAT'])
   const lon = parseCoord(env['ELIO_WEATHER_LON'])
   if (lat !== null && lon !== null && lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180) {
-    const name = env['ELIO_WEATHER_CITY']?.trim() || `coords ${lat.toFixed(2)},${lon.toFixed(2)}`
+    const name = env['ELIO_WEATHER_CITY']?.trim() || `Local configurado`
     return { name, latitude: lat, longitude: lon, source: 'env-coords' }
   }
 
@@ -82,17 +98,21 @@ export function resolveWeatherLocationFromEnv(
   if (city) {
     return {
       name: city.slice(0, 80),
-      latitude: DEFAULT_LAT,
-      longitude: DEFAULT_LON,
+      latitude: FALLBACK_LAT,
+      longitude: FALLBACK_LON,
       source: 'env-city',
     }
   }
 
+  return null
+}
+
+function fromCache(cached: CachedLocation): WeatherLocation {
   return {
-    name: DEFAULT_CITY,
-    latitude: DEFAULT_LAT,
-    longitude: DEFAULT_LON,
-    source: 'default',
+    name: cached.name,
+    latitude: cached.latitude,
+    longitude: cached.longitude,
+    source: cached.source === 'os' ? 'cache-os' : 'cache-ip',
   }
 }
 
@@ -136,23 +156,60 @@ export async function geocodeCity(
   return { name: label, latitude: hit.latitude, longitude: hit.longitude }
 }
 
+/**
+ * Resolve local para clima. Preferência: env → cache (OS/IP) → IP live → fallback.
+ * Não loga coordenadas precisas.
+ */
 export async function resolveWeatherLocation(
   signal?: AbortSignal,
   env: NodeJS.ProcessEnv = process.env,
 ): Promise<WeatherLocation> {
-  const base = resolveWeatherLocationFromEnv(env)
-  if (base.source === 'env-coords') return base
+  const fromEnv = resolveWeatherLocationFromEnv(env)
+  if (fromEnv?.source === 'env-coords') return fromEnv
 
-  if (base.source === 'env-city') {
-    const geo = await geocodeCity(base.name, signal)
+  if (fromEnv?.source === 'env-city') {
+    const geo = await geocodeCity(fromEnv.name, signal)
     if (geo) {
       return { ...geo, source: 'env-city' }
     }
-    // Cidade não resolvida: mantém coords padrão com o nome pedido.
-    return base
+    return fromEnv
   }
 
-  return base
+  try {
+    const cached = readCachedLocation()
+    if (cached) return fromCache(cached)
+  } catch {
+    // Electron app pode não estar disponível em testes unitários.
+  }
+
+  const ip = await resolveLocationFromIp(signal)
+  if (ip) {
+    try {
+      writeCachedLocation({
+        latitude: ip.latitude,
+        longitude: ip.longitude,
+        name: ip.name,
+        source: 'ip',
+        updatedAt: new Date().toISOString(),
+        permissionDenied: true,
+      })
+    } catch {
+      /* cache opcional em testes */
+    }
+    return {
+      name: ip.name,
+      latitude: ip.latitude,
+      longitude: ip.longitude,
+      source: 'ip',
+    }
+  }
+
+  return {
+    name: FALLBACK_CITY,
+    latitude: FALLBACK_LAT,
+    longitude: FALLBACK_LON,
+    source: 'fallback',
+  }
 }
 
 export async function getWeatherSnapshot(signal?: AbortSignal): Promise<WeatherSnapshot> {
@@ -182,6 +239,7 @@ export async function getWeatherSnapshot(signal?: AbortSignal): Promise<WeatherS
   const humidity =
     typeof current.relative_humidity_2m === 'number' ? current.relative_humidity_2m : null
   const wind = typeof current.wind_speed_10m === 'number' ? current.wind_speed_10m : null
+  // Só o nome da cidade no resumo — coords ficam no processo main / Open-Meteo.
   const parts = [
     `Clima em ${location.name}: ${current.temperature_2m}°C, ${conditionPt}`,
   ]

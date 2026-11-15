@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { resolveWhisperModel, WHISPER_INITIAL_PROMPT } from '../src/main/services/voice/constants'
 
 /**
  * Testa o parser WAV sem subir Electron: reimplementação espelhada da lógica
@@ -67,16 +68,43 @@ describe('WAV PCM para Whisper', () => {
     )
   })
 
-  it('fixture de constantes de voz está pinada', () => {
+  it('fixture de constantes de voz está pinada em small', () => {
     const src = readFileSync(
       join(__dirname, '../src/main/services/voice/constants.ts'),
       'utf8',
     )
     expect(src).toContain("WHISPER_RELEASE = 'v1.9.2'")
-    expect(src).toContain("MODEL_ID = 'base'")
-    expect(src).toContain("MODEL_FILE = 'ggml-base.bin'")
-    expect(src).toContain("LEGACY_MODEL_FILE = 'ggml-tiny.bin'")
-    expect(src).toContain('ggml-base.bin?download=true')
+    expect(src).toContain("DEFAULT_MODEL_ID: WhisperModelId = 'small'")
+    expect(src).toContain("file: 'ggml-small.bin'")
+    expect(src).toContain('?download=true')
     expect(src).toContain('DOWNLOAD_MAX_ATTEMPTS = 3')
+    expect(src).toContain('WHISPER_INITIAL_PROMPT')
+    expect(resolveWhisperModel({} as NodeJS.ProcessEnv).file).toBe('ggml-small.bin')
+  })
+})
+
+describe('resolveWhisperModel', () => {
+  it('default é small (~466 MB)', () => {
+    const m = resolveWhisperModel({} as NodeJS.ProcessEnv)
+    expect(m.id).toBe('small')
+    expect(m.file).toBe('ggml-small.bin')
+    expect(m.sizeHintMb).toBe(466)
+    expect(m.url).toContain('ggml-small.bin')
+  })
+
+  it('respeita ELIO_WHISPER_MODEL', () => {
+    const m = resolveWhisperModel({ ELIO_WHISPER_MODEL: 'base' } as NodeJS.ProcessEnv)
+    expect(m.id).toBe('base')
+    expect(m.file).toBe('ggml-base.bin')
+  })
+
+  it('ignora valor inválido e cai no default', () => {
+    const m = resolveWhisperModel({ ELIO_WHISPER_MODEL: 'huge' } as NodeJS.ProcessEnv)
+    expect(m.id).toBe('small')
+  })
+
+  it('prompt PT-BR menciona clima/horário', () => {
+    expect(WHISPER_INITIAL_PROMPT).toMatch(/clima/i)
+    expect(WHISPER_INITIAL_PROMPT).toMatch(/hor/i)
   })
 })

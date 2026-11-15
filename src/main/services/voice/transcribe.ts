@@ -6,6 +6,7 @@ import {
   MAX_AUDIO_BYTES,
   MIN_AUDIO_MS,
   TRANSCRIBE_TIMEOUT_MS,
+  WHISPER_INITIAL_PROMPT,
 } from './constants'
 import { ensureVoiceAssets } from './download'
 import {
@@ -103,6 +104,8 @@ async function runWhisperCli(wavPath: string, outBase: string): Promise<string> 
     wavPath,
     '-l',
     'pt',
+    '--prompt',
+    WHISPER_INITIAL_PROMPT,
     '-otxt',
     '-of',
     outBase,

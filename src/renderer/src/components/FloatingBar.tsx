@@ -10,6 +10,7 @@ import {
   WifiOff,
 } from 'lucide-react'
 import type { ChatStatus, ShellState } from '@shared/ipc'
+import { detectChatToolIntent } from '@shared/chatIntent'
 import {
   isMicMissingMessage,
   micPermissionMessage,
@@ -17,6 +18,11 @@ import {
   startMicRecording,
   type MicRecorder,
 } from '../lib/recordWav'
+import { ensureAppLocation } from '../lib/geolocation'
+import {
+  armVoiceConfirmSend,
+  type VoiceConfirmController,
+} from '@shared/voiceConfirm'
 
 export type BarUiState =
   'idle' | 'listening' | 'transcribing' | 'thinking' | 'error' | 'offline' | 'executing'
@@ -49,12 +55,17 @@ export function FloatingBar(): React.JSX.Element {
   const [voicePhase, setVoicePhase] = useState<VoicePhase>('idle')
   const [lastReply, setLastReply] = useState<string | null>(null)
   const [statusLine, setStatusLine] = useState<string | null>(null)
+  const [voiceConfirming, setVoiceConfirming] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const recorderRef = useRef<MicRecorder | null>(null)
   const recordingActiveRef = useRef(false)
   const recordStartedAt = useRef(0)
   const menuRef = useRef<HTMLDivElement>(null)
   const micProbeBusy = useRef(false)
+  const draftRef = useRef('')
+  const voiceConfirmRef = useRef<VoiceConfirmController | null>(null)
+
+  draftRef.current = draft
 
   useEffect(() => {
     let cancelled = false
@@ -202,13 +213,27 @@ export function FloatingBar(): React.JSX.Element {
     return created.id
   }
 
+  const cancelVoiceConfirm = (): void => {
+    voiceConfirmRef.current?.cancel()
+    voiceConfirmRef.current = null
+    setVoiceConfirming(false)
+  }
+
   const sendContent = async (raw: string): Promise<void> => {
     const content = raw.trim()
     if (!content) return
+    cancelVoiceConfirm()
     setError(null)
     setLastReply(null)
     setStatusLine(null)
     setMenuOpen(false)
+    if (detectChatToolIntent(content).needsWeather) {
+      try {
+        await ensureAppLocation()
+      } catch {
+        /* clima cai no fallback IP/cidade no main */
+      }
+    }
     const looksLikeOpen = /^\s*(?:por\s+favor\s+|pf\s+|pode\s+)?(?:abre|abrir|abra|confirma\s+abrir)\b/i.test(
       content,
     )
@@ -242,6 +267,7 @@ export function FloatingBar(): React.JSX.Element {
     ) {
       return
     }
+    cancelVoiceConfirm()
     await sendContent(draft)
   }
 
@@ -308,11 +334,24 @@ export function FloatingBar(): React.JSX.Element {
         setVoicePhase('idle')
         return
       }
-      // Junta com rascunho já digitado (se houver) e envia ao chat — MVP: fala = agir.
-      const existing = draft.trim()
+      // Confirmação breve na barra — evita disparar intent errado (PJ-25).
+      const existing = draftRef.current.trim()
       const content = existing ? `${existing} ${trimmed}` : trimmed
+      cancelVoiceConfirm()
+      setDraft(content)
+      setInputActive(true)
       setVoicePhase('idle')
-      await sendContent(content)
+      setBarState(offline ? 'offline' : 'idle')
+      setVoiceConfirming(true)
+      setLastReply(null)
+      setError(null)
+      requestAnimationFrame(() => inputRef.current?.focus())
+      voiceConfirmRef.current = armVoiceConfirmSend(() => {
+        voiceConfirmRef.current = null
+        setVoiceConfirming(false)
+        const latest = draftRef.current.trim()
+        if (latest) void sendContent(latest)
+      })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Falha na transcrição')
       setBarState('error')
@@ -398,32 +437,49 @@ export function FloatingBar(): React.JSX.Element {
               <span className="fb-error-inline-text">{error}</span>
             </div>
           ) : showTextField ? (
-            <input
-              ref={inputRef}
-              className="fb-input"
-              value={draft}
-              placeholder=""
-              aria-label="Mensagem para o Elio"
-              onChange={(e) => {
-                setDraft(e.target.value)
-                if (barState === 'error') setBarState(offline ? 'offline' : 'idle')
-              }}
-              onBlur={() => {
-                if (!draft.trim()) setInputActive(false)
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault()
-                  void send()
+            <div className={voiceConfirming ? 'fb-confirm-wrap' : undefined}>
+              <input
+                ref={inputRef}
+                className="fb-input"
+                value={draft}
+                placeholder={
+                  voiceConfirming
+                    ? 'Confira · envia sozinho · Enter agora · Esc cancela'
+                    : ''
                 }
-                if (e.key === 'Escape') {
-                  e.preventDefault()
-                  setDraft('')
-                  setInputActive(false)
-                  inputRef.current?.blur()
-                }
-              }}
-            />
+                aria-label="Mensagem para o Elio"
+                onChange={(e) => {
+                  setDraft(e.target.value)
+                  if (voiceConfirming) {
+                    cancelVoiceConfirm()
+                    setStatusLine(null)
+                  }
+                  if (barState === 'error') setBarState(offline ? 'offline' : 'idle')
+                }}
+                onBlur={() => {
+                  if (!draft.trim() && !voiceConfirming) setInputActive(false)
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    void send()
+                  }
+                  if (e.key === 'Escape') {
+                    e.preventDefault()
+                    cancelVoiceConfirm()
+                    setDraft('')
+                    setInputActive(false)
+                    setStatusLine(null)
+                    inputRef.current?.blur()
+                  }
+                }}
+              />
+              {voiceConfirming ? (
+                <span className="fb-confirm-hint" aria-live="polite">
+                  Confira o texto
+                </span>
+              ) : null}
+            </div>
           ) : showLastReply ? (
             <button
               type="button"
@@ -477,10 +533,10 @@ export function FloatingBar(): React.JSX.Element {
             }
             title={
               resolvedState === 'listening'
-                ? 'Solte para enviar'
+                ? 'Solte para transcrever'
                 : micMissing
                   ? 'Mic ausente ou sem sinal — segure para tentar de novo'
-                  : 'Segure para falar (envia ao chat)'
+                  : 'Segure para falar (confira o texto antes de enviar)'
             }
             aria-label="Voz"
             aria-pressed={resolvedState === 'listening'}

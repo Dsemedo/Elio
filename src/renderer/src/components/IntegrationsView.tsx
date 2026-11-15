@@ -38,7 +38,7 @@ export function IntegrationsView({ status }: Props): React.JSX.Element {
       kind: 'app',
       status: 'ok',
       detail:
-        'Sem chave. Padrão: São Paulo. Defina ELIO_WEATHER_CITY (ex.: Campinas) ou ELIO_WEATHER_LAT + ELIO_WEATHER_LON antes do npm run dev. Fuso: ELIO_TIMEZONE (padrão America/Sao_Paulo).',
+        'Sem chave. Na 1ª pergunta de clima pede localização do Windows (cache local). Se negar, usa IP aproximado. Opcional: ELIO_WEATHER_CITY ou ELIO_WEATHER_LAT+LON. Fuso: ELIO_TIMEZONE (padrão America/Sao_Paulo).',
     },
     {
       id: 'slack',
