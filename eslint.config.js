@@ -27,7 +27,16 @@ export default tseslint.config(
     },
   },
   {
-    files: ['src/main/**/*.ts', 'src/preload/**/*.ts', 'src/shared/**/*.ts', 'tests/**/*.ts'],
+    files: [
+      'src/main/**/*.ts',
+      'src/preload/**/*.ts',
+      'src/shared/**/*.ts',
+      'tests/**/*.ts',
+      'scripts/**/*.{js,mjs,cjs}',
+      'electron.vite.config.ts',
+      'vitest.config.ts',
+      'eslint.config.js',
+    ],
     languageOptions: {
       ecmaVersion: 2022,
       globals: globals.node,
