@@ -1,33 +1,25 @@
+import {
+  getOpenRouterModel,
+  resolveOpenRouterApiKey,
+} from '../settings'
 import type { AiProvider, ChatCompletionRequest, ChatCompletionResult } from './types'
 
 const API_URL = 'https://openrouter.ai/api/v1/chat/completions'
-
-/** Modelo gratuito padrão; sobrescreva com OPENROUTER_MODEL. */
-const DEFAULT_FREE_MODEL = 'meta-llama/llama-3.2-3b-instruct:free'
-
-function apiKey(): string | undefined {
-  const key = process.env['OPENROUTER_API_KEY']?.trim()
-  return key || undefined
-}
-
-function preferredModel(): string {
-  return process.env['OPENROUTER_MODEL'] ?? DEFAULT_FREE_MODEL
-}
 
 export const openRouterProvider: AiProvider = {
   kind: 'openrouter',
 
   async isAvailable(): Promise<boolean> {
-    return Boolean(apiKey())
+    return Boolean(await resolveOpenRouterApiKey())
   },
 
   async complete(request: ChatCompletionRequest): Promise<ChatCompletionResult> {
-    const key = apiKey()
+    const key = await resolveOpenRouterApiKey()
     if (!key) {
-      throw new Error('OPENROUTER_API_KEY não configurada')
+      throw new Error('OpenRouter não configurado — salve a chave em Configurações')
     }
 
-    const model = preferredModel()
+    const model = getOpenRouterModel()
     const init: RequestInit = {
       method: 'POST',
       headers: {
@@ -71,6 +63,6 @@ export const openRouterProvider: AiProvider = {
   },
 }
 
-export function isOpenRouterConfigured(): boolean {
-  return Boolean(apiKey())
+export async function isOpenRouterConfigured(): Promise<boolean> {
+  return Boolean(await resolveOpenRouterApiKey())
 }

@@ -1,6 +1,7 @@
 import { BrowserWindow, ipcMain } from 'electron'
 import {
   ChatCancelInputSchema,
+  ChatRenameInputSchema,
   ChatUpdatedEventSchema,
   ChatSendInputSchema,
   ConversationIdSchema,
@@ -24,6 +25,7 @@ import {
   getConversation,
   listConversations,
   makeMessage,
+  renameConversation,
 } from '../services/store'
 
 const inflight = new Map<string, AbortController>()
@@ -95,6 +97,20 @@ export function registerChatIpc(): void {
       broadcastChatUpdated({ reason: 'deleted', conversationId })
     }
     return { ok }
+  })
+
+  ipcMain.handle(IpcChannels.CHAT_RENAME, (_event, raw: unknown) => {
+    const input = ChatRenameInputSchema.parse(raw)
+    const conversation = renameConversation(input.conversationId, input.title)
+    if (!conversation) {
+      throw new Error('Não foi possível renomear a conversa')
+    }
+    broadcastChatUpdated({
+      reason: 'updated',
+      conversationId: conversation.id,
+      conversation,
+    })
+    return conversation
   })
 
   ipcMain.handle(IpcChannels.CHAT_CANCEL, (_event, raw: unknown) => {

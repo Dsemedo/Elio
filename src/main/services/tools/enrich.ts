@@ -1,4 +1,5 @@
 import type { ChatMessage } from '../../../shared/ipc'
+import { getWeatherCityPreference } from '../settings'
 import { detectChatToolIntent } from './intent'
 import { getLocalClock } from './time'
 import { getWeatherSnapshot } from './weather'
@@ -24,7 +25,14 @@ export async function enrichMessagesWithLocalFacts(
 
   if (intent.needsWeather) {
     try {
-      const weather = await getWeatherSnapshot(signal)
+      let prefs: { weatherCity?: string } | undefined
+      try {
+        const city = getWeatherCityPreference()
+        if (city) prefs = { weatherCity: city }
+      } catch {
+        prefs = undefined
+      }
+      const weather = await getWeatherSnapshot(signal, prefs)
       // Só cidade/nome — sem lat/lon no prompt (evita vazar coords a provedores cloud).
       lines.push(`- ${weather.summary}`)
       lines.push(

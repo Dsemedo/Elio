@@ -6,7 +6,7 @@ import { getSpotifyConnectionStatus } from './spotify'
 
 export async function getChatStatus(): Promise<ChatStatus> {
   const ollamaAvailable = await ollamaProvider.isAvailable()
-  const openRouterConfigured = isOpenRouterConfigured()
+  const openRouterConfigured = await isOpenRouterConfigured()
   const spotify = await getSpotifyConnectionStatus()
 
   let preferredProvider: ProviderKind = 'none'
@@ -17,10 +17,10 @@ export async function getChatStatus(): Promise<ChatStatus> {
     hint = 'Ollama local detectado — as respostas vão priorizar o modelo da sua máquina.'
   } else if (openRouterConfigured) {
     preferredProvider = 'openrouter'
-    hint = 'Ollama offline. Usando OpenRouter (chave em OPENROUTER_API_KEY).'
+    hint = 'Ollama offline. Usando OpenRouter (chave salva neste PC ou no ambiente).'
   } else {
     hint =
-      'Nenhum provedor pronto. Instale o Ollama (https://ollama.com) ou defina OPENROUTER_API_KEY e reinicie o Elio.'
+      'Nenhum provedor pronto. Instale o Ollama ou configure a chave OpenRouter em Configurações → Integrações.'
   }
 
   return {
@@ -45,6 +45,6 @@ export async function routeCompletion(
   }
 
   throw new Error(
-    'Nenhum provedor disponível. Abra o Ollama ou configure OPENROUTER_API_KEY (veja o README).',
+    'Nenhum provedor disponível. Abra o Ollama ou configure OpenRouter em Configurações.',
   )
 }

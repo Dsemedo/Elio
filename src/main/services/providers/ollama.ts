@@ -1,14 +1,5 @@
+import { getOllamaHost, getOllamaModel } from '../settings'
 import type { AiProvider, ChatCompletionRequest, ChatCompletionResult } from './types'
-
-const DEFAULT_BASE = 'http://127.0.0.1:11434'
-
-function baseUrl(): string {
-  return (process.env['OLLAMA_HOST'] ?? DEFAULT_BASE).replace(/\/$/, '')
-}
-
-function preferredModel(): string {
-  return process.env['OLLAMA_MODEL'] ?? 'llama3.2'
-}
 
 export const ollamaProvider: AiProvider = {
   kind: 'ollama',
@@ -17,7 +8,9 @@ export const ollamaProvider: AiProvider = {
     try {
       const controller = new AbortController()
       const timer = setTimeout(() => controller.abort(), 1500)
-      const res = await fetch(`${baseUrl()}/api/tags`, { signal: controller.signal })
+      const res = await fetch(`${getOllamaHost()}/api/tags`, {
+        signal: controller.signal,
+      })
       clearTimeout(timer)
       return res.ok
     } catch {
@@ -26,7 +19,7 @@ export const ollamaProvider: AiProvider = {
   },
 
   async complete(request: ChatCompletionRequest): Promise<ChatCompletionResult> {
-    const model = preferredModel()
+    const model = getOllamaModel()
     const init: RequestInit = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -42,7 +35,7 @@ export const ollamaProvider: AiProvider = {
     if (request.signal) {
       init.signal = request.signal
     }
-    const res = await fetch(`${baseUrl()}/api/chat`, init)
+    const res = await fetch(`${getOllamaHost()}/api/chat`, init)
 
     if (!res.ok) {
       const body = await res.text().catch(() => '')

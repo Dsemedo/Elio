@@ -10,9 +10,16 @@ export const IpcChannels = {
   CHAT_SEND: 'chat:send',
   CHAT_CANCEL: 'chat:cancel',
   CHAT_DELETE: 'chat:delete',
+  CHAT_RENAME: 'chat:rename',
   CHAT_STATUS: 'chat:status',
   /** Evento main → renderer: conversa criada/atualizada/apagada (sync Bar ↔ Painel). */
   CHAT_UPDATED: 'chat:updated',
+  /** Preferências locais + chave OpenRouter (cofre). */
+  SETTINGS_GET: 'settings:get',
+  SETTINGS_UPDATE: 'settings:update',
+  SETTINGS_SET_OPENROUTER_KEY: 'settings:setOpenRouterKey',
+  SETTINGS_CLEAR_OPENROUTER_KEY: 'settings:clearOpenRouterKey',
+  SETTINGS_PROBE_OLLAMA: 'settings:probeOllama',
   VOICE_GET_STATUS: 'voice:getStatus',
   VOICE_ENSURE: 'voice:ensure',
   VOICE_TRANSCRIBE: 'voice:transcribe',
