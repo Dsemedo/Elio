@@ -1,0 +1,25 @@
+appId: com.elio.app
+productName: Elio
+copyright: Copyright © 2026 Douglas Semedo Neto
+directories:
+  output: dist
+  buildResources: resources
+files:
+  - out/**/*
+asar: true
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  artifactName: ${productName}-${version}-Setup.${ext}
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Elio
+linux:
+  target:
+    - AppImage
+  category: Utility
