@@ -25,6 +25,7 @@ import type {
   TtsSettings,
   TtsSynthesizeInput,
   TtsSynthesizeResult,
+  MicAccessSnapshot,
   VoiceProgress,
   VoiceStatus,
   VoiceTranscribeInput,
@@ -92,6 +93,9 @@ const elioApi = {
 
   getVoiceStatus: (): Promise<VoiceStatus> =>
     ipcRenderer.invoke(IpcChannels.VOICE_GET_STATUS),
+
+  getMicAccessStatus: (): Promise<MicAccessSnapshot> =>
+    ipcRenderer.invoke(IpcChannels.VOICE_GET_MIC_ACCESS),
 
   ensureVoice: (): Promise<VoiceStatus> => ipcRenderer.invoke(IpcChannels.VOICE_ENSURE),
 

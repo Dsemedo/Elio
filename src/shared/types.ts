@@ -161,6 +161,19 @@ export type VoiceStatus = {
   platform: NodeJS.Platform
 }
 
+/** Consentimento de microfone reportado pelo SO (Electron systemPreferences). */
+export type MicAccessStatusValue =
+  | 'not-determined'
+  | 'granted'
+  | 'denied'
+  | 'restricted'
+  | 'unknown'
+
+export type MicAccessSnapshot = {
+  status: MicAccessStatusValue
+  platform: NodeJS.Platform
+}
+
 export type AppLocationSource = 'os' | 'ip' | 'manual'
 
 export type AppLocation = {

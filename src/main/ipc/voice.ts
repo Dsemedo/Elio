@@ -4,12 +4,13 @@ import {
   VoiceTranscribeInputSchema,
   type VoiceStatus,
 } from '../../shared/ipc'
+import { readMicAccessStatus } from '../micAccess'
 import { WHISPER_RELEASE, resolveWhisperModel } from '../services/voice/constants'
 import { ensureVoiceAssets, voiceAssetsStatus } from '../services/voice/download'
 import { friendlyVoiceError, logVoiceError } from '../services/voice/errors'
 import { readSttPreferenceFromEnv } from '../services/voice/sttPreference'
 import { transcribeWavBase64 } from '../services/voice/transcribe'
-import type { VoiceProgress } from '../../shared/types'
+import type { MicAccessSnapshot, VoiceProgress } from '../../shared/types'
 
 function broadcastProgress(progress: VoiceProgress): void {
   for (const win of BrowserWindow.getAllWindows()) {
@@ -45,6 +46,11 @@ function toVoiceStatus(): VoiceStatus {
 
 export function registerVoiceIpc(): void {
   ipcMain.handle(IpcChannels.VOICE_GET_STATUS, (): VoiceStatus => toVoiceStatus())
+
+  ipcMain.handle(
+    IpcChannels.VOICE_GET_MIC_ACCESS,
+    (): MicAccessSnapshot => readMicAccessStatus(),
+  )
 
   ipcMain.handle(IpcChannels.VOICE_ENSURE, async () => {
     try {

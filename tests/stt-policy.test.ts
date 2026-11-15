@@ -1,12 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import {
   extractWindowsSpeechErrorCode,
+  isSpeechPermissionDenied,
   parseSttPreference,
   resolveSttBackend,
   sanitizeVoiceUiError,
   shouldFallbackToWhisper,
+  whisperFallbackStatusMessage,
   windowsSpeechUserMessage,
 } from '../src/shared/sttPolicy'
+import { micAccessDeniedUserMessage } from '../src/shared/micMessages'
 
 describe('parseSttPreference', () => {
   it('aceita valores conhecidos', () => {
@@ -74,16 +77,45 @@ describe('resolveSttBackend', () => {
   })
 })
 
+describe('isSpeechPermissionDenied', () => {
+  it('reconhece not-allowed e service-not-allowed', () => {
+    expect(isSpeechPermissionDenied('not-allowed')).toBe(true)
+    expect(isSpeechPermissionDenied('service-not-allowed')).toBe(true)
+    expect(isSpeechPermissionDenied('network')).toBe(false)
+    expect(isSpeechPermissionDenied(null)).toBe(false)
+  })
+})
+
 describe('shouldFallbackToWhisper', () => {
-  it('cai no Whisper também se permissão negada (PTT continua útil)', () => {
-    expect(shouldFallbackToWhisper('not-allowed')).toBe(true)
-    expect(shouldFallbackToWhisper('service-not-allowed')).toBe(true)
+  it('NÃO cai no Whisper se permissão negada (chip PT-BR)', () => {
+    expect(shouldFallbackToWhisper('not-allowed')).toBe(false)
+    expect(shouldFallbackToWhisper('service-not-allowed')).toBe(false)
   })
 
   it('cai no Whisper em erros recuperáveis / vazio', () => {
     expect(shouldFallbackToWhisper('network')).toBe(true)
     expect(shouldFallbackToWhisper('audio-capture')).toBe(true)
     expect(shouldFallbackToWhisper(null)).toBe(true)
+  })
+})
+
+describe('whisperFallbackStatusMessage', () => {
+  it('mostra engine + motivo curto', () => {
+    expect(whisperFallbackStatusMessage('network')).toBe(
+      'Speech falhou (rede) — Whisper',
+    )
+    expect(whisperFallbackStatusMessage('audio-capture')).toBe(
+      'Speech falhou (áudio) — Whisper',
+    )
+    expect(whisperFallbackStatusMessage('no-speech')).toBe(
+      'Speech sem fala — Whisper',
+    )
+    expect(whisperFallbackStatusMessage(null)).toBe('Speech falhou — Whisper')
+  })
+
+  it('nunca inclui prefixo WINDOWS_SPEECH_ERROR', () => {
+    const msg = whisperFallbackStatusMessage('network')
+    expect(msg.toLowerCase()).not.toContain('windows_speech')
   })
 })
 
@@ -99,11 +131,11 @@ describe('extractWindowsSpeechErrorCode', () => {
 })
 
 describe('windowsSpeechUserMessage', () => {
-  it('não vaza código cru not-allowed', () => {
+  it('não vaza código cru not-allowed e aponta Privacidade Windows', () => {
     const msg = windowsSpeechUserMessage(new Error('WINDOWS_SPEECH_ERROR:not-allowed'))
     expect(msg.toLowerCase()).not.toContain('windows_speech_error')
     expect(msg.toLowerCase()).not.toContain('not-allowed')
-    expect(msg).toMatch(/permissão|microfone|fala|windows/i)
+    expect(msg).toMatch(/microfone|privacidade|windows/i)
   })
 
   it('mensagem curta o bastante para a barra', () => {
@@ -112,12 +144,21 @@ describe('windowsSpeechUserMessage', () => {
   })
 })
 
+describe('micAccessDeniedUserMessage', () => {
+  it('orienta Privacidade → Microfone (desktop / Elio)', () => {
+    const msg = micAccessDeniedUserMessage()
+    expect(msg).toMatch(/privacidade/i)
+    expect(msg).toMatch(/microfone/i)
+    expect(msg).toMatch(/desktop|elio/i)
+  })
+})
+
 describe('sanitizeVoiceUiError', () => {
   it('nunca deixa código cru na UI', () => {
     const msg = sanitizeVoiceUiError('WINDOWS_SPEECH_ERROR:not-allowed')
     expect(msg.toLowerCase()).not.toContain('windows_speech_error')
     expect(msg.toLowerCase()).not.toContain('not-allowed')
-    expect(msg).toMatch(/permissão|microfone|fala/i)
+    expect(msg).toMatch(/microfone|privacidade|fala/i)
   })
 
   it('preserva mensagens amigáveis', () => {

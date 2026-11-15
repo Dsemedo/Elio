@@ -19,8 +19,10 @@ import {
   resolveSttBackend,
   sanitizeVoiceUiError,
   shouldFallbackToWhisper,
+  whisperFallbackStatusMessage,
   windowsSpeechUserMessage,
 } from '@shared/sttPolicy'
+import { micAccessDeniedUserMessage } from '@shared/micMessages'
 import {
   isMicMissingMessage,
   micPermissionMessage,
@@ -361,6 +363,14 @@ export function FloatingBar(): React.JSX.Element {
     setVoicePhase('preparing')
     try {
       await probeMicPresence()
+      const micAccess = await window.elio.getMicAccessStatus()
+      if (micAccess.status === 'denied' || micAccess.status === 'restricted') {
+        setError(micAccessDeniedUserMessage())
+        setBarState('error')
+        setVoicePhase('idle')
+        return
+      }
+
       const backend = resolveSttBackend({
         platform,
         speechRecognitionAvailable: isWindowsSpeechAvailable(),
@@ -369,10 +379,10 @@ export function FloatingBar(): React.JSX.Element {
 
       let capture: PttCapture
       if (backend === 'windows-speech') {
-        // getUserMedia antes do Speech — evita not-allowed residual no Chromium.
+        // getUserMedia antes do Speech — pedido real de mic (prompt OS se precisar).
         capture = await startWindowsSpeechPtt({ lang: 'pt-BR' })
         if (capture.kind === 'whisper') {
-          setStatusLine('Usando Whisper…')
+          setStatusLine(whisperFallbackStatusMessage(capture.speechErrorCode))
           const voice = await window.elio.ensureVoice()
           setSttPreference(voice.sttPreference)
           setPlatform(voice.platform)
@@ -461,10 +471,8 @@ export function FloatingBar(): React.JSX.Element {
         if (speechText) {
           capture.recorder.cancel()
           trimmed = speechText
-        } else if (!speechFailed || shouldFallbackToWhisper(speechErrorCode)) {
-          setStatusLine('Usando Whisper…')
-          trimmed = await transcribeWithWhisper(capture.recorder)
-        } else {
+        } else if (speechFailed && !shouldFallbackToWhisper(speechErrorCode)) {
+          // Permissão negada no Speech → chip claro, sem Whisper silencioso.
           capture.recorder.cancel()
           setError(
             windowsSpeechUserMessage(
@@ -475,10 +483,17 @@ export function FloatingBar(): React.JSX.Element {
           setBarState('error')
           setVoicePhase('idle')
           return
+        } else {
+          setStatusLine(
+            whisperFallbackStatusMessage(
+              speechFailed ? speechErrorCode : 'no-speech',
+            ),
+          )
+          trimmed = await transcribeWithWhisper(capture.recorder)
         }
       } else {
         if (capture.speechErrorCode) {
-          setStatusLine('Usando Whisper…')
+          setStatusLine(whisperFallbackStatusMessage(capture.speechErrorCode))
         }
         trimmed = await transcribeWithWhisper(capture.recorder)
       }

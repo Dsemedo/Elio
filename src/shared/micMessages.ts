@@ -8,3 +8,8 @@ export function isMicMissingMessage(message: string | null | undefined): boolean
     message.includes('mau contato')
   )
 }
+
+/** Chip PT-BR quando o SO já bloqueou o mic (sem tentar Whisper). */
+export function micAccessDeniedUserMessage(): string {
+  return 'Microfone bloqueado no Windows — Privacidade → Microfone (apps de desktop / Elio)'
+}

@@ -51,13 +51,38 @@ export function extractWindowsSpeechErrorCode(
   return trimmed.toLowerCase()
 }
 
-/** Erros da Web Speech API que justificam cair no Whisper (áudio paralelo). */
+/** true se o Speech falhou por permissão (não cair no Whisper em silêncio). */
+export function isSpeechPermissionDenied(
+  errorCode: string | undefined | null,
+): boolean {
+  if (!errorCode) return false
+  const code = errorCode.toLowerCase()
+  return code.includes('not-allowed') || code.includes('service-not-allowed')
+}
+
+/**
+ * Erros da Web Speech API que justificam cair no Whisper (áudio paralelo).
+ * Permissão negada NÃO entra — a UI mostra chip PT-BR e o usuário ajusta o Windows.
+ */
 export function shouldFallbackToWhisper(errorCode: string | undefined | null): boolean {
-  if (!errorCode) return true
-  // Inclui not-allowed / service-not-allowed: no Electron o Speech pode
-  // falhar por permissão de sessão enquanto getUserMedia (Whisper) ainda
-  // funciona — e o produto precisa continuar útil nesse PTT.
+  if (isSpeechPermissionDenied(errorCode)) return false
   return true
+}
+
+/** Motivo curto (sem código cru longo) para o chip/status da barra. */
+export function whisperFallbackStatusMessage(
+  errorCode: string | undefined | null,
+): string {
+  const code = (errorCode ?? '').toLowerCase().trim()
+  if (!code) return 'Speech falhou — Whisper'
+  if (code.includes('network')) return 'Speech falhou (rede) — Whisper'
+  if (code.includes('audio-capture')) return 'Speech falhou (áudio) — Whisper'
+  if (code.includes('no-speech')) return 'Speech sem fala — Whisper'
+  if (code.includes('aborted')) return 'Speech interrompido — Whisper'
+  if (code.includes('language-not-supported')) return 'Speech sem pt-BR — Whisper'
+  if (code.includes('unavailable')) return 'Speech indisponível — Whisper'
+  const short = code.replace(/[^a-z0-9-]+/g, '').slice(0, 18)
+  return short ? `Speech falhou (${short}) — Whisper` : 'Speech falhou — Whisper'
 }
 
 /** Mensagem curta em PT para a barra (sem códigos crus que truncam). */
@@ -65,7 +90,7 @@ export function windowsSpeechUserMessage(err: unknown): string {
   const raw = err instanceof Error ? err.message : String(err)
   const code = extractWindowsSpeechErrorCode(raw) ?? raw.toLowerCase()
   if (code.includes('not-allowed') || code.includes('service-not-allowed')) {
-    return 'Permissão de microfone/fala negada — ative em Configurações do Windows ou tente de novo'
+    return 'Microfone/fala bloqueados — Windows: Privacidade → Microfone (apps de desktop / Elio)'
   }
   if (raw.includes('WINDOWS_SPEECH_UNAVAILABLE') || code.includes('unavailable')) {
     return 'Reconhecimento de fala do Windows indisponível neste ambiente.'

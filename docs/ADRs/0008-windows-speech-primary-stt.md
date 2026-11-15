@@ -31,5 +31,6 @@ Alternativas:
 - Qualidade PT-BR depende do pacote de idioma de fala do Windows (pt-BR).
 - Privacidade no caminho primário: áudio tratado pelo stack de fala do OS/Chromium no Windows (não enviamos a um servidor nosso). Whisper fallback continua 100% local.
 - ADR 0002 permanece válido para o **caminho Whisper** (subprocess); deixa de ser o STT default no produto Windows.
-- A sessão Electron deve conceder `media`/`microphone` (além de `geolocation`); um handler só-geo produz `not-allowed` no Speech. Em `not-allowed` / `service-not-allowed` o PTT **cai no Whisper** com feedback “Usando Whisper…”.
-- Residual pós-0.12.1: abrir **getUserMedia antes** do `SpeechRecognition` (mic-first) — o Chromium no Electron ainda pode devolver `not-allowed` no Speech se a permissão de mic não foi materializada. UI nunca mostra `WINDOWS_SPEECH_ERROR:…` cru.
+- A sessão Electron deve conceder `media`/`microphone` (além de `geolocation`); um handler só-geo produz `not-allowed` no Speech **sem** chegar ao prompt do Windows. O handler libera o Chromium; o consentimento do SO vem do `getUserMedia`.
+- Ordem PTT: **getUserMedia → SpeechRecognition** (mic-first). Permissão negada (`not-allowed` / `service-not-allowed` / SO `denied`) → **chip PT-BR**, sem Whisper silencioso. Whisper só após falha explícita do Speech (rede, áudio, sem texto, …), com status “Speech falhou (…) — Whisper”.
+- UI nunca mostra `WINDOWS_SPEECH_ERROR:…` cru.

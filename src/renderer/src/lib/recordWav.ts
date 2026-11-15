@@ -180,7 +180,7 @@ export async function micPermissionMessage(err: unknown): Promise<string> {
   }
   if (err instanceof DOMException) {
     if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-      return 'Permissão de microfone/fala negada — ative em Configurações do Windows ou tente de novo'
+      return 'Microfone bloqueado — Windows: Privacidade → Microfone (apps de desktop / Elio)'
     }
     if (err.name === 'NotFoundError') {
       const presence = await probeMicPresence()

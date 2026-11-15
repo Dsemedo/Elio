@@ -14,8 +14,10 @@ import {
   resolveSttBackend,
   sanitizeVoiceUiError,
   shouldFallbackToWhisper,
+  whisperFallbackStatusMessage,
   windowsSpeechUserMessage,
 } from '@shared/sttPolicy'
+import { micAccessDeniedUserMessage } from '@shared/micMessages'
 import { micPermissionMessage, type MicRecorder } from '../lib/recordWav'
 import { ensureAppLocation } from '../lib/geolocation'
 import {
@@ -63,7 +65,9 @@ export function ChatView({
   const [voiceStatus, setVoiceStatus] = useState<VoiceStatus | null>(null)
   const [voiceUi, setVoiceUi] = useState<VoiceUiState>('idle')
   const [voiceProgress, setVoiceProgress] = useState<VoiceProgress | null>(null)
-  const [whisperFallbackHint, setWhisperFallbackHint] = useState(false)
+  const [whisperFallbackHint, setWhisperFallbackHint] = useState<string | null>(
+    null,
+  )
   const [lastServed, setLastServed] = useState<string | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const messagesRef = useRef<HTMLDivElement>(null)
@@ -131,7 +135,7 @@ export function ChatView({
     stickToBottomRef.current = true
     setBusy(true)
     setVoiceUi('thinking')
-    setWhisperFallbackHint(false)
+    setWhisperFallbackHint(null)
     setError(null)
     setDraft('')
     void ttsController.stop()
@@ -239,10 +243,17 @@ export function ChatView({
       return
     }
     setError(null)
-    setWhisperFallbackHint(false)
+    setWhisperFallbackHint(null)
     setVoiceUi('preparing')
 
     try {
+      const micAccess = await window.elio.getMicAccessStatus()
+      if (micAccess.status === 'denied' || micAccess.status === 'restricted') {
+        setError(micAccessDeniedUserMessage())
+        setVoiceUi('idle')
+        return
+      }
+
       const backend = resolveSttBackend({
         platform,
         speechRecognitionAvailable: isWindowsSpeechAvailable(),
@@ -253,7 +264,9 @@ export function ChatView({
       if (backend === 'windows-speech') {
         capture = await startWindowsSpeechPtt({ lang: 'pt-BR' })
         if (capture.kind === 'whisper') {
-          setWhisperFallbackHint(true)
+          setWhisperFallbackHint(
+            whisperFallbackStatusMessage(capture.speechErrorCode),
+          )
           const ready = await ensureVoiceReady()
           if (!ready) {
             capture.recorder.cancel()
@@ -326,10 +339,7 @@ export function ChatView({
         if (speechText) {
           capture.recorder.cancel()
           trimmed = speechText
-        } else if (!speechFailed || shouldFallbackToWhisper(speechErrorCode)) {
-          setWhisperFallbackHint(true)
-          trimmed = await transcribeWithWhisper(capture.recorder)
-        } else {
+        } else if (speechFailed && !shouldFallbackToWhisper(speechErrorCode)) {
           capture.recorder.cancel()
           setError(
             windowsSpeechUserMessage(
@@ -338,12 +348,21 @@ export function ChatView({
           )
           setVoiceUi('idle')
           setVoiceProgress(null)
-          setWhisperFallbackHint(false)
+          setWhisperFallbackHint(null)
           return
+        } else {
+          setWhisperFallbackHint(
+            whisperFallbackStatusMessage(
+              speechFailed ? speechErrorCode : 'no-speech',
+            ),
+          )
+          trimmed = await transcribeWithWhisper(capture.recorder)
         }
       } else {
         if (capture.speechErrorCode) {
-          setWhisperFallbackHint(true)
+          setWhisperFallbackHint(
+            whisperFallbackStatusMessage(capture.speechErrorCode),
+          )
         }
         trimmed = await transcribeWithWhisper(capture.recorder)
       }
@@ -374,13 +393,9 @@ export function ChatView({
     voiceUi === 'recording'
       ? 'Solte para transcrever'
       : voiceUi === 'preparing'
-        ? whisperFallbackHint
-          ? 'Usando Whisper…'
-          : 'Preparando voz…'
+        ? whisperFallbackHint ?? 'Preparando voz…'
         : voiceUi === 'transcribing'
-          ? whisperFallbackHint
-            ? 'Usando Whisper…'
-            : 'Transcrevendo…'
+          ? whisperFallbackHint ?? 'Transcrevendo…'
           : voiceUi === 'thinking'
             ? 'Pensando…'
             : usingWindowsSpeech
@@ -596,16 +611,14 @@ export function ChatView({
                   }
                   captureRef.current = null
                   recordingActiveRef.current = false
-                  setWhisperFallbackHint(false)
+                  setWhisperFallbackHint(null)
                   setVoiceUi('idle')
                 }}
               >
                 {voiceUi === 'recording'
                   ? 'Ouvindo…'
                   : voiceUi === 'transcribing'
-                    ? whisperFallbackHint
-                      ? 'Usando Whisper…'
-                      : 'Transcrevendo…'
+                    ? whisperFallbackHint ?? 'Transcrevendo…'
                     : voiceUi === 'thinking'
                       ? 'Pensando…'
                       : 'Falar'}
