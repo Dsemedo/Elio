@@ -15,7 +15,8 @@ function createWindow(): BrowserWindow {
     backgroundColor: '#0c1222',
     autoHideMenuBar: true,
     webPreferences: {
-      preload: join(__dirname, '../preload/index.mjs'),
+      // CJS: sandboxed preload cannot load ESM (.mjs) — see electron.vite.config.ts
+      preload: join(__dirname, '../preload/index.cjs'),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
