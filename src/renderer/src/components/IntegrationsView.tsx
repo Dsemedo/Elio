@@ -159,8 +159,8 @@ export function IntegrationsView({ status, onStatusRefresh }: Props): React.JSX.
           </header>
           <p>
             {status.ollamaAvailable
-              ? 'Detectado neste PC — prioridade do roteador.'
-              : 'Não detectado. Instale/abra o Ollama e verifique de novo.'}
+              ? 'Detectado — 3º na cascata (BYOK → cota grátis → Ollama).'
+              : 'Não detectado. Instale/abra o Ollama para fallback local.'}
           </p>
           <label className="field">
             <span>Host</span>
@@ -214,12 +214,14 @@ export function IntegrationsView({ status, onStatusRefresh }: Props): React.JSX.
           </header>
           <p>
             {settings?.openRouterKeySource === 'env'
-              ? 'Chave via variável de ambiente (prioridade).'
+              ? 'Chave via ambiente (prioridade). Cascata: modelo sem :free = BYOK; :free = cota.'
               : settings?.openRouterKeyConfigured
-                ? 'Chave no cofre deste PC (safeStorage).'
+                ? status.preferredTier === 'byok'
+                  ? 'Chave no cofre — cascata começa em BYOK (modelo pago).'
+                  : 'Chave no cofre — cascata começa na cota grátis (:free).'
                 : settings?.encryptionAvailable === false
                   ? 'Criptografia do SO indisponível — use OPENROUTER_API_KEY no ambiente.'
-                  : 'Fallback na nuvem. Cole a chave aqui para não depender do terminal.'}
+                  : '1º–2º da cascata. Cole a chave aqui (ou env). Modelo pago = BYOK na frente.'}
           </p>
           <label className="field">
             <span>Modelo</span>
@@ -359,6 +361,10 @@ export function IntegrationsView({ status, onStatusRefresh }: Props): React.JSX.
 
       <h2 className="integrations-band quiet">Em breve</h2>
       <ul className="soon-list">
+        <li>
+          <span>ChatGPT / Gemini (direto)</span>
+          <span className="badge muted">em breve</span>
+        </li>
         <li>
           <span>Slack</span>
           <span className="badge muted">em breve</span>

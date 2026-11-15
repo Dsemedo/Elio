@@ -36,16 +36,28 @@ describe('chat IPC contracts', () => {
     ).toThrow()
   })
 
-  it('aceita status de provedor', () => {
+  it('aceita status de provedor com cascata e budget stub', () => {
     const status = ChatStatusSchema.parse({
       ollamaAvailable: false,
       openRouterConfigured: false,
       preferredProvider: 'none',
+      preferredTier: 'none',
+      cascadeOrder: ['byok', 'free', 'local'],
       hint: 'configure',
+      budget: {
+        byokUsed: 0,
+        freeUsed: 0,
+        localUsed: 0,
+        byokLimit: null,
+        freeLimit: null,
+        localLimit: null,
+        enforce: false,
+      },
       spotifyClientConfigured: false,
       spotifyConnected: false,
     })
     expect(status.preferredProvider).toBe('none')
+    expect(status.cascadeOrder[0]).toBe('byok')
     expect(status.spotifyConnected).toBe(false)
   })
 })

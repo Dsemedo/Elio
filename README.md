@@ -1,7 +1,7 @@
 # Elio
 
 Assistente pessoal de IA para desktop (**JARVIS MVP**).  
-**v0.13.0** — Command Center UX (threads ao lado, histórico com busca/renomear, Ollama/OpenRouter na UI). Inclui fix Speech `not-allowed` (0.12.1), NSIS + auto-update (0.12.0) e Windows Speech (0.11.0).
+**v0.14.0** — Cascata de IAs BYOK → cota grátis → Ollama (PJ-34). 0.13.0 = Command Center UX + settings IA; 0.12.1 = Speech permission; 0.12.0 = NSIS.
 
 Spec UI: [`docs/elio-design-system.md`](./docs/elio-design-system.md) · ADRs: [`docs/ADRs/`](./docs/ADRs/) · Distribuição: [`docs/windows-distribution.md`](./docs/windows-distribution.md)
 
@@ -11,9 +11,10 @@ Spec UI: [`docs/elio-design-system.md`](./docs/elio-design-system.md) · ADRs: [
 - **Node.js 22.12+** (só para desenvolvimento)  
 - Microfone (voz)  
 - Pacote de idioma de fala **pt-BR** do Windows (reconhecimento nativo)  
-- Internet: só se o fallback Whisper for usado na 1ª vez (~**466 MB**) e para clima  
+- Internet: OpenRouter (se usar BYOK/cota), Whisper na 1ª vez do fallback (~**466 MB**), clima  
 - Localização do Windows (opcional; se negar, usa IP aproximado)  
-- (Opcional) [Ollama](https://ollama.com) com um modelo (ex.: `llama3.2`)  
+- (Opcional) chave [OpenRouter](https://openrouter.ai) — BYOK e/ou modelos `:free`  
+- (Opcional) [Ollama](https://ollama.com) com um modelo (ex.: `llama3.2`) — fallback local  
 - (Opcional) Spotify Premium + Client ID para play remoto por API
 
 ## Instalar (usuário — sem Node)
@@ -39,26 +40,47 @@ npm run ensure:electron
 npm run dev
 ```
 
-### O que Douglas deve ver (0.13.0)
+### O que Douglas deve ver (0.14.0)
 
-1. Selo **v0.13.0**  
-2. Command Center → **Conversas**: lista de threads **ao lado** do chat  
-3. Header do chat limpo (título + Nova + status)  
-4. Aba **Histórico**: busca por título, renomear (✎ / duplo clique), confirmar exclusão  
-5. **Início**: Continuar conversa + Nova conversa  
-6. **Configurações → Integrações**: Ollama (verificar) + OpenRouter (salvar chave no cofre) + cidade do clima  
-7. Floating Bar: Windows Speech → **envia sozinho**; se permissão falhar → **“Usando Whisper…”** (sem `WINDOWS_SPEECH_ERROR:not-allowed`)  
-8. `npm run dist:win` gera instalador NSIS; Spotify / clima das versões anteriores continuam ok
+1. Selo **v0.14.0**  
+2. Status do chat / bolha: quem respondeu (`OpenRouter (BYOK|cota grátis)` ou `Ollama (local)`)  
+3. Cascata: modelo pago OpenRouter = BYOK → `:free` = cota → Ollama  
+4. Command Center (0.13.0): threads ao lado, histórico com busca/renomear, Início Continuar/Nova  
+5. **Configurações → Integrações**: chave OpenRouter no cofre + modelo; ChatGPT/Gemini direto = “em breve”  
+6. Floating Bar: Windows Speech → auto-envio; permissão falha → “Usando Whisper…” (sem `WINDOWS_SPEECH_ERROR:not-allowed`)  
+7. `npm run dist:win` gera instalador NSIS; Spotify / clima ok  
+
+### Cascata de IAs (BYOK → free → Ollama)
+
+Ordem automática ([ADR 0011](./docs/ADRs/0011-ai-cascade-byok.md)):
+
+1. **BYOK** — chave OpenRouter + modelo **sem** `:free`  
+2. **Cota grátis** — mesma chave com modelo `:free` (padrão)  
+3. **Ollama** — local, se estiver rodando  
+
+Chave: UI (cofre `safeStorage`) ou `OPENROUTER_API_KEY` (env tem prioridade). Modelo: UI / `OPENROUTER_MODEL`.
+
+```powershell
+$env:OPENROUTER_API_KEY = "sk-or-v1-..."
+# cota grátis (padrão):
+$env:OPENROUTER_MODEL = "meta-llama/llama-3.2-3b-instruct:free"
+# ou BYOK (pago), ex.:
+# $env:OPENROUTER_MODEL = "anthropic/claude-3.5-sonnet"
+npm run dev
+```
+
+Stub de cotas (só contadores; bloqueio só com `ELIO_AI_BUDGET_ENFORCE=true`):  
+`ELIO_AI_BUDGET_BYOK_DAILY` / `FREE` / `LOCAL`. A chave **nunca** vai para o log.
 
 ### OpenRouter / Ollama na UI
 
-Em **Configurações → Integrações** você pode:
+Em **Configurações → Integrações**:
 
-- Ajustar host/modelo do Ollama e clicar **Verificar de novo**  
-- Colar a chave OpenRouter — fica cifrada em `%APPDATA%\elio\secrets\openrouter-key.bin`  
+- Ajustar host/modelo do Ollama e **Verificar de novo**  
+- Colar a chave OpenRouter — `%APPDATA%\elio\secrets\openrouter-key.bin`  
 - Preferências não secretas em `%APPDATA%\elio\elio-settings.json`  
 
-`OPENROUTER_API_KEY` / `OLLAMA_*` no ambiente ainda funcionam e **têm prioridade** sobre o cofre/arquivo.
+`OPENROUTER_API_KEY` / `OLLAMA_*` no ambiente **têm prioridade** sobre o cofre/arquivo.
 
 ### Microfone / fala no Windows (se aparecer permissão negada)
 
@@ -67,6 +89,7 @@ Em **Configurações → Integrações** você pode:
 3. Se o Windows perguntar na 1ª vez, **Permitir** microfone/fala para o Elio  
 4. Reinicie o Elio (`npm run dev`) e segure o mic de novo  
 5. Se ainda falhar: o Elio cai no Whisper sozinho nesse PTT (aguarde “Usando Whisper…”)
+
 
 ### Conectar Spotify (Windows)
 
@@ -101,9 +124,9 @@ Tokens ficam cifrados em `%APPDATA%\elio\secrets\` (Electron `safeStorage` **asy
 | **A** PC | abre site / pasta / arquivo / app; **Spotify play/connect** | ✅ allowlist + PKCE |
 | **B** Fato local | hora, clima | ✅ enrich (Open-Meteo + relógio + geo) |
 | **C** Web context | aba aberta, pesquisa web | ⏳ deferred (extensão/CDP) |
-| **D** Chat | conversa geral | ✅ LLM (Ollama / OpenRouter) |
+| **D** Chat | conversa geral | ✅ LLM cascata BYOK → free → Ollama |
 
-**Não neste PR:** TTS, ler aba do browser, BYOK cascade, mudanças de STT/installer (já em main).
+**Não neste PR:** OAuth ChatGPT/Gemini, TTS, ler aba do browser, busca de música.
 
 ### Clima e fuso
 
@@ -123,7 +146,10 @@ Ordem de resolução:
 | `ELIO_WHISPER_MODEL` | `tiny` / `base` / `small` (padrão `small`; só fallback) |
 | `ELIO_STT_PROVIDER` | `auto` (padrão) / `windows-speech` / `whisper` |
 | `ELIO_SPOTIFY_CLIENT_ID` | Client ID Spotify (PKCE; sem secret) |
-| `OPENROUTER_API_KEY` | Chave nuvem (prioridade sobre cofre da UI) |
+| `OPENROUTER_API_KEY` | Chave OpenRouter (prioridade sobre cofre da UI) |
+| `OPENROUTER_MODEL` | Modelo (`:free` = cota; sem `:free` = BYOK) |
+| `ELIO_AI_BUDGET_ENFORCE` | `true` ativa soft-block dos limites diários (stub) |
+| `ELIO_AI_BUDGET_*_DAILY` | Limites stub `BYOK` / `FREE` / `LOCAL` |
 
 ### Privacidade (localização)
 
@@ -144,7 +170,7 @@ Ordem de resolução:
 ### Como testar STT no Windows
 
 1. Confirme idioma de fala pt-BR em **Configurações → Hora e idioma → Fala**  
-2. `npm run dev` → selo **v0.13.0**  
+2. `npm run dev` → selo **v0.14.0**  
 3. Segure o mic na Floating Bar → diga *“Qual é o clima atual do lugar que eu moro?”* → solte  
 4. O texto deve ir **direto** ao chat (sem caixa “Confira o texto”)  
 5. Preferência: “atual” **não** vira “outdoor”  

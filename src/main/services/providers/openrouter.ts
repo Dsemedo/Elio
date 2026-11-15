@@ -1,10 +1,26 @@
 import {
+  OPENROUTER_DEFAULT_FREE_MODEL,
+  isFreeOpenRouterModel,
+} from '../../../shared/aiRoute'
+import {
   getOpenRouterModel,
   resolveOpenRouterApiKey,
 } from '../settings'
 import type { AiProvider, ChatCompletionRequest, ChatCompletionResult } from './types'
 
 const API_URL = 'https://openrouter.ai/api/v1/chat/completions'
+
+/** Modelo preferido (settings UI / env) — BYOK se sem `:free`. */
+export function preferredOpenRouterModel(): string {
+  return getOpenRouterModel() || OPENROUTER_DEFAULT_FREE_MODEL
+}
+
+export function openRouterFreeModel(): string {
+  const preferred = preferredOpenRouterModel()
+  return isFreeOpenRouterModel(preferred)
+    ? preferred
+    : OPENROUTER_DEFAULT_FREE_MODEL
+}
 
 export const openRouterProvider: AiProvider = {
   kind: 'openrouter',
@@ -19,7 +35,7 @@ export const openRouterProvider: AiProvider = {
       throw new Error('OpenRouter não configurado — salve a chave em Configurações')
     }
 
-    const model = getOpenRouterModel()
+    const model = request.model?.trim() || preferredOpenRouterModel()
     const init: RequestInit = {
       method: 'POST',
       headers: {

@@ -71,6 +71,7 @@ export function ChatView({
   const [voiceUi, setVoiceUi] = useState<VoiceUiState>('idle')
   const [voiceProgress, setVoiceProgress] = useState<VoiceProgress | null>(null)
   const [whisperFallbackHint, setWhisperFallbackHint] = useState(false)
+  const [lastServed, setLastServed] = useState<string | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const messagesRef = useRef<HTMLDivElement>(null)
   const stickToBottomRef = useRef(true)
@@ -170,6 +171,7 @@ export function ChatView({
         conversationId: conversation.id,
         content,
       })
+      setLastServed(result.servedByLabel)
       stickToBottomRef.current = true
       await onConversationChange(result.conversation)
       await onStatusRefresh()
@@ -410,16 +412,20 @@ export function ChatView({
   const providerLabel =
     status.preferredProvider === 'none'
       ? 'sem provedor'
-      : status.preferredProvider === 'ollama'
-        ? 'Ollama'
-        : 'OpenRouter'
+      : status.preferredTier === 'byok'
+        ? 'OpenRouter BYOK'
+        : status.preferredTier === 'free'
+          ? 'OpenRouter free'
+          : status.preferredProvider === 'ollama'
+            ? 'Ollama local'
+            : 'OpenRouter'
   const headerStatus = busy
     ? 'Pensando…'
     : voiceUi === 'recording'
       ? 'Ouvindo…'
       : voiceUi === 'transcribing' || voiceUi === 'preparing'
         ? 'Voz…'
-        : providerLabel
+        : (lastServed ?? providerLabel)
 
   const confirmDelete = (id: string, title: string): void => {
     const ok = window.confirm(`Excluir a conversa “${title}”?`)
