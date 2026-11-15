@@ -1,0 +1,35 @@
+# Dependencies
+node_modules/
+
+# Build
+out/
+dist/
+release/
+*.asar
+
+# Logs / local
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
+
+# IDE / env
+.idea/
+.vscode/*
+!.vscode/extensions.json
+.env
+.env.*
+!.env.example
+
+# TypeScript
+*.tsbuildinfo
+node_modules/.tmp/
+
+# Test / coverage
+coverage/
+
+# Electron
+*.dmg
+*.exe
+*.AppImage
+*.blockmap

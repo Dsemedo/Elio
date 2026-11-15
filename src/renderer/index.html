@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <!--
+      Em desenvolvimento o Vite precisa de websocket (HMR).
+      Em produção o app só carrega arquivos locais.
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' ws://localhost:* http://localhost:* ws://127.0.0.1:* http://127.0.0.1:*"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Elio</title>
+    <style>
+      html,
+      body,
+      #root {
+        height: 100%;
+        margin: 0;
+        background: #0c1222;
+        color: #e8eefc;
+        font-family: 'Segoe UI', sans-serif;
+      }
+      .boot {
+        display: grid;
+        place-items: center;
+        height: 100%;
+        text-align: center;
+        padding: 2rem;
+      }
+      .boot h1 {
+        margin: 0;
+        font-size: 3rem;
+        letter-spacing: -0.04em;
+      }
+      .boot p {
+        color: #9aa8c7;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root">
+      <div class="boot">
+        <div>
+          <h1>Elio</h1>
+          <p>Carregando a interface…</p>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="./src/main.tsx"></script>
+  </body>
+</html>
