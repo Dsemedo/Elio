@@ -1,128 +1,55 @@
 # Elio
 
 Assistente pessoal de IA para desktop (**JARVIS MVP** — Estágio 1).  
-Produto: **Elio**. Conversa por **texto** e **voz → texto** (Whisper local).  
-**v0.4.0** — shell com **barrinha flutuante** + **painel** (Conversar, Histórico, Integrações, Computador).
+**v0.5.0** — Design System **v1.1 (MVP-scoped)**: Floating Bar + Command Center.
+
+Spec: [`docs/elio-design-system.md`](./docs/elio-design-system.md)
 
 ## Requisitos
 
-- **Windows 10/11 (x64)** — plataforma alvo do MVP  
-- **Node.js 22.12+** ([download](https://nodejs.org/))  
-- Microfone (para voz)  
-- Internet **só na primeira vez** que usar a voz (baixa Whisper + modelo tiny, ~80 MB)  
-- (Opcional) **[Ollama](https://ollama.com)** instalado e aberto, com um modelo (ex.: `ollama pull llama3.2`)
+- **Windows 10/11 (x64)**  
+- **Node.js 22.12+**  
+- Microfone (voz)  
+- Internet só na 1ª vez da voz (~80 MB Whisper)  
+- (Opcional) [Ollama](https://ollama.com) com um modelo
 
 ## Como rodar (Windows)
 
-Pasta correta (só uma cópia): `C:\Users\Douglas\Elio`  
-Não use outro clone em Downloads, Desktop ou OneDrive.
-
-No PowerShell, **nessa** pasta:
+Pasta: `C:\Users\Douglas\Elio`
 
 ```powershell
 git restore package-lock.json
-git checkout main
+git fetch
+git checkout cursor/design-system-fase1-e0f1
 git pull
 npm install
 npm run ensure:electron
 npm run dev
 ```
 
-Deve aparecer:
+### O que Douglas deve ver
 
-1. Uma **barrinha** no topo (~20% da largura) com o nome **Elio**  
-2. Um ícone do Elio na **bandeja** (canto da barra de tarefas)  
-3. Ao **clicar na barrinha**, o **painel** abre/fecha  
+1. **Floating Bar** grafite translúcida (~420×58, radius 18): logo compacto + campo + mic + expand + menu  
+2. Digitar e **Enter** envia sem abrir o painel → estado **Pensando…** neutro (não roxo)  
+3. Segurar mic → **Ouvindo…** / **Transcrevendo…** (accent teal)  
+4. Expandir → **Command Center** (Geist Sans, sidebar: Início, Conversas, Atividades, Agentes, Memória, Configurações)  
+5. Atividades / Agentes / Memória = **em breve** (honestos)  
+6. Selo **v0.5.0**
 
-Confirme o selo **v0.4.0** no painel (nav à esquerda).
+Se sumir: bandeja → **Mostrar Elio**.
 
-### O que testar no painel
+### Gaps vs DS completo
 
-| Seção | O que deve funcionar |
-|-------|----------------------|
-| **Conversar** | Chat por texto + botão **Falar** (voz → texto), igual às versões anteriores |
-| **Histórico** | Lista de conversas; clicar abre em Conversar; excluir / nova |
-| **Integrações** | Status de Ollama / OpenRouter; Slack e Jira como **em breve** (ainda sem login) |
-| **Computador** | Memória, CPU aproximada, SO — atualiza sozinho; **não** lista apps que mais pesam |
-
-### Barrinha some / como voltar
-
-- Se você focar **outro app**, a barrinha e o painel **tendem a sumir** (best-effort no Windows).  
-- Para **voltar**: clique no ícone do Elio na **bandeja** → **Mostrar Elio**.  
-- Atalho de teclado global ainda **não** está definido (decisão OD-20 aberta).  
-- Limitações: ver `docs/ADRs/0003-shell-overlay.md`.
-
-### Testar a voz (STT)
-
-1. Em **Conversar**, clique em **Preparar voz** (ou segure **Falar** — na primeira vez baixa sozinho).  
-2. Espere o progresso (~80 MB: binário + modelo `tiny`).  
-3. **Segure** o botão **Falar**, diga uma frase em português, **solte**.  
-4. O texto deve aparecer na caixa. Revise e clique **Enviar**.
-
-Tudo fica em `%APPDATA%\elio\whisper\` — **áudio e texto da fala não saem deste PC**.
-
-### Testar o chat por texto
-
-1. **Com Ollama (recomendado, sem chave):** instale/abra o Ollama, `ollama pull llama3.2`, envie uma mensagem.  
-2. **Com OpenRouter:**
-
-```powershell
-$env:OPENROUTER_API_KEY="sk-or-v1-SUA_CHAVE"
-npm run dev
-```
-
-3. **Sem provedor:** o app abre; ao enviar, aviso para configurar.
-
-### Se algo falhar no Windows
-
-**Erro `Electron uninstall`:**
-
-```bat
-npm run ensure:electron
-npm run dev
-```
-
-1. Confirme Node **22.12+** (`node -v`).
-2. Feche janelas do Elio / Electron.
-3. Antivírus: permita `node_modules\electron\dist\` e `%APPDATA%\elio\whisper\`.
-4. Use terminal **fora** do WSL.
-5. Se a barrinha não voltar: bandeja → **Mostrar Elio** ou **Sair** e `npm run dev` de novo.
-
-## Scripts úteis
-
-| Comando | O que faz |
-|---------|-----------|
-| `npm run dev` | Sobe o app em modo desenvolvimento |
-| `npm run build` | Compila main / preload / renderer |
-| `npm test` | Testes (Vitest) |
-| `npm run lint` | ESLint |
-| `npm run typecheck` | TypeScript estrito |
-| `npm run dist:win` | Build + instalador NSIS (Windows) |
+| No MVP (Fase 1) | Depois |
+|-----------------|--------|
+| Tokens, Geist, Lucide, barra, estados reais | Workspace full |
+| Chat / voz / histórico | Atividades / Agentes / Memória reais |
+| Stubs “em breve” | EXECUTING / approval (quando o Core tiver) |
+| Hide por foco + bandeja | Atalho global (OD-20) |
 
 ## Segurança
 
-- `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`
-- Preload mínimo (CJS) via `contextBridge`
-- IPC com canais fixos + validação **Zod** no main (chat, voz, shell, sistema)
-- Subprocess Whisper **só no main** (`shell: false`)
-- Chaves só por variável de ambiente neste pedaço (keytar depois); **não** vão para logs
-- Logs sem conteúdo de fala e sem path completo do usuário
-
-## Persistência
-
-- Conversas: `%APPDATA%\elio\elio-chat.json`  
-- Whisper: `%APPDATA%\elio\whisper\` (binário, modelo, temp)
-
-## Versão do Electron
-
-Pin: **45.3.2** — ver `docs/ADRs/0001-electron-version.md`.  
-STT: subprocess `whisper-cli` — ver `docs/ADRs/0002-whisper-subprocess.md`.  
-Shell overlay: `docs/ADRs/0003-shell-overlay.md`.
-
-## Escopo atual (v0.4.0)
-
-**Funciona:** barrinha + painel, chat, voz→texto, histórico, status IA, snapshot básico do PC, bandeja.  
-**Stub / depois:** OAuth Slack/Jira, análise profunda de desempenho, atalho global (OD-20), abrir apps/pastas.
+`contextIsolation`, sem `nodeIntegration`, sandbox, Zod IPC. Sem rewrite do núcleo nesta fase.
 
 ## Licença
 
