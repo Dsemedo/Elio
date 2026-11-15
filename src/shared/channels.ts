@@ -20,6 +20,13 @@ export const IpcChannels = {
   SETTINGS_SET_OPENROUTER_KEY: 'settings:setOpenRouterKey',
   SETTINGS_CLEAR_OPENROUTER_KEY: 'settings:clearOpenRouterKey',
   SETTINGS_PROBE_OLLAMA: 'settings:probeOllama',
+  SETTINGS_EXPORT_DATA: 'settings:exportData',
+  SETTINGS_DELETE_ALL_DATA: 'settings:deleteAllData',
+  /** Memórias explícitas (CRUD local). */
+  MEMORY_LIST: 'memory:list',
+  MEMORY_CREATE: 'memory:create',
+  MEMORY_UPDATE: 'memory:update',
+  MEMORY_DELETE: 'memory:delete',
   VOICE_GET_STATUS: 'voice:getStatus',
   VOICE_ENSURE: 'voice:ensure',
   VOICE_TRANSCRIBE: 'voice:transcribe',

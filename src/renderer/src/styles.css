@@ -1282,16 +1282,139 @@ textarea {
 .config-stack {
   height: 100%;
   overflow: auto;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  min-height: 0;
+}
+
+.config-tabs {
+  padding-top: 0.75rem;
 }
 
 .config-stack .panel-section {
   height: auto;
   animation: none;
+  overflow: auto;
 }
 
-.config-stack .panel-section + .panel-section {
-  border-top: 1px solid var(--elio-border);
-  padding-top: 1.5rem;
+.btn.danger {
+  background: rgba(232, 93, 117, 0.16);
+  color: #f0a0ad;
+  border: 1px solid rgba(232, 93, 117, 0.35);
+}
+
+.btn.danger:hover:not(:disabled) {
+  background: rgba(232, 93, 117, 0.28);
+}
+
+.btn.ghost.danger {
+  background: transparent;
+  color: #f0a0ad;
+  border-color: transparent;
+}
+
+.memory-compose {
+  display: grid;
+  gap: 0.55rem;
+  margin-bottom: 1.25rem;
+}
+
+.memory-compose textarea,
+.memory-edit textarea,
+.integration-actions input[type='password'] {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--elio-border);
+  border-radius: var(--elio-radius-md);
+  background: var(--elio-bg);
+  color: var(--elio-text);
+  font: inherit;
+  padding: 0.75rem 0.85rem;
+  resize: vertical;
+}
+
+.integration-actions input[type='password'] {
+  resize: none;
+}
+
+.memory-compose-actions,
+.memory-item-actions,
+.integration-btn-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  align-items: center;
+}
+
+.memory-count {
+  margin-right: auto;
+  font-size: 0.78rem;
+  color: var(--elio-text-secondary);
+}
+
+.memory-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.memory-item {
+  border: 1px solid var(--elio-border);
+  border-radius: var(--elio-radius-md);
+  background: var(--elio-surface);
+  padding: 0.9rem 1rem;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.memory-content {
+  margin: 0;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
+.memory-item-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.5rem;
+  align-items: center;
+  font-size: 0.78rem;
+  color: var(--elio-text-secondary);
+}
+
+.data-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.85rem;
+}
+
+.data-card {
+  border: 1px solid var(--elio-border);
+  border-radius: 14px;
+  background: var(--elio-surface);
+  padding: 1rem 1.05rem;
+  display: grid;
+  gap: 0.55rem;
+  justify-items: start;
+}
+
+.data-card h2 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.data-card p {
+  margin: 0;
+  color: var(--elio-text-secondary);
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.data-card.danger-zone {
+  border-color: rgba(232, 93, 117, 0.35);
 }
 
 .history-list {

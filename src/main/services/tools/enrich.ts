@@ -1,4 +1,5 @@
 import type { ChatMessage } from '../../../shared/ipc'
+import { loadMemoriesPromptBlock } from '../memory/prompt'
 import { getWeatherCityPreference } from '../settings'
 import { detectChatToolIntent } from './intent'
 import { getLocalClock } from './time'
@@ -7,8 +8,8 @@ import { getWeatherSnapshot } from './weather'
 type HistoryMessage = Pick<ChatMessage, 'role' | 'content'>
 
 /**
- * Injeta fatos locais (hora sempre; clima sob demanda) como system message.
- * Caminho simples e confiável com llama3.2 / OpenRouter — sem tool-call loop.
+ * Injeta fatos locais (hora sempre; clima sob demanda) + memórias explícitas
+ * como system message. Caminho simples e confiável com llama3.2 / OpenRouter.
  */
 export async function enrichMessagesWithLocalFacts(
   messages: HistoryMessage[],
@@ -50,6 +51,12 @@ export async function enrichMessagesWithLocalFacts(
   lines.push(
     'Responda em português do Brasil, de forma direta. Abrir sites/pastas/arquivos/apps é feito pelo Elio via allowlist (não invente que abriu algo).',
   )
+
+  const memoriesBlock = loadMemoriesPromptBlock()
+  if (memoriesBlock) {
+    lines.push('')
+    lines.push(memoriesBlock)
+  }
 
   return [{ role: 'system', content: lines.join('\n') }, ...messages]
 }

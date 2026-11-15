@@ -10,6 +10,11 @@ import type {
   ChatUpdatedEvent,
   Conversation,
   ConversationSummary,
+  DeleteAllDataResult,
+  Memory,
+  MemoryCreateInput,
+  MemoryUpdateInput,
+  UserDataExportPayload,
   LocationSaveOsInput,
   SettingsOpenRouterKeyInput,
   SettingsPublic,
@@ -167,6 +172,23 @@ const elioApi = {
       encryptionAvailable: boolean
     }
   }> => ipcRenderer.invoke(IpcChannels.SPOTIFY_DISCONNECT),
+  listMemories: (): Promise<Memory[]> => ipcRenderer.invoke(IpcChannels.MEMORY_LIST),
+
+  createMemory: (input: MemoryCreateInput): Promise<Memory> =>
+    ipcRenderer.invoke(IpcChannels.MEMORY_CREATE, input),
+
+  updateMemory: (input: MemoryUpdateInput): Promise<Memory> =>
+    ipcRenderer.invoke(IpcChannels.MEMORY_UPDATE, input),
+
+  deleteMemory: (id: string): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke(IpcChannels.MEMORY_DELETE, { id }),
+
+  exportUserData: (): Promise<UserDataExportPayload> =>
+    ipcRenderer.invoke(IpcChannels.SETTINGS_EXPORT_DATA),
+
+  deleteAllUserData: (): Promise<DeleteAllDataResult> =>
+    ipcRenderer.invoke(IpcChannels.SETTINGS_DELETE_ALL_DATA),
+
 }
 
 export type ElioApi = typeof elioApi

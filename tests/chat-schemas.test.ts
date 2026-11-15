@@ -60,4 +60,10 @@ describe('chat IPC contracts', () => {
     expect(status.cascadeOrder[0]).toBe('byok')
     expect(status.spotifyConnected).toBe(false)
   })
+
+  it('expõe canais de memória e settings', () => {
+    expect(IpcChannels.MEMORY_LIST).toBe('memory:list')
+    expect(IpcChannels.SETTINGS_EXPORT_DATA).toBe('settings:exportData')
+    expect(IpcChannels.SETTINGS_DELETE_ALL_DATA).toBe('settings:deleteAllData')
+  })
 })

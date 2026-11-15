@@ -3,6 +3,8 @@ import {
   IpcChannels,
   SettingsOpenRouterKeyInputSchema,
   SettingsUpdateInputSchema,
+  type DeleteAllDataResult,
+  type UserDataExportPayload,
 } from '../../shared/ipc'
 import { ollamaProvider } from '../services/providers/ollama'
 import {
@@ -12,6 +14,11 @@ import {
   setOpenRouterApiKey,
   updateLocalSettings,
 } from '../services/settings'
+import {
+  buildUserDataExport,
+  deleteAllUserData,
+  exportUserDataJson,
+} from '../services/userData'
 
 export function registerSettingsIpc(): void {
   ipcMain.handle(IpcChannels.SETTINGS_GET, async () => getPublicSettings())
@@ -48,4 +55,18 @@ export function registerSettingsIpc(): void {
         : `Ollama não detectado em ${host}. Abra o app Ollama e tente de novo.`,
     }
   })
+
+  ipcMain.handle(IpcChannels.SETTINGS_EXPORT_DATA, (): UserDataExportPayload => {
+    const data = buildUserDataExport()
+    return {
+      json: exportUserDataJson(),
+      conversationCount: data.conversations.length,
+      memoryCount: data.memories.length,
+    }
+  })
+
+  ipcMain.handle(
+    IpcChannels.SETTINGS_DELETE_ALL_DATA,
+    (): DeleteAllDataResult => deleteAllUserData(),
+  )
 }

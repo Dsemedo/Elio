@@ -1,5 +1,8 @@
 import { mkdir, readFile, writeFile, rm } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
+import type { SecretCrypto } from '../secrets/crypto'
+
+export type { SecretCrypto } from '../secrets/crypto'
 
 /**
  * Tokens Spotify cifrados com safeStorage (API async) em userData.
@@ -12,13 +15,6 @@ export type SpotifyTokenSet = {
   expiresAt: number
   tokenType: string
   scope: string
-}
-
-/** Abstração async — alinha com safeStorage.isAsyncEncryptionAvailable / *Async. */
-export type SecretCrypto = {
-  isEncryptionAvailable: () => Promise<boolean>
-  encryptString: (plain: string) => Promise<Buffer>
-  decryptString: (encrypted: Buffer) => Promise<string>
 }
 
 export type TokenPaths = {

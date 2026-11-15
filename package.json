@@ -1,7 +1,7 @@
 {
   "name": "elio",
-  "version": "0.14.0",
-  "description": "Elio \u2014 assistente pessoal de IA (JARVIS MVP)",
+  "version": "0.14.1",
+  "description": "Elio — assistente pessoal de IA (JARVIS MVP)",
   "author": "Douglas Semedo Neto",
   "license": "UNLICENSED",
   "private": true,
