@@ -51,6 +51,7 @@ export function ChatView({
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const recorderRef = useRef<MicRecorder | null>(null)
+  const recordingActiveRef = useRef(false)
   const recordStartedAt = useRef(0)
 
   useEffect(() => {
@@ -152,7 +153,7 @@ export function ChatView({
   const beginTalk = async (): Promise<void> => {
     if (
       busy ||
-      voiceUi === 'recording' ||
+      recordingActiveRef.current ||
       voiceUi === 'transcribing' ||
       voiceUi === 'thinking'
     ) {
@@ -166,9 +167,11 @@ export function ChatView({
     try {
       const recorder = await startMicRecording()
       recorderRef.current = recorder
+      recordingActiveRef.current = true
       recordStartedAt.current = Date.now()
       setVoiceUi('recording')
     } catch (err) {
+      recordingActiveRef.current = false
       setError(micPermissionMessage(err))
       setVoiceUi('idle')
     }
@@ -176,8 +179,9 @@ export function ChatView({
 
   const endTalk = async (): Promise<void> => {
     const recorder = recorderRef.current
-    if (!recorder || voiceUi !== 'recording') return
+    if (!recorder || !recordingActiveRef.current) return
     recorderRef.current = null
+    recordingActiveRef.current = false
     setVoiceUi('transcribing')
 
     try {
@@ -386,15 +390,19 @@ export function ChatView({
               title={micLabel}
               onPointerDown={(e) => {
                 e.preventDefault()
+                e.currentTarget.setPointerCapture(e.pointerId)
                 void beginTalk()
               }}
-              onPointerUp={() => void endTalk()}
-              onPointerLeave={() => {
-                if (voiceUi === 'recording') void endTalk()
+              onPointerUp={(e) => {
+                if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+                  e.currentTarget.releasePointerCapture(e.pointerId)
+                }
+                void endTalk()
               }}
               onPointerCancel={() => {
                 recorderRef.current?.cancel()
                 recorderRef.current = null
+                recordingActiveRef.current = false
                 setVoiceUi('idle')
               }}
             >
