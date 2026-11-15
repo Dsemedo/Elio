@@ -30,9 +30,8 @@ const STATE_LABEL: Record<BarUiState, string> = {
 }
 
 /**
- * Floating Bar — DS v1.1 §3
- * Densidade: input + voz no centro; logo compacto; menu overflow.
- * Estados reais apenas (sem EXECUTING / approval fingidos).
+ * Floating Bar — DS v1.1 §3 + UX Douglas (voz primeiro, sem chrome duplo).
+ * Identidade: logo + mic PTT. Campo de texto sob demanda (sem placeholder).
  */
 export function FloatingBar(): React.JSX.Element {
   const [shell, setShell] = useState<ShellState | null>(null)
@@ -42,6 +41,7 @@ export function FloatingBar(): React.JSX.Element {
   const [barState, setBarState] = useState<BarUiState>('idle')
   const [error, setError] = useState<string | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [inputActive, setInputActive] = useState(false)
   const [voicePhase, setVoicePhase] = useState<VoicePhase>('idle')
   const inputRef = useRef<HTMLInputElement>(null)
   const recorderRef = useRef<MicRecorder | null>(null)
@@ -82,6 +82,7 @@ export function FloatingBar(): React.JSX.Element {
       cancelled = true
       unsub()
       recorderRef.current?.cancel()
+      void window.elio.setBarOverlay(false)
     }
   }, [])
 
@@ -92,6 +93,14 @@ export function FloatingBar(): React.JSX.Element {
     document.addEventListener('mousedown', onDoc)
     return () => document.removeEventListener('mousedown', onDoc)
   }, [])
+
+  useEffect(() => {
+    const needOverlay = menuOpen || (barState === 'error' && !!error)
+    void window.elio.setBarOverlay(needOverlay)
+    return () => {
+      if (needOverlay) void window.elio.setBarOverlay(false)
+    }
+  }, [menuOpen, barState, error])
 
   const panelOpen = shell?.panelOpen ?? false
   const offline = status?.preferredProvider === 'none'
@@ -123,6 +132,7 @@ export function FloatingBar(): React.JSX.Element {
     setMenuOpen(false)
     setBarState('thinking')
     setDraft('')
+    setInputActive(false)
     try {
       const id = await ensureConversation()
       await window.elio.sendMessage({ conversationId: id, content })
@@ -133,6 +143,7 @@ export function FloatingBar(): React.JSX.Element {
       setError(err instanceof Error ? err.message : 'Não foi possível responder')
       setBarState('error')
       setDraft(content)
+      setInputActive(true)
     }
   }
 
@@ -140,6 +151,7 @@ export function FloatingBar(): React.JSX.Element {
     if (resolvedState === 'thinking' || voicePhase === 'recording') return
     setError(null)
     setMenuOpen(false)
+    setInputActive(false)
     setVoicePhase('preparing')
     try {
       const voice = await window.elio.ensureVoice()
@@ -181,6 +193,7 @@ export function FloatingBar(): React.JSX.Element {
         const trimmed = prev.trim()
         return trimmed ? `${trimmed} ${text}` : text
       })
+      setInputActive(true)
       setBarState(offline ? 'offline' : 'idle')
       inputRef.current?.focus()
     } catch (err) {
@@ -191,10 +204,20 @@ export function FloatingBar(): React.JSX.Element {
     }
   }
 
-  const showInput =
-    resolvedState !== 'listening' &&
-    resolvedState !== 'transcribing' &&
-    resolvedState !== 'thinking'
+  const busy =
+    resolvedState === 'listening' ||
+    resolvedState === 'transcribing' ||
+    resolvedState === 'thinking'
+
+  const showTextField = busy
+    ? false
+    : inputActive || draft.trim().length > 0 || resolvedState === 'error'
+
+  const activateInput = (): void => {
+    if (busy) return
+    setInputActive(true)
+    requestAnimationFrame(() => inputRef.current?.focus())
+  }
 
   return (
     <div className="fb-root">
@@ -206,7 +229,7 @@ export function FloatingBar(): React.JSX.Element {
           // Clique na barra foca o input (DS §3.5) — sem roubar se já está em controle.
           const target = e.target as HTMLElement
           if (target.closest('button, input, [role="menu"]')) return
-          inputRef.current?.focus()
+          activateInput()
         }}
       >
         <div className="fb-drag" aria-hidden />
@@ -217,7 +240,7 @@ export function FloatingBar(): React.JSX.Element {
         </div>
 
         <div className="fb-input-wrap">
-          {!showInput ? (
+          {busy ? (
             <div
               className={
                 resolvedState === 'thinking'
@@ -233,24 +256,43 @@ export function FloatingBar(): React.JSX.Element {
               )}
               <span>{STATE_LABEL[resolvedState]}</span>
             </div>
-          ) : (
+          ) : showTextField ? (
             <input
               ref={inputRef}
               className="fb-input"
               value={draft}
-              placeholder={offline ? 'Configure um provedor…' : 'Pergunte ao Elio…'}
+              placeholder=""
               aria-label="Mensagem para o Elio"
               onChange={(e) => {
                 setDraft(e.target.value)
                 if (barState === 'error') setBarState(offline ? 'offline' : 'idle')
+              }}
+              onBlur={() => {
+                if (!draft.trim()) setInputActive(false)
               }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
                   e.preventDefault()
                   void send()
                 }
+                if (e.key === 'Escape') {
+                  e.preventDefault()
+                  setDraft('')
+                  setInputActive(false)
+                  inputRef.current?.blur()
+                }
               }}
             />
+          ) : (
+            <button
+              type="button"
+              className="fb-voice-idle"
+              onClick={activateInput}
+              aria-label="Ativar por voz com o microfone, ou clique para digitar"
+            >
+              <span className="fb-voice-idle-main">Segure o mic</span>
+              <span className="fb-voice-idle-sub">Palavra de ativação · em breve</span>
+            </button>
           )}
         </div>
 
@@ -258,6 +300,12 @@ export function FloatingBar(): React.JSX.Element {
           <span className="fb-chip offline" title={status?.hint}>
             <WifiOff size={14} aria-hidden />
             <span className="fb-chip-label">offline</span>
+          </span>
+        ) : null}
+
+        {resolvedState === 'error' && error ? (
+          <span className="fb-chip error" title={error} aria-label={error}>
+            !
           </span>
         ) : null}
 
@@ -345,11 +393,21 @@ export function FloatingBar(): React.JSX.Element {
                     const created = await window.elio.createConversation()
                     setConversationId(created.id)
                     setDraft('')
+                    setInputActive(false)
                     setBarState(offline ? 'offline' : 'idle')
                   })()
                 }}
               >
                 Nova conversa
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                disabled
+                title="Em breve"
+                aria-disabled="true"
+              >
+                Palavra de ativação · em breve
               </button>
               <button
                 type="button"

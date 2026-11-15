@@ -1,6 +1,7 @@
 import { ipcMain } from 'electron'
 import {
   IpcChannels,
+  ShellBarOverlaySchema,
   ShellStateSchema,
   SystemSnapshotSchema,
   type ShellState,
@@ -44,6 +45,12 @@ export function registerShellIpc(): void {
   ipcMain.handle(IpcChannels.SHELL_HIDE, (): ShellState => {
     getShellManager().hideShell()
     return currentState()
+  })
+
+  ipcMain.handle(IpcChannels.SHELL_SET_BAR_OVERLAY, (_event, raw: unknown) => {
+    const { open } = ShellBarOverlaySchema.parse(raw)
+    getShellManager().setBarOverlay(open)
+    return { ok: true as const }
   })
 
   ipcMain.handle(IpcChannels.SYSTEM_GET_SNAPSHOT, async () =>

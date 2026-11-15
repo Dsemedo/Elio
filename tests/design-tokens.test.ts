@@ -27,4 +27,10 @@ describe('design system tokens v1.1', () => {
     )
     expect(css).toContain('só badges de IA')
   })
+
+  it('Floating Bar sem moldura: superfície bar transparente e shell full-bleed', () => {
+    expect(css).toContain("html[data-surface='bar']")
+    expect(css).toContain('background: transparent !important')
+    expect(css).toContain('/* Preenche a BrowserWindow inteira')
+  })
 })

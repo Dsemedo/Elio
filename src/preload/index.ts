@@ -79,6 +79,9 @@ const elioApi = {
 
   hideShell: (): Promise<ShellState> => ipcRenderer.invoke(IpcChannels.SHELL_HIDE),
 
+  setBarOverlay: (open: boolean): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke(IpcChannels.SHELL_SET_BAR_OVERLAY, { open }),
+
   onShellState: (handler: (state: ShellState) => void): (() => void) => {
     const listener = (_event: Electron.IpcRendererEvent, state: ShellState): void => {
       handler(state)

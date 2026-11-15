@@ -1,7 +1,7 @@
 # Elio
 
 Assistente pessoal de IA para desktop (**JARVIS MVP** — Estágio 1).  
-**v0.5.0** — Design System **v1.1 (MVP-scoped)**: Floating Bar + Command Center.
+**v0.5.1** — Floating Bar UX: barra preenche a janela, voz primeiro, sem auto-hide no blur.
 
 Spec: [`docs/elio-design-system.md`](./docs/elio-design-system.md)
 
@@ -20,7 +20,7 @@ Pasta: `C:\Users\Douglas\Elio`
 ```powershell
 git restore package-lock.json
 git fetch
-git checkout cursor/design-system-fase1-e0f1
+git checkout cursor/floating-bar-ux-740e
 git pull
 npm install
 npm run ensure:electron
@@ -29,14 +29,23 @@ npm run dev
 
 ### O que Douglas deve ver
 
-1. **Floating Bar** grafite translúcida (~420×58, radius 18): logo compacto + campo + mic + expand + menu  
-2. Digitar e **Enter** envia sem abrir o painel → estado **Pensando…** neutro (não roxo)  
-3. Segurar mic → **Ouvindo…** / **Transcrevendo…** (accent teal)  
-4. Expandir → **Command Center** (Geist Sans, sidebar: Início, Conversas, Atividades, Agentes, Memória, Configurações)  
-5. Atividades / Agentes / Memória = **em breve** (honestos)  
-6. Selo **v0.5.0**
+1. **Floating Bar** ~420×58 **sem moldura preta** externa — a janela é a própria barra  
+2. Idle **voz primeiro**: “Segure o mic” + stub “Palavra de ativação · em breve” (sem “Pergunte ao Elio…”)  
+3. Segurar mic → **Ouvindo…** / **Transcrevendo…** (accent teal); clique na área central para digitar  
+4. Clicar em outro app: **barra permanece**; Command Center pode recolher. Ocultar barra só pelo menu → “Ocultar (bandeja)” ou bandeja  
+5. Expandir → **Command Center** (Geist Sans, stubs “em breve”)  
+6. Selo **v0.5.1**
 
-Se sumir: bandeja → **Mostrar Elio**.
+Se ocultar de propósito: bandeja → **Mostrar Elio**.
+
+### Comportamento de foco (mudança vs 0.5.0)
+
+| Antes (0.5.0) | Agora (0.5.1) |
+|---------------|---------------|
+| Blur / outro app → escondia barra + painel | Blur → **só recolhe o painel**; **barra fica** |
+| Voltar pela bandeja | Barra já no desktop; bandeja só se você ocultou |
+
+Preferência futura `hideBarOnBlur` (opcional) pode voltar ao comportamento antigo; default = DS (barra acessível).
 
 ### Gaps vs DS completo
 
@@ -45,7 +54,7 @@ Se sumir: bandeja → **Mostrar Elio**.
 | Tokens, Geist, Lucide, barra, estados reais | Workspace full |
 | Chat / voz / histórico | Atividades / Agentes / Memória reais |
 | Stubs “em breve” | EXECUTING / approval (quando o Core tiver) |
-| Hide por foco + bandeja | Atalho global (OD-20) |
+| Barra always-on-top + bandeja | Atalho global (OD-20) |
 
 ## Segurança
 

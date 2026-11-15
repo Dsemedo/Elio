@@ -120,7 +120,16 @@ export const VoiceTranscribeResultSchema = z.object({
 export const ShellStateSchema = z.object({
   panelOpen: z.boolean(),
   barVisible: z.boolean(),
+  /**
+   * Legacy: antes escondia barra+painel no blur.
+   * Com DS v1.1 / UX 0.5.1 a barra não some por foco; o campo
+   * permanece p/ compat e fica false no default.
+   */
   hiddenByFocus: z.boolean(),
+})
+
+export const ShellBarOverlaySchema = z.object({
+  open: z.boolean(),
 })
 
 export const SystemSnapshotSchema = z.object({

@@ -19,6 +19,9 @@ export type FocusState = {
  * Best-effort no Windows: pergunta ao user32 qual HWND está na frente
  * e compara com as janelas Electron do Elio.
  *
+ * Usado para recolher o Command Center quando outro app está na frente.
+ * A Floating Bar permanece visível por default (ver focusPolicy.ts).
+ *
  * Limitações (documentar no README):
  * - Polling ~700ms; não é instantâneo.
  * - Depende de PowerShell; antivírus/políticas podem bloquear.

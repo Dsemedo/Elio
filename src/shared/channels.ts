@@ -22,6 +22,8 @@ export const IpcChannels = {
   SHELL_CLOSE_PANEL: 'shell:closePanel',
   SHELL_SHOW: 'shell:show',
   SHELL_HIDE: 'shell:hide',
+  /** Expande a janela da barra p/ overlay (menu) sem chrome preto. */
+  SHELL_SET_BAR_OVERLAY: 'shell:setBarOverlay',
   /** Evento main → renderer (estado da shell). */
   SHELL_STATE_CHANGED: 'shell:stateChanged',
   SYSTEM_GET_SNAPSHOT: 'system:getSnapshot',
