@@ -30,6 +30,8 @@ export const IpcChannels = {
   VOICE_GET_STATUS: 'voice:getStatus',
   VOICE_ENSURE: 'voice:ensure',
   VOICE_TRANSCRIBE: 'voice:transcribe',
+  /** Estado SO do microfone (Windows/macOS getMediaAccessStatus). */
+  VOICE_GET_MIC_ACCESS: 'voice:getMicAccess',
   /** Evento main → renderer (progresso de download). */
   VOICE_PROGRESS: 'voice:progress',
   /** Preferências + síntese TTS (edge-tts no main; system no renderer). */

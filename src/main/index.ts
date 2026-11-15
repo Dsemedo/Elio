@@ -30,10 +30,10 @@ function registerIpc(): void {
 }
 
 /**
- * Concede geolocation + media/mic (áudio) ao origin do app.
- * O SO ainda pode mostrar o diálogo do Windows; sem isto o renderer recebe
- * PERMISSION_DENIED / SpeechRecognition `not-allowed` imediatamente.
- * (0.9 só liberava geolocation — isso bloqueava Web Speech / getUserMedia.)
+ * Concede geolocation + media/mic (áudio) ao origin do app no Chromium.
+ * Isto NÃO pula o consentimento do Windows: só deixa o getUserMedia chegar
+ * no SO. Sem este handler (ou com allowlist só-geo), o renderer recebe
+ * PERMISSION_DENIED / SpeechRecognition `not-allowed` sem prompt do OS.
  *
  * Request + Check: Chromium consulta os dois; SpeechRecognition costuma ir
  * pelo check. `mediaTypes` pode vir omitido — não negar por isso.

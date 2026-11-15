@@ -1,7 +1,7 @@
 # Elio
 
 Assistente pessoal de IA para desktop (**JARVIS MVP**).  
-**v0.15.3** — Speech mic-first + UI sem código cru; boot updater ESM (0.15.2); TTS (0.15.1).
+**v0.15.4** — Prompt real de mic + chip se negado; Whisper só após falha explícita do Speech (com motivo).
 
 Spec UI: [`docs/elio-design-system.md`](./docs/elio-design-system.md) · ADRs: [`docs/ADRs/`](./docs/ADRs/) · Distribuição: [`docs/windows-distribution.md`](./docs/windows-distribution.md)
 
@@ -40,18 +40,16 @@ npm run ensure:electron
 npm run dev
 ```
 
-### O que Douglas deve ver (0.15.3)
+### O que Douglas deve ver (0.15.4)
 
-1. Selo **v0.15.3** — `npm run dev` sobe; mic Speech ou “Usando Whisper…” (sem chip `WINDOWS_SPEECH_ERROR`)  
-
-2. **“o que está na aba aberta?”** → resposta honesta: precisa de extensão (ainda não incluída)  
-3. **“pesquisa na web sobre Elio”** → abre busca https no navegador (sem crawl genérico)  
-4. **“resume https://pt.wikipedia.org/wiki/Electron”** → abre + lê trecho público (allowlist) e resume via LLM (cascata)  
-5. Memória (0.14.1): criar/listar/apagar; export/delete-all em Configurações  
-6. Cascata BYOK → free → Ollama; Command Center threads/histórico  
-7. **Integrações → Fala do Elio (TTS)** + Floating Bar **⋯ → Falar respostas**; botão ■ para a fala  
-8. Floating Bar: Windows Speech → auto-envio; permissão falha → “Usando Whisper…”  
-9. `npm run dist:win` gera instalador NSIS; Spotify / clima ok  
+1. Selo **v0.15.4** — 1ª voz: pedido de mic (prompt Windows se ainda não concedido); Speech primário  
+2. Se negar mic → chip claro (Privacidade → Microfone), **sem** cair no Whisper em silêncio  
+3. Se Speech falhar por outro motivo → status tipo “Speech falhou (rede) — Whisper”  
+4. **“o que está na aba aberta?”** → resposta honesta: precisa de extensão (ainda não incluída)  
+5. **“pesquisa na web sobre Elio”** → abre busca https no navegador (sem crawl genérico)  
+6. **“resume https://pt.wikipedia.org/wiki/Electron”** → abre + lê trecho público (allowlist) e resume via LLM (cascata)  
+7. Memória / cascata BYOK / TTS / Spotify / clima como antes  
+8. `npm run dist:win` gera instalador NSIS  
 
 
 ### Cascata de IAs (BYOK → free → Ollama)
@@ -86,9 +84,9 @@ Em **Configurações → Integrações**:
 
 `OPENROUTER_API_KEY` / `OLLAMA_*` no ambiente **têm prioridade** sobre o cofre/arquivo.
 
-### Microfone / fala no Windows (se aparecer permissão negada)
+### Microfone / fala no Windows (validar 0.15.4)
 
-Confirme que está na **0.15.3+** (selo / `npm pkg get version`). Builds antigas ainda mostram o chip cru `WINDOWS_SPEECH_ERROR:not-al…`.
+Confirme o selo **v0.15.4** (`npm pkg get version`).
 
 ```powershell
 git pull origin main
@@ -97,13 +95,16 @@ npm run ensure:electron
 npm run dev
 ```
 
-(Ou reinstale o NSIS da release mais nova.)
-
-1. **Configurações → Privacidade e segurança → Microfone** → ativar *Acesso ao microfone* e permitir apps de desktop  
-2. **Configurações → Hora e idioma → Fala** (ou *Speech*) → pacote de idioma **português (Brasil)** com reconhecimento de fala  
-3. Se o Windows perguntar na 1ª vez, **Permitir** microfone/fala para o Elio  
-4. Reinicie o Elio e segure o mic de novo  
-5. Se o Speech ainda falhar: o Elio cai no Whisper sozinho nesse PTT (aguarde “Usando Whisper…”) — sem chip vermelho de código cru
+1. **Configurações → Privacidade e segurança → Microfone**  
+   - *Acesso ao microfone* = **Ativado**  
+   - *Permitir que aplicativos de área de trabalho acessem o microfone* = **Ativado**  
+   - Se o Elio (ou Electron) aparecer na lista, deixe **permitido**  
+2. Na **1ª** vez que segurar o mic: o Windows pode perguntar — **Permitir**.  
+   (Se “apps de desktop” já estiver ligado, às vezes **não** há toast; o Elio ainda chama `getUserMedia`.)  
+3. **Configurações → Hora e idioma → Fala** → pacote **português (Brasil)** com reconhecimento de fala  
+4. Esperado: “Ouvindo…” com Windows Speech e auto-envio  
+5. Se negar o mic → chip apontando Privacidade (não Whisper silencioso)  
+6. Se Speech falhar por rede/áudio/sem texto → status “Speech falhou (…) — Whisper” e cai no Whisper nesse PTT  
 
 
 ### Conectar Spotify (Windows)
@@ -188,7 +189,7 @@ Ordem de resolução:
 ### Como testar STT no Windows
 
 1. Confirme idioma de fala pt-BR em **Configurações → Hora e idioma → Fala**  
-2. `npm run dev` → selo **v0.15.3**  
+2. `npm run dev` → selo **v0.15.4**  
 3. Segure o mic na Floating Bar → diga *“Qual é o clima atual do lugar que eu moro?”* → solte  
 4. O texto deve ir **direto** ao chat (sem caixa “Confira o texto”)  
 5. Preferência: “atual” **não** vira “outdoor”  
@@ -214,7 +215,7 @@ Desligado por padrão. Quando ligado, o Elio **fala as respostas** em pt-BR.
 ### Como habilitar TTS no Windows
 
 1. Instale/ative **voz pt-BR** em **Configurações → Hora e idioma → Fala** (e, se existir, *Vozes* / *Voice access*).  
-2. `npm run dev` → selo **v0.15.3**.  
+2. `npm run dev` → selo **v0.15.4**.  
 3. Na Floating Bar: **⋯ → Falar respostas (TTS)**  
    — ou **Command Center → Configurações → Integrações → Ativar TTS**.  
 4. Envie uma mensagem (texto ou voz). A barra mostra **Falando…**; use **■** ou “Parar fala” para interromper.  
