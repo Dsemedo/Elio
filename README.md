@@ -26,10 +26,20 @@ Deve abrir uma janela com a marca **Elio** e um texto de fundação (hello / Spr
 
 ### Se algo falhar no Windows
 
-1. Confirme que o Node é 20+ (`node -v`).
-2. Delete `node_modules` e `package-lock.json`, depois `npm install` de novo.
-3. Se o antivírus bloquear o Electron, permita a pasta do projeto / o executável em `node_modules\electron\dist\`.
-4. Use um terminal **fora** do WSL se quiser a janela nativa do Windows (WSL abre display Linux/X11, se houver).
+**Erro `Electron uninstall`:** o programa Electron não baixou. No PowerShell, na pasta do projeto:
+
+```bat
+npm run ensure:electron
+npm run dev
+```
+
+Se ainda falhar:
+
+1. Confirme que o Node é **22.12+** (`node -v`) — o Electron 45 pede isso.
+2. Feche qualquer janela do Elio / Electron.
+3. Rode de novo: `npm run ensure:electron`
+4. Se o antivírus bloquear, permita a pasta `node_modules\electron\dist\`.
+5. Use um terminal **fora** do WSL para a janela nativa do Windows.
 
 ## Scripts úteis
 
