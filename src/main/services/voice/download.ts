@@ -13,6 +13,7 @@ import { pipeline } from 'node:stream/promises'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { Readable } from 'node:stream'
+import { randomBytes } from 'node:crypto'
 import {
   BINARY_ARCHIVE_MIN_BYTES,
   DOWNLOAD_MAX_ATTEMPTS,
@@ -58,14 +59,66 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
+function isLockError(err: unknown): boolean {
+  const code = err instanceof Error ? (err as NodeJS.ErrnoException).code : undefined
+  return code === 'EPERM' || code === 'EACCES' || code === 'EBUSY'
+}
+
 function safeRm(path: string, recursive = false): void {
   try {
     rmSync(path, { recursive, force: true })
   } catch (err) {
-    // Windows/Defender: não engolir o erro principal por falha de limpeza.
+    // Windows/Defender: EPERM/EBUSY é esperado em .partial/.exe — não poluir o log.
+    if (isLockError(err)) return
     logVoiceError('voice: limpeza temporária falhou (ignorada)', err, {
       where: redactPath(path),
     })
+  }
+}
+
+/** Nome de arquivo único (sem path) — evita reabrir .partial travado pelo Defender. */
+export function buildUniquePartName(
+  prefix: string,
+  attempt: number,
+  pid: number,
+  now: number,
+  id: string,
+): string {
+  return `${prefix}-${pid}-${now}-a${attempt}-${id}.part`
+}
+
+function uniqueDownloadPath(prefix: string, attempt = 1): string {
+  return join(
+    whisperTempDir(),
+    buildUniquePartName(
+      prefix,
+      attempt,
+      process.pid,
+      Date.now(),
+      randomBytes(4).toString('hex'),
+    ),
+  )
+}
+
+/** Remove leftovers de tentativas antigas (best-effort). */
+function sweepStaleDownloadParts(): void {
+  for (const dir of [whisperTempDir(), whisperModelDir()]) {
+    let entries: string[]
+    try {
+      entries = readdirSync(dir)
+    } catch {
+      continue
+    }
+    for (const name of entries) {
+      if (
+        name.endsWith('.part') ||
+        name.endsWith('.partial') ||
+        name === 'whisper-bin.zip' ||
+        name === 'whisper-bin.tar.gz'
+      ) {
+        safeRm(join(dir, name))
+      }
+    }
   }
 }
 
@@ -84,6 +137,12 @@ function assertMinFileSize(path: string, minBytes: number, label: string): void 
   }
 }
 
+function asInstallLockError(_err: unknown, label: string): Error {
+  return new Error(
+    `INSTALL_FAILED: Windows bloqueou a gravação de ${label} (antivírus/arquivo em uso). Feche outras janelas do Elio e tente de novo.`,
+  )
+}
+
 async function downloadToFileOnce(
   url: string,
   destPath: string,
@@ -92,7 +151,6 @@ async function downloadToFileOnce(
   label: string,
 ): Promise<void> {
   mkdirSync(dirname(destPath), { recursive: true })
-  safeRm(destPath)
 
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), DOWNLOAD_TIMEOUT_MS)
@@ -112,7 +170,17 @@ async function downloadToFileOnce(
 
     const total = Number(response.headers.get('content-length') ?? '0')
     let received = 0
-    const file = createWriteStream(destPath)
+
+    let file
+    try {
+      // 'wx' = cria arquivo novo; nunca reabre path travado de tentativa anterior.
+      file = createWriteStream(destPath, { flags: 'wx' })
+    } catch (openErr) {
+      if (isLockError(openErr)) {
+        throw asInstallLockError(openErr, label)
+      }
+      throw openErr
+    }
 
     const nodeStream = Readable.fromWeb(response.body as import('node:stream/web').ReadableStream)
     nodeStream.on('data', (chunk: Buffer) => {
@@ -125,7 +193,14 @@ async function downloadToFileOnce(
       }
     })
 
-    await pipeline(nodeStream, file)
+    try {
+      await pipeline(nodeStream, file)
+    } catch (pipeErr) {
+      if (isLockError(pipeErr)) {
+        throw asInstallLockError(pipeErr, label)
+      }
+      throw pipeErr
+    }
     emit(onProgress, phase, 100, `${label}: concluído`)
   } catch (err) {
     safeRm(destPath)
@@ -135,15 +210,20 @@ async function downloadToFileOnce(
   }
 }
 
-async function downloadToFile(
+/**
+ * Baixa para um path único em tmp a cada tentativa (Windows: evita EPERM em .partial fixo).
+ * Devolve o path do arquivo completo.
+ */
+async function downloadToUniqueTemp(
   url: string,
-  destPath: string,
+  prefix: string,
   onProgress: ProgressEmitter | undefined,
   phase: VoiceProgress['phase'],
   label: string,
-): Promise<void> {
+): Promise<string> {
   let lastErr: unknown
   for (let attempt = 1; attempt <= DOWNLOAD_MAX_ATTEMPTS; attempt++) {
+    const destPath = uniqueDownloadPath(prefix, attempt)
     try {
       if (attempt > 1) {
         emit(
@@ -152,19 +232,25 @@ async function downloadToFile(
           0,
           `${label}: nova tentativa ${attempt}/${DOWNLOAD_MAX_ATTEMPTS}…`,
         )
-        await sleep(DOWNLOAD_RETRY_DELAY_MS * attempt)
+        // EPERM/Defender: espera um pouco mais antes de reabrir disco.
+        const delay =
+          lastErr && isLockError(lastErr)
+            ? DOWNLOAD_RETRY_DELAY_MS * attempt * 2
+            : DOWNLOAD_RETRY_DELAY_MS * attempt
+        await sleep(delay)
       }
       await downloadToFileOnce(url, destPath, onProgress, phase, label)
-      return
+      return destPath
     } catch (err) {
       lastErr = err
+      safeRm(destPath)
       logVoiceError('voice: tentativa de download falhou', err, {
         label,
         attempt,
         maxAttempts: DOWNLOAD_MAX_ATTEMPTS,
+        where: redactPath(destPath),
       })
       const message = err instanceof Error ? err.message : ''
-      // Não insiste em HTTP 404 / plataforma — não vai melhorar.
       if (/HTTP 404|HTTP 403|UNSUPPORTED/i.test(message)) {
         break
       }
@@ -289,6 +375,7 @@ function installBinaryDir(sourceDir: string, destDir: string): void {
 }
 
 function installModelFile(partialPath: string, finalPath: string): void {
+  safeRm(finalPath)
   try {
     renameSync(partialPath, finalPath)
     return
@@ -320,16 +407,20 @@ async function ensureBinary(onProgress?: ProgressEmitter): Promise<void> {
   }
 
   ensureWhisperDirs()
-  const archiveName = process.platform === 'win32' ? 'whisper-bin.zip' : 'whisper-bin.tar.gz'
-  const archivePath = join(whisperTempDir(), archiveName)
-  const extractDir = join(whisperTempDir(), 'extract')
-
-  safeRm(extractDir, true)
+  sweepStaleDownloadParts()
+  const extractDir = join(whisperTempDir(), `extract-${process.pid}-${Date.now()}`)
   mkdirSync(extractDir, { recursive: true })
 
+  let archivePath: string | null = null
   emit(onProgress, 'binary', 0, 'Baixando Whisper (binário)…')
   try {
-    await downloadToFile(url, archivePath, onProgress, 'binary', 'Binário Whisper')
+    archivePath = await downloadToUniqueTemp(
+      url,
+      'whisper-bin',
+      onProgress,
+      'binary',
+      'Binário Whisper',
+    )
     assertMinFileSize(archivePath, BINARY_ARCHIVE_MIN_BYTES, 'binário Whisper')
 
     emit(onProgress, 'extract', 10, 'Extraindo Whisper…')
@@ -359,7 +450,7 @@ async function ensureBinary(onProgress?: ProgressEmitter): Promise<void> {
     throw new Error(`DOWNLOAD_FAILED: não foi possível baixar o Whisper (${message})`)
   } finally {
     // Nunca deixar limpeza mascarar sucesso/erro principal (comum no Windows).
-    safeRm(archivePath)
+    if (archivePath) safeRm(archivePath)
     safeRm(extractDir, true)
   }
 }
@@ -368,18 +459,26 @@ async function ensureModel(onProgress?: ProgressEmitter): Promise<void> {
   if (isModelReady()) return
 
   ensureWhisperDirs()
-  const partial = join(whisperModelDir(), `${MODEL_FILE}.partial`)
-  safeRm(partial)
+  sweepStaleDownloadParts()
 
   const migrating = hasLegacyTinyModel()
   const startMsg = migrating
     ? `Atualizando modelo de voz (tiny → base, ~${MODEL_SIZE_HINT_MB} MB)…`
     : `Baixando modelo de voz (base, ~${MODEL_SIZE_HINT_MB} MB)…`
   emit(onProgress, 'model', 0, startMsg)
+
+  let downloaded: string | null = null
   try {
-    await downloadToFile(MODEL_URL, partial, onProgress, 'model', 'Modelo base')
-    assertMinFileSize(partial, MODEL_MIN_BYTES, 'modelo base')
-    installModelFile(partial, modelPath())
+    downloaded = await downloadToUniqueTemp(
+      MODEL_URL,
+      MODEL_FILE,
+      onProgress,
+      'model',
+      'Modelo base',
+    )
+    assertMinFileSize(downloaded, MODEL_MIN_BYTES, 'modelo base')
+    installModelFile(downloaded, modelPath())
+    downloaded = null
     if (!isModelReady()) {
       throw new Error('MODEL_MISSING: modelo não ficou disponível após o download')
     }
@@ -392,7 +491,7 @@ async function ensureModel(onProgress?: ProgressEmitter): Promise<void> {
         : 'Modelo base pronto',
     )
   } catch (err) {
-    safeRm(partial)
+    if (downloaded) safeRm(downloaded)
     logVoiceError('voice: download modelo falhou', err, {
       where: redactPath(whisperModelDir()),
     })

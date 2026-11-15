@@ -5,6 +5,7 @@ import {
   normalizeVoiceEnsureError,
   serializeVoiceError,
 } from '../src/main/services/voice/errors'
+import { buildUniquePartName } from '../src/main/services/voice/download'
 
 describe('erros de voz', () => {
   it('reconhece prefixos tipados', () => {
@@ -57,5 +58,13 @@ describe('erros de voz', () => {
     ).toMatch(/Sem conexão/i)
     expect(friendlyVoiceError('DOWNLOAD_FAILED: HTTP 503')).toMatch(/ocupado|minuto/i)
     expect(friendlyVoiceError('algo-interno-com-path')).toMatch(/digitar/i)
+  })
+
+  it('gera nome .part único por tentativa (evita EPERM em partial fixo)', () => {
+    const a = buildUniquePartName('ggml-base.bin', 1, 42, 1000, 'abcd')
+    const b = buildUniquePartName('ggml-base.bin', 2, 42, 1001, 'ef01')
+    expect(a).toBe('ggml-base.bin-42-1000-a1-abcd.part')
+    expect(b).toBe('ggml-base.bin-42-1001-a2-ef01.part')
+    expect(a).not.toBe(b)
   })
 })
