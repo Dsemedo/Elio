@@ -1,7 +1,7 @@
 {
   "name": "elio",
   "version": "0.1.0",
-  "description": "Elio \u2014 assistente pessoal de IA (JARVIS MVP)",
+  "description": "Elio — assistente pessoal de IA (JARVIS MVP)",
   "author": "Douglas Semedo Neto",
   "license": "UNLICENSED",
   "private": true,
@@ -25,7 +25,8 @@
   },
   "dependencies": {
     "react": "^19.3.1",
-    "react-dom": "^19.3.1"
+    "react-dom": "^19.3.1",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
