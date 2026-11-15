@@ -1,19 +1,23 @@
-import { app, safeStorage, shell } from 'electron'
+import { app, shell } from 'electron'
 import type { SpotifyIntent } from './intent'
-import { parseSpotifyIntent, describeSpotifyIntent, looksLikeSpotifyCommand } from './intent'
+import {
+  parseSpotifyIntent,
+  describeSpotifyIntent,
+  looksLikeSpotifyCommand,
+} from './intent'
 import {
   handleSpotifyIntent,
   electronSpotifyPaths,
   type SpotifyActionResult,
   type SpotifyRuntime,
 } from './play'
-import {
-  clearSpotifyTokens,
-  loadSpotifyTokens,
-  type SecretCrypto,
-} from './tokens'
+import { clearSpotifyTokens, loadSpotifyTokens } from './tokens'
+import { electronSecretCrypto } from '../secrets/crypto'
 import { isSpotifyClientConfigured } from './config'
 import { validateSpotifyExternalUrl } from './urls'
+
+export { electronSecretCrypto } from '../secrets/crypto'
+export type { SecretCrypto } from '../secrets/crypto'
 
 export {
   parseSpotifyIntent,
@@ -34,62 +38,6 @@ function resolveUserDataPath(): string | null {
     // Fora do processo Electron (unit tests).
   }
   return null
-}
-
-/**
- * Wrapper Electron safeStorage (API async — sync deprecado no 45, removido no 46).
- * Tokens antigos cifrados com encryptString sync ainda descriptografam via decryptStringAsync.
- */
-export function electronSecretCrypto(): SecretCrypto {
-  return {
-    isEncryptionAvailable: async () => {
-      try {
-        const asyncFn = (
-          safeStorage as unknown as {
-            isAsyncEncryptionAvailable?: () => Promise<boolean>
-          }
-        ).isAsyncEncryptionAvailable
-        if (typeof asyncFn === 'function') {
-          return Boolean(await asyncFn.call(safeStorage))
-        }
-        // Fallback só se build antigo sem API async (não deve ocorrer no pin 45.3.x).
-        return Boolean(
-          (
-            safeStorage as unknown as {
-              isEncryptionAvailable?: () => boolean
-            }
-          ).isEncryptionAvailable?.(),
-        )
-      } catch {
-        return false
-      }
-    },
-    encryptString: async (plain) => {
-      const asyncFn = (
-        safeStorage as unknown as {
-          encryptStringAsync?: (s: string) => Promise<Buffer>
-        }
-      ).encryptStringAsync
-      if (typeof asyncFn === 'function') {
-        return asyncFn.call(safeStorage, plain)
-      }
-      return safeStorage.encryptString(plain)
-    },
-    decryptString: async (encrypted) => {
-      const asyncFn = (
-        safeStorage as unknown as {
-          decryptStringAsync?: (
-            buf: Buffer,
-          ) => Promise<{ result: string; shouldReEncrypt?: boolean }>
-        }
-      ).decryptStringAsync
-      if (typeof asyncFn === 'function') {
-        const out = await asyncFn.call(safeStorage, encrypted)
-        return out.result
-      }
-      return safeStorage.decryptString(encrypted)
-    },
-  }
 }
 
 export function createElectronSpotifyRuntime(

@@ -2,6 +2,7 @@ import { app, Menu, ipcMain, session, type Session } from 'electron'
 import { IpcChannels, type AppInfo } from '../shared/ipc'
 import { registerChatIpc } from './ipc/chat'
 import { registerLocationIpc } from './ipc/location'
+import { registerMemoryIpc } from './ipc/memory'
 import { registerSettingsIpc } from './ipc/settings'
 import { registerShellIpc } from './ipc/shell'
 import { registerSpotifyIpc } from './ipc/spotify'
@@ -23,6 +24,7 @@ function registerIpc(): void {
   registerLocationIpc()
   registerSpotifyIpc()
   registerSettingsIpc()
+  registerMemoryIpc()
 }
 
 /**

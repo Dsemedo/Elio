@@ -55,6 +55,42 @@ export type ChatStatus = {
   spotifyConnected: boolean
 }
 
+export type Memory = {
+  id: string
+  content: string
+  tags: string[]
+  createdAt: string
+  updatedAt: string
+}
+
+export type MemoryCreateInput = {
+  content: string
+  tags?: string[]
+}
+
+export type MemoryUpdateInput = {
+  id: string
+  content?: string
+  tags?: string[]
+}
+
+export type UserDataExportPayload = {
+  json: string
+  conversationCount: number
+  memoryCount: number
+}
+
+export type DeleteAllDataResult = {
+  ok: true
+  removed: {
+    conversations: boolean
+    memories: number
+    location: boolean
+    openRouterKey: boolean
+    spotifyTokens: boolean
+  }
+}
+
 export type ChatRenameInput = {
   conversationId: string
   title: string

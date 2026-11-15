@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Home, MessageSquare, Settings } from 'lucide-react'
+import { Brain, Home, MessageSquare, Settings } from 'lucide-react'
 import type { ChatStatus, Conversation, ConversationSummary } from '@shared/ipc'
 import { ChatView } from './ChatView'
 import { ComputerView } from './ComputerView'
 import { HistoryView } from './HistoryView'
 import { HomeView } from './HomeView'
+import { DataSettingsView } from './DataSettingsView'
 import { IntegrationsView } from './IntegrationsView'
+import { MemoryView } from './MemoryView'
 import { StubSection } from './StubSection'
 
 export type PanelSection =
@@ -24,18 +26,19 @@ const PRIMARY_NAV: {
 }[] = [
   { id: 'inicio', label: 'Início', icon: Home },
   { id: 'conversas', label: 'Conversas', icon: MessageSquare },
+  { id: 'memoria', label: 'Memória', icon: Brain },
   { id: 'configuracoes', label: 'Configurações', icon: Settings },
 ]
 
 const SOON_NAV: { id: PanelSection; label: string }[] = [
   { id: 'atividades', label: 'Atividades' },
   { id: 'agentes', label: 'Agentes' },
-  { id: 'memoria', label: 'Memória' },
 ]
 
 export function PanelShell(): React.JSX.Element {
   const [section, setSection] = useState<PanelSection>('inicio')
   const [convTab, setConvTab] = useState<'chat' | 'historico'>('chat')
+  const [configTab, setConfigTab] = useState<'integracoes' | 'computador' | 'dados'>('integracoes')
   const [status, setStatus] = useState<ChatStatus | null>(null)
   const [summaries, setSummaries] = useState<ConversationSummary[]>([])
   const [active, setActive] = useState<Conversation | null>(null)
@@ -332,17 +335,63 @@ export function PanelShell(): React.JSX.Element {
           <StubSection title="Agentes" lede="Workspace de agentes — em breve." />
         ) : null}
 
-        {section === 'memoria' ? (
-          <StubSection
-            title="Memória"
-            lede="Memória explícita — em breve. O histórico já fica em Conversas."
-          />
-        ) : null}
+        {section === 'memoria' ? <MemoryView /> : null}
 
         {section === 'configuracoes' ? (
           <div className="config-stack">
-            <IntegrationsView status={status} onStatusRefresh={refreshStatus} />
-            <ComputerView />
+            <div className="conv-tabs config-tabs" role="tablist">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={configTab === 'integracoes'}
+                className={
+                  configTab === 'integracoes' ? 'conv-tab active' : 'conv-tab'
+                }
+                onClick={() => setConfigTab('integracoes')}
+              >
+                Integrações
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={configTab === 'computador'}
+                className={
+                  configTab === 'computador' ? 'conv-tab active' : 'conv-tab'
+                }
+                onClick={() => setConfigTab('computador')}
+              >
+                Computador
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={configTab === 'dados'}
+                className={configTab === 'dados' ? 'conv-tab active' : 'conv-tab'}
+                onClick={() => setConfigTab('dados')}
+              >
+                Dados
+              </button>
+            </div>
+            {configTab === 'integracoes' ? (
+              <IntegrationsView status={status} onStatusRefresh={refreshStatus} />
+            ) : null}
+            {configTab === 'computador' ? <ComputerView /> : null}
+            {configTab === 'dados' ? (
+              <DataSettingsView
+                onAfterDeleteAll={async () => {
+                  await refreshStatus()
+                  const list = await window.elio.listConversations()
+                  setSummaries(list)
+                  if (list[0]) {
+                    setActive(await window.elio.getConversation(list[0].id))
+                  } else {
+                    const created = await window.elio.createConversation()
+                    setActive(created)
+                    setSummaries(await window.elio.listConversations())
+                  }
+                }}
+              />
+            ) : null}
           </div>
         ) : null}
       </div>

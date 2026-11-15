@@ -12,11 +12,16 @@ import type {
   ChatUpdatedEvent,
   Conversation,
   ConversationSummary,
+  DeleteAllDataResult,
+  Memory,
+  MemoryCreateInput,
+  MemoryUpdateInput,
   ProviderKind,
   RouteTier,
   SettingsOpenRouterKeyInput,
   SettingsPublic,
   SettingsUpdateInput,
+  UserDataExportPayload,
   ShellState,
   SystemSnapshot,
   AppLocation,
@@ -41,12 +46,17 @@ export type {
   ChatUpdatedEvent,
   Conversation,
   ConversationSummary,
+  DeleteAllDataResult,
+  Memory,
+  MemoryCreateInput,
+  MemoryUpdateInput,
   ProviderKind,
   RouteTier,
   BudgetSnapshot,
   SettingsOpenRouterKeyInput,
   SettingsPublic,
   SettingsUpdateInput,
+  UserDataExportPayload,
   ShellState,
   SystemSnapshot,
   AppLocation,
@@ -253,4 +263,45 @@ export const SystemSnapshotSchema = z.object({
   cpuCount: z.number().int().positive(),
   cpuLoadPercent: z.number().min(0).max(100).nullable(),
   note: z.string(),
+})
+
+
+export const MemorySchema = z.object({
+  id: z.string().min(1),
+  content: z.string().trim().min(1).max(500),
+  tags: z.array(z.string().trim().min(1).max(32)).max(8),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+})
+
+export const MemoryCreateInputSchema = z.object({
+  content: z.string().trim().min(1).max(500),
+  tags: z.array(z.string().trim().min(1).max(32)).max(8).optional(),
+})
+
+export const MemoryUpdateInputSchema = z.object({
+  id: z.string().min(1),
+  content: z.string().trim().min(1).max(500).optional(),
+  tags: z.array(z.string().trim().min(1).max(32)).max(8).optional(),
+})
+
+export const MemoryIdSchema = z.object({
+  id: z.string().min(1),
+})
+
+export const UserDataExportPayloadSchema = z.object({
+  json: z.string().min(2),
+  conversationCount: z.number().int().nonnegative(),
+  memoryCount: z.number().int().nonnegative(),
+})
+
+export const DeleteAllDataResultSchema = z.object({
+  ok: z.literal(true),
+  removed: z.object({
+    conversations: z.boolean(),
+    memories: z.number().int().nonnegative(),
+    location: z.boolean(),
+    openRouterKey: z.boolean(),
+    spotifyTokens: z.boolean(),
+  }),
 })

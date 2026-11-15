@@ -1,7 +1,7 @@
 # Elio
 
 Assistente pessoal de IA para desktop (**JARVIS MVP**).  
-**v0.14.0** — Cascata de IAs BYOK → cota grátis → Ollama (PJ-34). 0.13.0 = Command Center UX + settings IA; 0.12.1 = Speech permission; 0.12.0 = NSIS.
+**v0.14.1** — Memória persistente + export/delete-all; cascata BYOK (0.14.0); Command Center UX (0.13.0).
 
 Spec UI: [`docs/elio-design-system.md`](./docs/elio-design-system.md) · ADRs: [`docs/ADRs/`](./docs/ADRs/) · Distribuição: [`docs/windows-distribution.md`](./docs/windows-distribution.md)
 
@@ -40,9 +40,12 @@ npm run ensure:electron
 npm run dev
 ```
 
-### O que Douglas deve ver (0.14.0)
+### O que Douglas deve ver (0.14.1)
 
-1. Selo **v0.14.0**  
+1. Selo **v0.14.1**  
+2. **Memória** no Command Center: salvar / editar / excluir (entram no system prompt)  
+3. Configurações com abas Integrações | Computador | **Dados** (export JSON / apagar tudo; OpenRouter na Integrações — sem UI duplicada)  
+4. Cascata BYOK → cota `:free` → Ollama (status no chat)  
 2. Status do chat / bolha: quem respondeu (`OpenRouter (BYOK|cota grátis)` ou `Ollama (local)`)  
 3. Cascata: modelo pago OpenRouter = BYOK → `:free` = cota → Ollama  
 4. Command Center (0.13.0): threads ao lado, histórico com busca/renomear, Início Continuar/Nova  
@@ -170,12 +173,18 @@ Ordem de resolução:
 ### Como testar STT no Windows
 
 1. Confirme idioma de fala pt-BR em **Configurações → Hora e idioma → Fala**  
-2. `npm run dev` → selo **v0.14.0**  
+2. `npm run dev` → selo **v0.14.1**  
 3. Segure o mic na Floating Bar → diga *“Qual é o clima atual do lugar que eu moro?”* → solte  
 4. O texto deve ir **direto** ao chat (sem caixa “Confira o texto”)  
 5. Preferência: “atual” **não** vira “outdoor”  
 6. (Opcional) forçar Whisper: `$env:ELIO_STT_PROVIDER = "whisper"` e repetir  
 7. (Opcional) “Preparar fallback” no Command Center baixa o Whisper sem falar
+
+## Memória e dados
+
+- Memórias explícitas: `%APPDATA%\\elio\\elio-memories.json`  
+- Chave OpenRouter: cofre `safeStorage` (`secrets/openrouter-key.bin`) via **Configurações → Integrações** (cascata BYOK/free)  
+- Export / apagar tudo: **Configurações → Dados** (sem keys/tokens no export)  
 
 ## Segurança
 
@@ -183,7 +192,7 @@ Ordem de resolução:
 STT: Windows Speech no renderer; Whisper subprocess só no main (`shell: false`).  
 Clima: Open-Meteo + cache local; coords não vão ao histórico/LLM.  
 Spotify / OpenRouter: PKCE + `safeStorage`; opens só `spotify:` / `https://open.spotify.com`.  
-Ver `docs/ADRs/0002-whisper-subprocess.md`, `0006-auto-location-weather.md`, `0007-spotify-voice-pkce.md`, `0008-windows-speech-primary-stt.md`, `0009-windows-distribution.md` e `0010-command-center-ux-settings.md`.
+Ver `docs/ADRs/0002-whisper-subprocess.md`, `0006-auto-location-weather.md`, `0007-spotify-voice-pkce.md`, `0008-windows-speech-primary-stt.md`, `0009-windows-distribution.md` e `0010-command-center-ux-settings.md`, `0011-ai-cascade-byok.md`, `0012-persistent-memory-settings.md`.
 
 ## Licença
 
