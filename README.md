@@ -1,14 +1,14 @@
 # Elio
 
 Assistente pessoal de IA para desktop (**JARVIS MVP**).  
-**v0.11.0** — Windows Speech STT primário (pt-BR) + Whisper fallback; auto-envio após fala; Spotify PKCE (0.10.0).
+**v0.12.0** — instalador NSIS + auto-update (GitHub Releases); Windows Speech STT + Whisper fallback; Spotify PKCE.
 
-Spec UI: [`docs/elio-design-system.md`](./docs/elio-design-system.md) · ADRs: [`docs/ADRs/`](./docs/ADRs/)
+Spec UI: [`docs/elio-design-system.md`](./docs/elio-design-system.md) · ADRs: [`docs/ADRs/`](./docs/ADRs/) · Distribuição: [`docs/windows-distribution.md`](./docs/windows-distribution.md)
 
 ## Requisitos
 
 - **Windows 10/11 (x64)**  
-- **Node.js 22.12+**  
+- **Node.js 22.12+** (só para desenvolvimento)  
 - Microfone (voz)  
 - Pacote de idioma de fala **pt-BR** do Windows (reconhecimento nativo)  
 - Internet: só se o fallback Whisper for usado na 1ª vez (~**466 MB**) e para clima  
@@ -16,7 +16,16 @@ Spec UI: [`docs/elio-design-system.md`](./docs/elio-design-system.md) · ADRs: [
 - (Opcional) [Ollama](https://ollama.com) com um modelo (ex.: `llama3.2`)  
 - (Opcional) Spotify Premium + Client ID para play remoto por API
 
-## Como rodar (Windows)
+## Instalar (usuário — sem Node)
+
+1. Baixe `Elio-*-Setup.exe` em [Releases](https://github.com/Dsemedo/Elio/releases).  
+2. Se o SmartScreen avisar: **Mais informações** → **Executar assim mesmo** (builds ainda unsigned).  
+3. Conclua o assistente NSIS (atalhos desktop/menu).  
+4. Atualizações chegam sozinhas; feche e abra o Elio quando avisar.
+
+Publicar / assinar / `npm run dist:win`: veja [`docs/windows-distribution.md`](./docs/windows-distribution.md).
+
+## Como rodar (Windows, desenvolvimento)
 
 Pasta: `C:\Users\Douglas\Elio`
 
@@ -30,15 +39,15 @@ npm run ensure:electron
 npm run dev
 ```
 
-### O que Douglas deve ver (0.11.0)
+### O que Douglas deve ver (0.12.0)
 
-1. Selo **v0.11.0**  
-2. Floating Bar: segurar mic → falar PT-BR → **envia sozinho** (sem tela de conferir/editar)  
-3. STT usa **Windows Speech** (sem baixar Whisper na 1ª vez)  
-4. Se o Windows Speech falhar: cai no **Whisper** (pode baixar ~466 MB na 1ª vez do fallback)  
-5. **“toca uma música no Spotify”** → abre o Spotify; se conectado + Premium → play remoto  
-6. **“como está o tempo?”** → localização → clima da **sua cidade**  
-7. Sem warning de `safeStorage.isEncryptionAvailable` no console (API async)
+1. Selo **v0.12.0**  
+2. `npm run dist:win` gera `dist\Elio-0.12.0-Setup.exe`; instalar e abrir pelo atalho  
+3. Floating Bar: segurar mic → falar PT-BR → **envia sozinho** (sem tela de conferir/editar)  
+4. STT usa **Windows Speech** (sem baixar Whisper na 1ª vez)  
+5. Se o Windows Speech falhar: cai no **Whisper** (pode baixar ~466 MB na 1ª vez do fallback)  
+6. **“toca uma música no Spotify”** → abre o Spotify; se conectado + Premium → play remoto  
+7. **“como está o tempo?”** → localização → clima da **sua cidade**
 
 ### Conectar Spotify (Windows)
 
@@ -114,7 +123,7 @@ Ordem de resolução:
 ### Como testar STT no Windows
 
 1. Confirme idioma de fala pt-BR em **Configurações → Hora e idioma → Fala**  
-2. `npm run dev` → selo **v0.11.0**  
+2. `npm run dev` → selo **v0.12.0**  
 3. Segure o mic na Floating Bar → diga *“Qual é o clima atual do lugar que eu moro?”* → solte  
 4. O texto deve ir **direto** ao chat (sem caixa “Confira o texto”)  
 5. Preferência: “atual” **não** vira “outdoor”  

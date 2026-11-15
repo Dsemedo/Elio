@@ -1,12 +1,16 @@
 {
   "name": "elio",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "description": "Elio — assistente pessoal de IA (JARVIS MVP)",
   "author": "Douglas Semedo Neto",
   "license": "UNLICENSED",
   "private": true,
   "type": "module",
   "main": "./out/main/index.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Dsemedo/Elio.git"
+  },
   "scripts": {
     "postinstall": "node ./scripts/ensure-electron.mjs",
     "ensure:electron": "node ./scripts/ensure-electron.mjs",
@@ -19,11 +23,14 @@
     "format:check": "prettier --check .",
     "test": "vitest run",
     "test:watch": "vitest",
+    "check:builder": "node ./scripts/check-builder-config.mjs",
     "pack": "npm run build && electron-builder --dir",
-    "dist": "npm run build && electron-builder",
-    "dist:win": "npm run build && electron-builder --win nsis"
+    "dist": "npm run build && electron-builder --publish never",
+    "dist:win": "npm run build && electron-builder --win nsis --publish never",
+    "release:win": "npm run build && electron-builder --win nsis --publish always"
   },
   "dependencies": {
+    "electron-updater": "^6.8.11",
     "lucide-react": "^1.73.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
