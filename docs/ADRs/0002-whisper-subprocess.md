@@ -14,7 +14,8 @@ OD-02 aprovou Whisper.cpp via **subprocess** do binário oficial `whisper-cli`, 
 |------|--------|
 | Integração | `child_process.spawn` no **main** (`shell: false`, argv em array) |
 | Binário pin | whisper.cpp **v1.9.2** — `whisper-bin-x64.zip` (Windows) / `whisper-bin-ubuntu-x64.tar.gz` (Linux) |
-| Modelo default | `ggml-base.bin` (multilíngue; `-l pt`) |
+| Extract Windows | `tar.exe -xf` (bsdtar Win10+) no `.zip`; fallback `Expand-Archive`; limpeza temp best-effort (não mascara erro) |
+| Modelo default | `ggml-base.bin` via HF `resolve/main/...?download=true` (multilíngue; `-l pt`) |
 | Legado | `ggml-tiny.bin` não é mais usado; usuário pode apagar em `%APPDATA%\elio\whisper\models\` |
 | Onde fica | `%APPDATA%\elio\whisper\` (userData) — binário + modelo + WAV temp |
 | Empacote | **não** embute o modelo no instalador; download sob demanda |

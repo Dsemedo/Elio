@@ -76,5 +76,7 @@ describe('WAV PCM para Whisper', () => {
     expect(src).toContain("MODEL_ID = 'base'")
     expect(src).toContain("MODEL_FILE = 'ggml-base.bin'")
     expect(src).toContain("LEGACY_MODEL_FILE = 'ggml-tiny.bin'")
+    expect(src).toContain('ggml-base.bin?download=true')
+    expect(src).toContain('DOWNLOAD_MAX_ATTEMPTS = 3')
   })
 })
