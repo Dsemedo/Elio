@@ -63,6 +63,7 @@ Objetivo: fechar a cena canônica em ~30 s.
 | B1 | Cumprimento → pergunta → resposta → ação | “Bom dia” abre diálogo curto sem perder o fio |
 | B2 | Personalidade curta e estável | Tom consistente em pt-BR; prompts versionados |
 | B3 | Contexto da conversa atual | Histórico da sessão suficiente; sem reinventar memória complexa |
+| B4 | Gancho de briefing (inspiração OpenJarvis) | “Bom dia” pode **anunciar** o que vem (clima/hora já); digest rico de e-mail/calendário espera Fase F |
 
 **Saída da Fase B:** a demo parece um companheiro, não um router mudo com TTS.
 
@@ -181,3 +182,4 @@ Não há analytics de produto ainda. Usar:
 | 2026-11-16 | Público-alvo, fases A–D, estacionados e DoD (`roadmap.md`); design system subordinado ao norte |
 | 2026-11-16 | Horizonte multi-IA (Claude/ChatGPT/Gemini/Cursor) + cascata de cotas grátis = **Fase E** |
 | 2026-11-16 | Ações no PC + conectores (Outlook/Teams) = [`conectores.md`](./conectores.md) + **Fase F** |
+| 2026-11-16 | Análise OpenJarvis / Jev / zouhir → [`analise-jarvis.md`](./analise-jarvis.md); digest “Bom dia” na inspiração B+F |

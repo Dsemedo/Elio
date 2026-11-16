@@ -226,6 +226,7 @@ Isto **não** substitui a Fase A (loop demo). Sem voz+ação básica, conector d
 | **[`produto.md`](./produto.md)** (este) | O quê, para quem, o que não é, princípios |
 | **[`roadmap.md`](./roadmap.md)** | Ordem, fases, DoD, o que está estacionado |
 | **[`conectores.md`](./conectores.md)** | Como agir no PC e em apps (Outlook, Teams, …) |
+| **[`analise-jarvis.md`](./analise-jarvis.md)** | O que aprender de OpenJarvis / Jev (e o que ignorar) |
 | **[`ADRs/`](./ADRs/)** | Como implementar decisões técnicas |
 | **[`elio-design-system.md`](./elio-design-system.md)** | UI visual — **subordinado** ao norte de produto |
 | **[`windows-distribution.md`](./windows-distribution.md)** | Instalador / update / assinatura |
