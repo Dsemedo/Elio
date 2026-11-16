@@ -20,7 +20,7 @@ Este documento responde **quando** e **em que ordem**. Não redefine o norte —
 | Abrir app / site / pasta | Base pronta | Um alvo por frase; Edge = browser genérico |
 | Comandos compostos (Edge + Instagram) | **Falta** | Centro da demo |
 | Spotify PKCE + resume/recent | Parcial | **Falta** tocar faixa **pelo nome** |
-| Cascata IA (OpenRouter / Ollama) | Base pronta | BYOK |
+| Cascata IA (OpenRouter / Ollama) | Base pronta | Hub único; **multi-IA nativa = Fase E** |
 | Digitar / teclas / Ctrl allowlist | Já shipped | Útil, mas **não** é Fatia 1 |
 | Memória explícita CRUD | Já shipped | Suficiente; “avançada” estacionada |
 | Pesquisa web leve | Já shipped | Secundário ao loop |
@@ -83,22 +83,40 @@ Itens já shipped ou úteis, mas **nunca** no lugar da Fase A:
 - Memória explícita (UX, não “memória avançada”)
 - Distribuição NSIS / auto-update / (depois) assinatura
 - Clima / hora / pesquisa web — manter honestos
-- Cascata IA — estabilidade e erros falados
+- Cascata IA atual (OpenRouter) — estabilidade e erros falados (preparação leve para E, sem multi-provedor ainda)
+
+### Fase E — Roteador multi-IA · **depois de A–B (no mínimo)**
+
+Visão de produto: [`produto.md` → Horizonte multi-IA](./produto.md#horizonte--roteador-multi-ia-não-é-fase-a).  
+Hoje só existe o hub OpenRouter + Ollama ([ADR 0011](./ADRs/0011-ai-cascade-byok.md)). Esta fase **expande** para IAs conectadas de verdade.
+
+| # | Entrega | DoD |
+|---|---------|-----|
+| E1 | Conectar provedores (API oficial / BYOK) | Claude, ChatGPT (OpenAI), Gemini no cofre; UI Integrações deixa de ser stub mentiroso |
+| E2 | Cascata de cotas | Pago → grátis do mesmo → próxima IA (pago/grátis) → Ollama → erro falado |
+| E3 | Roteamento por pedido | “Faz um site / explica este código” usa IA conectada; label **quem** atendeu |
+| E4 | Budget enforce real | Contadores persistidos; estouro detectado (402/429); sem chute |
+| E5 | Cursor (quando houver caminho) | Abrir/rotear para Cursor **só** com integração oficial ou fluxo documentado — sem gambiarra de UI |
+
+**Saída da Fase E:** usuário com várias contas (sem assinatura) esgota grátis da IA A e o Elio **sozinho** passa a usar grátis da IA B; com assinatura, preferência paga é óbvia.
+
+**Não fazer na Fase E:** scraping de chat web, login automático em sites, gastar cota sem label, Slack/Jira.
 
 ### Estacionado (não fazer agora)
 
-Explicitamente **fora** até o loop A–B estar bom:
+Explicitamente **fora** até o loop A–B estar bom (e, para multi-IA, até a Fase E ser aberta):
 
 | Item | Motivo |
 |------|--------|
 | Agentes / Atividades / Workspace | Puxam para “plataforma”; conflitam com o norte |
-| Slack, Jira, ChatGPT/Gemini “direto” na UI | Integração SaaS sem servir a demo |
+| Slack / Jira | SaaS lateral; não é roteador de LLM |
+| Multi-IA nativa (Claude / ChatGPT / Gemini / Cursor) | **Compromisso de horizonte = Fase E** — stubs UI ok, **zero PRs** antes de A–B |
 | Extensão de aba do browser | Lane C honesta; custo alto vs valor no loop |
 | RPA genérico / UI automation ampla | Allowlist > poder total |
 | Tema claro / i18n / Mac como produto | Fora do ICP atual |
-| Budget IA enforce / SQLite | Adiados técnicos; não são produto |
+| SQLite | Adiado técnico |
 
-Stubs na UI podem permanecer como “em breve” — **sem** PR de implementação até saírem desta lista por decisão explícita neste roadmap.
+Stubs na UI podem permanecer como “em breve” — **sem** PR de implementação até saírem desta lista por decisão explícita neste roadmap (abrir Fase E = decisão explícita).
 
 ---
 
@@ -117,10 +135,10 @@ Automação de teclado, extensão, agentes, etc.: **fila atrás**.
 
 Checklist obrigatório no corpo do PR (mesmo informal):
 
-1. Qual fase (A/B/C/D) isto melhora?  
+1. Qual fase (A/B/C/D/**E**) isto melhora?  
 2. Melhora a **demo canônica**? Como?  
 3. Introduz risco de segurança (escopo de ação, secrets, rede)?  
-4. Se for “D” ou estacionado: por que agora?
+4. Se for “D”, “E” ou estacionado: por que agora (e Fase A já está verde)?
 
 Se a resposta a (1) for “nenhuma” e a (2) for “não”, o PR espera.
 
@@ -142,3 +160,4 @@ Não há analytics de produto ainda. Usar:
 |------|---------|
 | 2026-11-15 | Norte redefinido como companheiro de voz (`produto.md`) |
 | 2026-11-16 | Público-alvo, fases A–D, estacionados e DoD (`roadmap.md`); design system subordinado ao norte |
+| 2026-11-16 | Horizonte multi-IA (Claude/ChatGPT/Gemini/Cursor) + cascata de cotas grátis = **Fase E** |

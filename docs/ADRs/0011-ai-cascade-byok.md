@@ -20,16 +20,19 @@ O roteador antigo priorizava Ollama e só caía no OpenRouter se o local estives
 4. **Budget stub:** contadores em memória (`byok` / `free` / `local`). Limites opcionais via `ELIO_AI_BUDGET_*_DAILY`. Enforcement só com `ELIO_AI_BUDGET_ENFORCE=true` (desligado no MVP).
 5. **Segredos:** chave só no env do processo main; nunca logar Authorization/body. Least privilege: só o scope de chat completions do OpenRouter.
 
-## Caminho futuro (BYOK nativo)
+## Caminho futuro (BYOK nativo → multi-IA)
+
+Alinhado ao horizonte de produto (**Fase E** em `docs/roadmap.md` / `docs/produto.md`): o Elio vira **roteador** entre IAs conectadas, com cascata **pago → grátis → próxima IA → Ollama**.
 
 | Etapa | O quê | Quando |
 |-------|--------|--------|
-| A (agora) | OpenRouter como hub BYOK + free | MVP |
-| B | Campo de chave OpenRouter na UI + `safeStorage` (fatia settings / PJ-35) | próximo |
-| C | Provedores diretos (OpenAI / Google) com chave no cofre — **sem** OAuth de conta ChatGPT/Gemini Plus | sob demanda |
-| D | OAuth ChatGPT/Gemini | **fora** até decisão explícita (complexidade + ToS) |
+| A (agora) | OpenRouter como hub BYOK + free | Feito (MVP) |
+| B | Campo de chave OpenRouter na UI + `safeStorage` | Feito (settings) |
+| C | Provedores diretos oficiais (Anthropic / OpenAI / Google) no cofre; cascata entre cotas | **Fase E** do roadmap |
+| D | Cursor só com caminho oficial documentado | **Fase E** (E5) |
+| E | OAuth de conta consumer (ChatGPT/Gemini “Plus”) | **fora** até ToS + decisão explícita — preferir API keys |
 
-Não inventar OAuth de assinatura ChatGPT/Gemini neste estágio: modelos equivalentes via OpenRouter bastam para validar a cascata.
+Não scrapear chat web nem inventar login fantasma: só APIs oficiais. OpenRouter continua válido como hub enquanto multi-provedor nativo não existir.
 
 ## Alternativas rejeitadas
 

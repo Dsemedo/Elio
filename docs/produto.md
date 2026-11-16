@@ -1,7 +1,7 @@
 # Elio — documento de produto
 
 **Status:** vigente  
-**Atualizado:** 2026-11-16  
+**Atualizado:** 2026-11-16 (roteador multi-IA no horizonte)  
 **Versão do produto referenciada:** v0.17.x  
 **Público:** quem for construir, priorizar, desenhar ou falar sobre o Elio
 
@@ -66,7 +66,7 @@ Pessoas que se parecerem com Douglas e possam instalar um `.exe` Windows:
 - Usam **Windows** como máquina principal
 - Querem **voz → ação** (Spotify, browser, apps), não um segundo ChatGPT na barra
 - Aceitam **limites explícitos** (allowlist, confirmação) em troca de previsibilidade e privacidade
-- Preferem **local quando possível** (Whisper, Ollama) e BYOK quando precisam de nuvem
+- Preferem **local quando possível** (Whisper, Ollama) e, no horizonte, **várias IAs conectadas** com cascata de cotas (Fase E)
 
 ### Não é público (agora)
 
@@ -131,7 +131,53 @@ Pessoas que se parecerem com Douglas e possam instalar um `.exe` Windows:
 4. **Allowlist > poder total.** Menos ações confiáveis > RPA genérico frágil.  
 5. **PT-BR real.** STT/TTS e intents para português do dia a dia.  
 6. **Um norte.** Este doc descreve *para quê* e *para quem*; ADRs descrevem *como*; [`roadmap.md`](./roadmap.md) descreve *quando*. Em dúvida de prioridade, **este doc vence**.  
-7. **Dogfood > feature.** Se Douglas não sente valor no dia a dia, não shipamos “plataforma”.
+7. **Dogfood > feature.** Se Douglas não sente valor no dia a dia, não shipamos “plataforma”.  
+8. **IA conectada, não IA escondida.** Quando o Elio usar Claude, ChatGPT, Gemini, Cursor etc., o usuário **vê qual** atendeu — e a cascata de cotas é previsível (abaixo).
+
+---
+
+## Horizonte — roteador multi-IA (não é Fase A)
+
+Isto **não** compete com o loop demo agora. É o futuro desejado depois que o companheiro de voz estiver sólido. Detalhe de ordem: **Fase E** em [`roadmap.md`](./roadmap.md). Base técnica atual: cascata OpenRouter → free → Ollama ([ADR 0011](./ADRs/0011-ai-cascade-byok.md)).
+
+### Experiência desejada
+
+1. A pessoa **conecta** no Elio as IAs que usa (ex.: Claude, ChatGPT, Gemini, Cursor — quando houver caminho oficial).  
+2. Pede algo ao Elio em voz ou texto: código, “faz um site com IA”, dúvida, etc.  
+3. O Elio **direciona** o pedido para uma IA conectada adequada (não obriga a pessoa a abrir outro app e copiar o prompt).  
+4. Se ela tem **assinatura / cota paga** naquela IA → usa essa cota.  
+5. Se **não** tem assinatura, mas tem conta / chave com **tokens grátis** → o Elio gasta essa cota grátis até esgotar.  
+6. Quando a cota grátis **estoura**, o Elio **passa automaticamente** para a próxima IA conectada que ainda tenha cota grátis (ou paga, se existir).  
+7. Se nenhuma IA restar → fallback local (Ollama) ou resposta falada honesta: “suas cotas acabaram”.
+
+### Política de cascata (produto)
+
+```text
+assinatura/pago da IA preferida
+  → cota grátis da mesma IA
+    → próxima IA conectada (pago, senão grátis)
+      → … até esgotar a fila
+        → Ollama local (se ligado)
+          → erro falado (sem inventar resposta)
+```
+
+Preferência de provedor pode seguir: pedido explícito do usuário (“usa o Claude”) → tipo de tarefa (código vs prosa) → ordem configurada nas Integrações.
+
+### O que isso **não** é
+
+| Não é | Por quê |
+|-------|---------|
+| O Elio “ser” o ChatGPT | Ele **roteia** e fala/age; a IA conectada gera quando precisar de LLM |
+| Scraping / login fantasma em sites de chat | Só **APIs oficiais** ou fluxos que a plataforma permitir (ToS + segurança) |
+| Gastar tokens **sem** o usuário saber | Sempre mostrar/servir label: quem atendeu (ex.: “Claude · cota grátis”) |
+| Substituir a Fase A | Sem loop voz+ação, multi-IA é chat genérico com cascata |
+
+### Segurança (obrigatório neste horizonte)
+
+- Chaves e tokens só no **cofre** do SO (`safeStorage`); nunca no renderer, logs ou export sem redaction.  
+- Cascata só entre provedores que o usuário **conectou** de propósito.  
+- Sem compartilhar a mesma chave entre processos não confiáveis.  
+- Respeitar ToS e limites de cada provedor; esgotamento = 402/429 (ou sinal oficial), não chute.
 
 ---
 
