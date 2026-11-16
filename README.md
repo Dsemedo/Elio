@@ -25,7 +25,7 @@ Hoje o microfone ainda é **segurar para falar** (PTT). Wake word (“Ei, Elio�
 | Já tem base | Próximo foco (nesta ordem) |
 |-------------|----------------------------|
 | Floating Bar + Command Center | **Loop demo:** TTS nas respostas de voz + confirmação falada + ação |
-| Windows Speech (STT) + TTS | Spotify por **nome da faixa** |
+| Whisper STT + TTS | Spotify por **nome da faixa** |
 | Abrir app / site / pasta | Comandos compostos (ex.: Edge + Instagram) |
 | Spotify (PKCE / play parcial) | Conversa multi-turno |
 | Cascata de IA (OpenRouter / Ollama) | Só então: wake word opcional |
@@ -63,8 +63,8 @@ npm run dev
 3. No Elio: ligue **Falar respostas** (menu da barra / Integrações) para ouvir o Elio.  
 4. Segure o mic → fale → solte.
 
-STT primário: Windows Speech. Whisper só como fallback em falha dura.  
-Override: `$env:ELIO_STT_PROVIDER = "windows-speech"` ou `"whisper"`.
+STT primário: Whisper local (mesmo caminho no Windows e no Mac).  
+Override opcional: `$env:ELIO_STT_PROVIDER = "whisper"` \| `"windows-speech"` \| `"auto"`.
 
 ### Integrações opcionais
 
