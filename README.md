@@ -27,8 +27,9 @@ Hoje o microfone ainda é **segurar para falar** (PTT). Wake word (“Ei, Elio�
 | Floating Bar + Command Center | **Loop demo:** TTS nas respostas de voz + confirmação falada + ação |
 | Whisper STT + TTS | Spotify por **nome da faixa** |
 | Abrir app / site / pasta | Comandos compostos (ex.: Edge + Instagram) |
-| Spotify (PKCE / play parcial) | Conversa multi-turno |
-| Cascata de IA (OpenRouter / Ollama) | Só então: wake word opcional |
+| Digitar + teclas/atalhos allowlist | Conversa multi-turno |
+| Spotify (PKCE / play parcial) | Só então: wake word opcional |
+| Cascata de IA (OpenRouter / Ollama) | (depois das fatias acima) |
 
 Detalhe técnico e decisões: [`docs/ADRs/`](./docs/ADRs/) · UI: [`docs/elio-design-system.md`](./docs/elio-design-system.md)
 
