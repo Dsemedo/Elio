@@ -1,6 +1,9 @@
 /**
  * Web Speech API (SpeechRecognition / webkitSpeechRecognition) com semântica PTT.
  * No Electron/Chromium no Windows isso usa o Windows Speech Runtime (pt-BR).
+ *
+ * Importante: durante o hold, `no-speech` / `onend` NÃO podem encerrar a sessão
+ * cedo — senão o usuário fala e, ao soltar, recebe texto vazio.
  */
 
 export type WindowsSpeechSession = {
@@ -77,6 +80,8 @@ export async function startWindowsSpeech(opts?: {
   let interimText = ''
   let settled = false
   let started = false
+  /** true depois que o usuário pediu stop/cancel — não reiniciar. */
+  let stopping = false
   let rejectStart: ((err: Error) => void) | null = null
   let resolveStop: ((text: string) => void) | null = null
   let rejectStop: ((err: Error) => void) | null = null
@@ -95,6 +100,15 @@ export async function startWindowsSpeech(opts?: {
     rejectStop?.(err)
     resolveStop = null
     rejectStop = null
+  }
+
+  const tryRestart = (): void => {
+    if (settled || stopping) return
+    try {
+      recognition.start()
+    } catch {
+      /* InvalidStateError se já estiver rodando — ok */
+    }
   }
 
   recognition.onresult = (event) => {
@@ -123,8 +137,12 @@ export async function startWindowsSpeech(opts?: {
       rejectStart?.(err)
       return
     }
-    // no-speech / aborted: devolve o que tiver ao parar.
-    if (code === 'no-speech' || code === 'aborted') {
+    // no-speech no meio do hold: o runtime encerra o reconhecimento.
+    // NÃO marcar settled — onend reinicia enquanto o usuário segura.
+    if (code === 'no-speech') {
+      return
+    }
+    if (code === 'aborted') {
       finishOk(finalText.trim() || interimText.trim())
       return
     }
@@ -132,7 +150,13 @@ export async function startWindowsSpeech(opts?: {
   }
 
   recognition.onend = () => {
-    finishOk(finalText.trim() || interimText.trim())
+    if (settled) return
+    if (stopping || resolveStop) {
+      finishOk(finalText.trim() || interimText.trim())
+      return
+    }
+    // Ainda no PTT — reinicia após no-speech / fim natural do motor.
+    tryRestart()
   }
 
   await new Promise<void>((resolve, reject) => {
@@ -150,6 +174,7 @@ export async function startWindowsSpeech(opts?: {
 
   return {
     cancel: () => {
+      stopping = true
       settled = true
       resolveStop = null
       rejectStop = null
@@ -165,6 +190,7 @@ export async function startWindowsSpeech(opts?: {
           resolve(finalText.trim() || interimText.trim())
           return
         }
+        stopping = true
         resolveStop = resolve
         rejectStop = reject
         try {
@@ -173,7 +199,6 @@ export async function startWindowsSpeech(opts?: {
           finishErr(e instanceof Error ? e : new Error(String(e)))
         }
         // Margem para o Windows Speech emitir isFinal antes do onend.
-        // Timeout curto demais → interim truncado → fallback Whisper com texto ruim.
         globalThis.setTimeout(() => {
           finishOk(finalText.trim() || interimText.trim())
         }, 4_000)

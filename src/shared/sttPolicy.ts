@@ -61,12 +61,37 @@ export function isSpeechPermissionDenied(
 }
 
 /**
- * Erros da Web Speech API que justificam cair no Whisper (áudio paralelo).
- * Permissão negada NÃO entra — a UI mostra chip PT-BR e o usuário ajusta o Windows.
+ * Erros ao **iniciar** o Speech que justificam cair no Whisper.
+ *
+ * NÃO cai no Whisper quando:
+ * - permissão negada
+ * - no-speech / aborted / texto vazio (pedir para falar de novo — Whisper mangla PT-BR)
+ *
+ * `null`/desconhecido no start → ainda permite fallback.
  */
 export function shouldFallbackToWhisper(errorCode: string | undefined | null): boolean {
   if (isSpeechPermissionDenied(errorCode)) return false
+  if (!errorCode) return true
+  const code = errorCode.toLowerCase()
+  if (code.includes('no-speech') || code.includes('aborted')) return false
   return true
+}
+
+/** Mensagem quando o Speech não devolveu texto (sem Whisper nesta fala). */
+export function emptySpeechUserMessage(
+  errorCode: string | undefined | null = 'no-speech',
+): string {
+  const code = (errorCode ?? 'no-speech').toLowerCase()
+  if (isSpeechPermissionDenied(code)) {
+    return windowsSpeechUserMessage(new Error(`WINDOWS_SPEECH_ERROR:${code}`))
+  }
+  if (code.includes('no-speech')) {
+    return 'Não ouvi nada — segure o mic e fale um pouco mais.'
+  }
+  if (code.includes('aborted')) {
+    return 'Captura interrompida — tente de novo.'
+  }
+  return 'Falha no reconhecimento de fala do Windows — tente de novo.'
 }
 
 /** Motivo curto (sem código cru longo) para o chip/status da barra. */

@@ -15,10 +15,10 @@ import {
 import type { ChatStatus, ShellState, SttPreference, TtsSettings } from '@shared/ipc'
 import { detectChatToolIntent } from '@shared/chatIntent'
 import {
+  emptySpeechUserMessage,
   extractWindowsSpeechErrorCode,
   resolveSttBackend,
   sanitizeVoiceUiError,
-  shouldFallbackToWhisper,
   whisperFallbackStatusMessage,
   windowsSpeechUserMessage,
 } from '@shared/sttPolicy'
@@ -182,7 +182,6 @@ export function FloatingBar(): React.JSX.Element {
       const capture = captureRef.current
       if (capture?.kind === 'windows-speech') {
         capture.session.cancel()
-        capture.recorder.cancel()
       } else if (capture?.kind === 'whisper') {
         capture.recorder.cancel()
       }
@@ -394,6 +393,7 @@ export function FloatingBar(): React.JSX.Element {
             return
           }
         }
+        // windows-speech: sem recorder paralelo (libera o mic para o Speech)
       } else {
         const voice = await window.elio.ensureVoice()
         setSttPreference(voice.sttPreference)
@@ -443,7 +443,6 @@ export function FloatingBar(): React.JSX.Element {
       if (Date.now() - recordStartedAt.current < 400) {
         if (capture.kind === 'windows-speech') {
           capture.session.cancel()
-          capture.recorder.cancel()
         } else {
           capture.recorder.cancel()
         }
@@ -457,6 +456,7 @@ export function FloatingBar(): React.JSX.Element {
       let trimmed = ''
 
       if (capture.kind === 'windows-speech') {
+        // Sem WAV paralelo: Speech sozinho no mic. Vazio → pedir de novo.
         let speechText = ''
         let speechFailed = false
         let speechErrorCode: string | null = null
@@ -469,27 +469,15 @@ export function FloatingBar(): React.JSX.Element {
         }
 
         if (speechText) {
-          capture.recorder.cancel()
           trimmed = speechText
-        } else if (speechFailed && !shouldFallbackToWhisper(speechErrorCode)) {
-          // Permissão negada no Speech → chip claro, sem Whisper silencioso.
-          capture.recorder.cancel()
-          setError(
-            windowsSpeechUserMessage(
-              new Error(`WINDOWS_SPEECH_ERROR:${speechErrorCode ?? 'unknown'}`),
-            ),
-          )
+        } else {
           setStatusLine(null)
+          setError(
+            emptySpeechUserMessage(speechFailed ? speechErrorCode : 'no-speech'),
+          )
           setBarState('error')
           setVoicePhase('idle')
           return
-        } else {
-          setStatusLine(
-            whisperFallbackStatusMessage(
-              speechFailed ? speechErrorCode : 'no-speech',
-            ),
-          )
-          trimmed = await transcribeWithWhisper(capture.recorder)
         }
       } else {
         if (capture.speechErrorCode) {
@@ -741,7 +729,6 @@ export function FloatingBar(): React.JSX.Element {
               const capture = captureRef.current
               if (capture?.kind === 'windows-speech') {
                 capture.session.cancel()
-                capture.recorder.cancel()
               } else if (capture?.kind === 'whisper') {
                 capture.recorder.cancel()
               }
