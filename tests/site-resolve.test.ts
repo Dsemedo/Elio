@@ -26,11 +26,12 @@ describe('normalizeSiteQueryHeard', () => {
     expect(n.query.toLowerCase()).not.toMatch(/^site\b/)
   })
 
-  it('expande Neoadonto → New Odonto e remove “no Edge”', () => {
+  it('remove “no Edge” sem reescrever a marca localmente', () => {
     const n = normalizeSiteQueryHeard('clínica Neoadonto no Edge')
-    expect(n.query.toLowerCase()).toMatch(/new\s+odonto/)
+    expect(n.query.toLowerCase()).toContain('neoadonto')
     expect(n.query.toLowerCase()).not.toMatch(/\bedge\b/)
-    expect(n.notes.some((x) => /marca colada/i.test(x))).toBe(true)
+    // Marcas coladas/mangladas são responsabilidade do LLM, não de regex por marca.
+    expect(n.notes.some((x) => /marca colada|new odonto/i.test(x))).toBe(false)
   })
 })
 
@@ -109,6 +110,37 @@ describe('resolveSiteQueryDynamically', () => {
     )
     expect(complete).toHaveBeenCalled()
   })
+
+  it('marca mangled pelo STT vai ao LLM sem hardcode local', async () => {
+    const complete = vi.fn(async (req) => {
+      const user = req.messages.find(
+        (m: { role: string; content: string }) => m.role === 'user',
+      )
+      expect(user?.content).toContain('Neoadonto')
+      const system = req.messages.find(
+        (m: { role: string; content: string }) => m.role === 'system',
+      )
+      // Prompt genérico: sem regra amarrada a uma marca.
+      expect(system?.content).not.toMatch(/New Odonto/i)
+      expect(system?.content).toMatch(/mangling|STT|confiança/i)
+      return {
+        content:
+          '{"label":"New Odonto","url":"https://www.newodonto.com.br/"}',
+      }
+    })
+    const r = await resolveSiteQueryDynamically(
+      'clínica Neoadonto no Edge',
+      complete,
+    )
+    expect(r.ok).toBe(true)
+    if (r.ok) {
+      expect(r.source).toBe('llm')
+      expect(r.corrected).toBe(true)
+      expect(r.label).toBe('New Odonto')
+      expect(r.url).toMatch(/^https:\/\//)
+    }
+    expect(complete).toHaveBeenCalledOnce()
+  })
 })
 
 describe('intent + router — open_site_query', () => {
@@ -136,7 +168,7 @@ describe('intent + router — open_site_query', () => {
     expect(b?.kind).toBe('open_site_query')
     if (b?.kind === 'open_site_query') {
       expect(b.browserId).toBe('edge')
-      expect(b.query.toLowerCase()).toMatch(/neoadonto|new\s+odonto|cl[ií]nica/)
+      expect(b.query.toLowerCase()).toContain('neoadonto')
       expect(b.query.toLowerCase()).not.toMatch(/\bedge\b/)
     }
   })

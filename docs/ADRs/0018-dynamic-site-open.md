@@ -33,4 +33,5 @@ A allowlist de aliases (`exame`, `google`, `instagram`…) não escala: Douglas 
 ## Atualização 0.18.2
 
 - “X no Edge/Chrome” preserva `browserId` também em `open_site_query` (antes só aliases).
-- Normalização: remove sufixo de browser do nome; expande “Neoadonto” → “New Odonto”; prompt desencoraja domínios inventados (ex.: jornalpopular.com.br).
+- Normalização local: remove sufixo de browser do nome; **sem** hardcode de marcas.
+- Correção de marcas/mangling (STT colado, New↔Neo, etc.) fica no **LLM** via prompt genérico; se não houver confiança no domínio oficial, `url` null (não inventar host).
