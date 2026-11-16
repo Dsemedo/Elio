@@ -34,3 +34,4 @@ Alternativas:
 - A sessão Electron deve conceder `media`/`microphone` (além de `geolocation`); um handler só-geo produz `not-allowed` no Speech **sem** chegar ao prompt do Windows. O handler libera o Chromium; o consentimento do SO vem do `getUserMedia`.
 - Ordem PTT: **getUserMedia → SpeechRecognition** (mic-first). Permissão negada (`not-allowed` / `service-not-allowed` / SO `denied`) → **chip PT-BR**, sem Whisper silencioso. Whisper só após falha explícita do Speech (rede, áudio, sem texto, …), com status “Speech falhou (…) — Whisper”.
 - UI nunca mostra `WINDOWS_SPEECH_ERROR:…` cru.
+- Pós-0.15.4 (**0.15.5**): margem de finalização do Speech no `stop()` sobe para **4 s** (reduz interim truncado → Whisper); fallback Whisper usa `-bs 8`, prompt com “clima atual” e `normalizeWhisperPtBr` (ex.: outdoor→atual no domínio clima/hora).

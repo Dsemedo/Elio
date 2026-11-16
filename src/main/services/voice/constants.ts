@@ -57,10 +57,19 @@ export const LEGACY_MODEL_FILES = ['ggml-tiny.bin', 'ggml-base.bin'] as const
 /**
  * Prompt inicial PT-BR (whisper-cli `--prompt`) — viés lexical para frases do assistente.
  * Não é enviado ao LLM; só condiciona o decoder local.
+ * Inclui “atual” de propósito (Whisper `small` costuma manglar para “outdoor”).
  */
 export const WHISPER_INITIAL_PROMPT =
-  'Oi, qual é o clima e o horário de agora? Que horas são? Como está o tempo hoje? ' +
-  'Abre o Chrome. Abre a pasta Downloads. Obrigado. Por favor.'
+  'Oi. Qual é o clima atual? Qual é o clima atual do lugar que eu moro? ' +
+  'Como está o tempo hoje? Que horas são? Qual é o horário atual? ' +
+  'Abre o Chrome. Abre a pasta Downloads. Conectar Spotify. Toca uma música. ' +
+  'Obrigado. Por favor.'
+
+/**
+ * Beam size do whisper-cli (`-bs`). Maior = um pouco mais lento, melhor em
+ * frases curtas PT-BR do assistente (fallback).
+ */
+export const WHISPER_BEAM_SIZE = 8
 
 /** Tamanho mínimo aceitável do arquivo do binário. */
 export const BINARY_ARCHIVE_MIN_BYTES = 1_000_000
