@@ -2,6 +2,7 @@ import { shell } from 'electron'
 import {
   parseConfirmOpen,
   executeDesktopIntent,
+  launchAllowlistedBrowser,
   type DesktopActionResult,
   type DesktopOpener,
 } from './open'
@@ -15,8 +16,12 @@ export {
   defaultPathRoots,
   isRiskyPath,
 } from './paths'
-export { resolveAppId, resolveAppPath } from './apps'
-export { parseConfirmOpen, executeDesktopIntent } from './open'
+export { resolveAppId, resolveAppPath, resolveBrowserAppId } from './apps'
+export {
+  parseConfirmOpen,
+  executeDesktopIntent,
+  launchAllowlistedBrowser,
+} from './open'
 export type { DesktopIntent } from './intent'
 export type { DesktopActionResult, DesktopOpener } from './open'
 export {
@@ -38,6 +43,11 @@ export function electronDesktopOpener(): DesktopOpener {
       await shell.openExternal(url)
     },
     openPath: async (target: string) => shell.openPath(target),
+    openInBrowser: async (browserId, url) => {
+      const launched = await launchAllowlistedBrowser(browserId, url)
+      if (!launched.ok) return { ok: false, reason: launched.reason }
+      return { ok: true }
+    },
   }
 }
 

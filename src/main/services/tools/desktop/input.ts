@@ -1,8 +1,11 @@
 /**
- * Automação leve de teclado (Estágio 2 — fatia 1).
+ * Automação leve de teclado (Estágio 2).
  *
- * - Digitar: clipboard do Electron + Ctrl+V (texto NUNCA passa pelo SendKeys).
- * - Teclas: allowlist fixa (Enter / Tab / Esc) via SendKeys com script fixo.
+ * Fatia 1: digitar (clipboard + Ctrl+V) + Enter/Tab/Esc.
+ * Fatia 2: atalhos allowlisted (copiar, colar, selecionar tudo, desfazer, salvar, recortar).
+ *
+ * - Texto do usuário NUNCA entra no SendKeys.
+ * - Scripts PowerShell fixos (sem interpolar input).
  * - Só Windows por enquanto.
  */
 
@@ -13,7 +16,17 @@ const execFileAsync = promisify(execFile)
 
 export const TYPE_TEXT_MAX_CHARS = 500
 
-export type AllowlistedKey = 'enter' | 'tab' | 'escape'
+/** Teclas simples + atalhos Ctrl allowlist (sem Win/Alt/F4/arbitrário). */
+export type AllowlistedKey =
+  | 'enter'
+  | 'tab'
+  | 'escape'
+  | 'copy'
+  | 'paste'
+  | 'cut'
+  | 'select_all'
+  | 'undo'
+  | 'save'
 
 export type DesktopInputIntent =
   | { kind: 'type_text'; text: string }
@@ -32,11 +45,64 @@ export type DesktopInputResult = {
 const TYPE_VERB =
   /^(?:por\s+favor\s+|pf\s+)?(?:digite|digitar|digita|escreva|escreve|escrever)\b[\s,:]*/i
 
+const KEY_LABELS: Record<AllowlistedKey, string> = {
+  enter: 'Enter',
+  tab: 'Tab',
+  escape: 'Esc',
+  copy: 'Ctrl+C',
+  paste: 'Ctrl+V',
+  cut: 'Ctrl+X',
+  select_all: 'Ctrl+A',
+  undo: 'Ctrl+Z',
+  save: 'Ctrl+S',
+}
+
+/** Aliases após “pressiona/aperta/tecla …”. */
 const KEY_ALIASES: Record<AllowlistedKey, RegExp> = {
   enter: /^(?:enter|return|enviar|confirma)$/i,
   tab: /^(?:tab|tabula(?:ção|cao)?)$/i,
   escape: /^(?:esc|escape|sair)$/i,
+  copy: /^(?:ctrl\s*\+\s*c|control\s*\+\s*c|ctrl\s+c|control\s+c|copiar|copia|copie)$/i,
+  paste: /^(?:ctrl\s*\+\s*v|control\s*\+\s*v|ctrl\s+v|control\s+v|colar|cola|cole)$/i,
+  cut: /^(?:ctrl\s*\+\s*x|control\s*\+\s*x|ctrl\s+x|control\s+x|recortar|recorta|recote)$/i,
+  select_all:
+    /^(?:ctrl\s*\+\s*a|control\s*\+\s*a|ctrl\s+a|control\s+a|selecionar\s+tudo|seleciona\s+tudo|selecione\s+tudo)$/i,
+  undo: /^(?:ctrl\s*\+\s*z|control\s*\+\s*z|ctrl\s+z|control\s+z|desfazer|desfaz|desfaça|desfaca)$/i,
+  save: /^(?:ctrl\s*\+\s*s|control\s*\+\s*s|ctrl\s+s|control\s+s|salvar|salva|salve)$/i,
 }
+
+/**
+ * Frases PT-BR que são o comando inteiro (sem “pressiona”).
+ * Ordem: mais específicas primeiro (seleciona tudo antes de verbos curtos).
+ */
+const STANDALONE_SHORTCUTS: Array<{ key: AllowlistedKey; pattern: RegExp }> = [
+  {
+    key: 'select_all',
+    pattern:
+      /^(?:por\s+favor\s+|pf\s+)?(?:seleciona|selecionar|selecione)\s+tudo(?:\s+(?:o\s+texto|isso|isto))?$/i,
+  },
+  {
+    key: 'copy',
+    pattern: /^(?:por\s+favor\s+|pf\s+)?(?:copia|copiar|copie)(?:\s+(?:isso|isto|o\s+texto))?$/i,
+  },
+  {
+    key: 'paste',
+    pattern: /^(?:por\s+favor\s+|pf\s+)?(?:cola|colar|cole)(?:\s+(?:isso|isto|aqui))?$/i,
+  },
+  {
+    key: 'cut',
+    pattern: /^(?:por\s+favor\s+|pf\s+)?(?:recorta|recortar|recote)(?:\s+(?:isso|isto|o\s+texto))?$/i,
+  },
+  {
+    key: 'undo',
+    pattern: /^(?:por\s+favor\s+|pf\s+)?(?:desfaz|desfazer|desfaça|desfaca)(?:\s+(?:isso|isto))?$/i,
+  },
+  {
+    key: 'save',
+    pattern:
+      /^(?:por\s+favor\s+|pf\s+)?(?:salva|salvar|salve)(?:\s+(?:isso|isto|o\s+arquivo|arquivo))?$/i,
+  },
+]
 
 /** Scripts PowerShell fixos — sem interpolar texto do usuário. */
 const PS_PASTE =
@@ -48,6 +114,14 @@ const PS_KEYS: Record<AllowlistedKey, string> = {
   tab: "Add-Type -AssemblyName System.Windows.Forms; Start-Sleep -Milliseconds 150; [System.Windows.Forms.SendKeys]::SendWait('{TAB}')",
   escape:
     "Add-Type -AssemblyName System.Windows.Forms; Start-Sleep -Milliseconds 150; [System.Windows.Forms.SendKeys]::SendWait('{ESC}')",
+  copy: "Add-Type -AssemblyName System.Windows.Forms; Start-Sleep -Milliseconds 150; [System.Windows.Forms.SendKeys]::SendWait('^c')",
+  paste:
+    "Add-Type -AssemblyName System.Windows.Forms; Start-Sleep -Milliseconds 150; [System.Windows.Forms.SendKeys]::SendWait('^v')",
+  cut: "Add-Type -AssemblyName System.Windows.Forms; Start-Sleep -Milliseconds 150; [System.Windows.Forms.SendKeys]::SendWait('^x')",
+  select_all:
+    "Add-Type -AssemblyName System.Windows.Forms; Start-Sleep -Milliseconds 150; [System.Windows.Forms.SendKeys]::SendWait('^a')",
+  undo: "Add-Type -AssemblyName System.Windows.Forms; Start-Sleep -Milliseconds 150; [System.Windows.Forms.SendKeys]::SendWait('^z')",
+  save: "Add-Type -AssemblyName System.Windows.Forms; Start-Sleep -Milliseconds 150; [System.Windows.Forms.SendKeys]::SendWait('^s')",
 }
 
 export function sanitizeTypeText(raw: string): { ok: true; text: string } | { ok: false; reason: string } {
@@ -75,14 +149,22 @@ function resolveKeyAlias(raw: string): AllowlistedKey | null {
   return null
 }
 
+function resolveStandaloneShortcut(text: string): AllowlistedKey | null {
+  const cleaned = text.trim().replace(/[?.!]+$/g, '')
+  for (const entry of STANDALONE_SHORTCUTS) {
+    if (entry.pattern.test(cleaned)) return entry.key
+  }
+  return null
+}
+
 /**
- * Detecta “digite …”, “escreve …”, “pressiona enter”, etc.
+ * Detecta “digite …”, “escreve …”, “pressiona enter”, “copia”, “ctrl+c”, etc.
  */
 export function parseDesktopInputIntent(text: string): DesktopInputIntent | null {
   const trimmed = text.trim()
   if (!trimmed) return null
 
-  // Tecla allowlisted: “pressiona enter” / “aperta tab” / “tecla esc”
+  // Tecla/atalho allowlisted: “pressiona enter” / “aperta ctrl+c” / “tecla esc”
   const keyMatch = trimmed.match(
     /^(?:por\s+favor\s+|pf\s+)?(?:pressiona|pressionar|aperta|apertar|tecla)\b[\s,]+(.+)$/i,
   )
@@ -90,6 +172,12 @@ export function parseDesktopInputIntent(text: string): DesktopInputIntent | null
     const key = resolveKeyAlias(keyMatch[1])
     if (key) return { kind: 'press_key', key }
     return null
+  }
+
+  // Frases curtas: “copia”, “seleciona tudo”, “salva”, …
+  const standalone = resolveStandaloneShortcut(trimmed)
+  if (standalone) {
+    return { kind: 'press_key', key: standalone }
   }
 
   if (!TYPE_VERB.test(trimmed)) return null
@@ -104,12 +192,7 @@ export function parseDesktopInputIntent(text: string): DesktopInputIntent | null
 
 export function describeInputIntent(intent: DesktopInputIntent): string {
   if (intent.kind === 'press_key') {
-    const labels: Record<AllowlistedKey, string> = {
-      enter: 'Enter',
-      tab: 'Tab',
-      escape: 'Esc',
-    }
-    return `Pressionando ${labels[intent.key]}…`
+    return `Pressionando ${KEY_LABELS[intent.key]}…`
   }
   const preview =
     intent.text.length > 40 ? `${intent.text.slice(0, 40)}…` : intent.text
@@ -141,7 +224,7 @@ export type ClipboardPort = {
 }
 
 /**
- * Driver Windows: cola via clipboard + Ctrl+V; teclas via SendKeys allowlist.
+ * Driver Windows: cola via clipboard + Ctrl+V; teclas/atalhos via SendKeys allowlist.
  */
 export function createWindowsInputDriver(
   clipboard: ClipboardPort,
@@ -211,7 +294,7 @@ export async function executeDesktopInputIntent(
     }
   }
 
-  // press_key
+  // press_key (tecla simples ou atalho allowlist)
   if (platform !== 'win32') {
     return {
       ok: false,
@@ -224,12 +307,7 @@ export async function executeDesktopInputIntent(
   }
   try {
     await driver.pressKey(intent.key)
-    const labels: Record<AllowlistedKey, string> = {
-      enter: 'Enter',
-      tab: 'Tab',
-      escape: 'Esc',
-    }
-    return { ok: true, message: `Pressionei ${labels[intent.key]}.` }
+    return { ok: true, message: `Pressionei ${KEY_LABELS[intent.key]}.` }
   } catch (err) {
     const detail = err instanceof Error ? err.message.slice(0, 120) : 'erro'
     return {

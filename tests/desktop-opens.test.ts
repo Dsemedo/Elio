@@ -37,6 +37,8 @@ describe('validateHttpsUrl / resolveOpenUrl', () => {
   it('resolve aliases PT-BR', () => {
     expect(resolveSiteAlias('Exame')).toBe('https://www.exame.com')
     expect(resolveSiteAlias('google')).toBe('https://www.google.com')
+    expect(resolveSiteAlias('Google Maps')).toBe('https://www.google.com/maps')
+    expect(resolveSiteAlias('maps')).toBe('https://www.google.com/maps')
     const alias = resolveOpenUrl('exame')
     expect(alias.ok).toBe(true)
     if (alias.ok) {
@@ -95,6 +97,26 @@ describe('parseDesktopOpenIntent (PT-BR)', () => {
 
     const b = parseDesktopOpenIntent('abrir o google')
     expect(b?.kind).toBe('open_url')
+  })
+
+  it('detecta Google Maps no Chrome', () => {
+    const a = parseDesktopOpenIntent('abre o Google Maps no Chrome')
+    expect(a?.kind).toBe('open_url')
+    if (a?.kind === 'open_url') {
+      expect(a.rawTarget.toLowerCase()).toMatch(/google\s*maps|maps/)
+      expect(a.browserId).toBe('chrome')
+    }
+    expect(describeIntent(a!)).toMatch(/Chrome/i)
+  })
+
+  it('detecta composto Edge e Instagram', () => {
+    const a = parseDesktopOpenIntent('abre o Edge e o Instagram')
+    expect(a?.kind).toBe('open_many')
+    if (a?.kind === 'open_many') {
+      expect(a.items).toHaveLength(2)
+      expect(a.items[0]?.kind).toBe('open_app')
+      expect(a.items[1]?.kind).toBe('open_url')
+    }
   })
 
   it('detecta pasta Downloads', () => {
@@ -159,6 +181,55 @@ describe('executeDesktopIntent', () => {
     const result = await executeDesktopIntent(intent, opener)
     expect(result.ok).toBe(true)
     expect(opened[0]).toMatch(/^https:\/\//)
+  })
+
+  it('abre Maps no Chrome via openInBrowser', async () => {
+    const browserCalls: Array<{ id: string; url: string }> = []
+    const opener: DesktopOpener = {
+      openExternal: async () => undefined,
+      openPath: async () => '',
+      openInBrowser: async (browserId, url) => {
+        browserCalls.push({ id: browserId, url })
+        return { ok: true }
+      },
+    }
+    const intent = parseDesktopOpenIntent('abre o Google Maps no Chrome')
+    expect(intent).not.toBeNull()
+    if (!intent) return
+    const result = await executeDesktopIntent(intent, opener, {
+      platform: 'win32',
+    })
+    expect(result.ok).toBe(true)
+    expect(browserCalls[0]?.id).toBe('chrome')
+    expect(browserCalls[0]?.url).toContain('google.com/maps')
+    expect(result.message).toMatch(/Chrome/i)
+  })
+
+  it('executa composto Edge + Instagram', async () => {
+    const opened: string[] = []
+    const browserCalls: Array<{ id: string; url: string }> = []
+    const opener: DesktopOpener = {
+      openExternal: async (url) => {
+        opened.push(url)
+      },
+      openPath: async () => '',
+      openInBrowser: async (browserId, url) => {
+        browserCalls.push({ id: browserId, url })
+        return { ok: true }
+      },
+    }
+    const intent = parseDesktopOpenIntent('abre o Edge e o Instagram')
+    expect(intent?.kind).toBe('open_many')
+    if (!intent) return
+    const result = await executeDesktopIntent(intent, opener, {
+      platform: 'win32',
+    })
+    expect(result.ok).toBe(true)
+    expect(browserCalls.some((c) => c.id === 'edge')).toBe(true)
+    expect(
+      opened.some((u) => u.includes('instagram')) ||
+        browserCalls.some((c) => c.url.includes('instagram')),
+    ).toBe(true)
   })
 
   it('abre pasta real sob home de teste', async () => {

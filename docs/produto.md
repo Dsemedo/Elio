@@ -136,6 +136,12 @@ Pessoas que se parecerem com Douglas e possam instalar um `.exe` Windows:
 
 ---
 
+## Estado atual (honesto)
+
+Em **v0.18.x** já existem pedaços: Floating Bar, Whisper STT, TTS (off por padrão), opens (incl. site no Chrome/Edge, compostos, Maps), Spotify PKCE + play por nome, clima, cascata de IA, digitar no app e atalhos allowlisted (Ctrl+C/V/A/Z/X/S). O que ainda falta na Fatia 1 é sobretudo **TTS ligado no pedido por voz** e confirmação falada pré-ação.
+
+---
+
 ## Horizonte — roteador multi-IA (não é Fase A)
 
 Isto **não** compete com o loop demo agora. É o futuro desejado depois que o companheiro de voz estiver sólido. Detalhe de ordem: **Fase E** em [`roadmap.md`](./roadmap.md). Base técnica atual: cascata OpenRouter → free → Ollama ([ADR 0011](./ADRs/0011-ai-cascade-byok.md)).
