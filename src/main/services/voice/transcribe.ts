@@ -6,6 +6,7 @@ import {
   MAX_AUDIO_BYTES,
   MIN_AUDIO_MS,
   TRANSCRIBE_TIMEOUT_MS,
+  WHISPER_BEAM_SIZE,
   WHISPER_INITIAL_PROMPT,
 } from './constants'
 import { ensureVoiceAssets } from './download'
@@ -19,6 +20,7 @@ import {
   redactPath,
   whisperTempDir,
 } from './paths'
+import { normalizeWhisperPtBr } from '../../../shared/whisperPtBrNormalize'
 import type { VoiceProgress } from '../../../shared/types'
 
 type WavInfo = {
@@ -106,6 +108,8 @@ async function runWhisperCli(wavPath: string, outBase: string): Promise<string> 
     'pt',
     '--prompt',
     WHISPER_INITIAL_PROMPT,
+    '-bs',
+    String(WHISPER_BEAM_SIZE),
     '-otxt',
     '-of',
     outBase,
@@ -208,7 +212,8 @@ export async function transcribeWavBase64(
 
   try {
     writeFileSync(wavPath, wav)
-    const text = await runWhisperCli(wavPath, outBase)
+    const raw = await runWhisperCli(wavPath, outBase)
+    const text = normalizeWhisperPtBr(raw)
     if (!text) {
       throw new Error('AUDIO_TOO_SHORT: não deu para entender — tente falar de novo')
     }

@@ -66,9 +66,12 @@ export async function startWindowsSpeech(opts?: {
 
   const recognition = new Ctor()
   recognition.lang = opts?.lang ?? 'pt-BR'
+  // continuous: frases curtas do PTT ainda usam continuous para não cortar no
+  // silêncio no meio do hold; no stop() esperamos finais com margem maior.
   recognition.continuous = true
   recognition.interimResults = true
-  recognition.maxAlternatives = 1
+  // Alternativa 0 = maior confiança no Chromium/Windows Speech.
+  recognition.maxAlternatives = 3
 
   let finalText = ''
   let interimText = ''
@@ -169,10 +172,11 @@ export async function startWindowsSpeech(opts?: {
         } catch (e) {
           finishErr(e instanceof Error ? e : new Error(String(e)))
         }
-        // Segurança: se onend não vier, resolve com o que tiver.
+        // Margem para o Windows Speech emitir isFinal antes do onend.
+        // Timeout curto demais → interim truncado → fallback Whisper com texto ruim.
         globalThis.setTimeout(() => {
           finishOk(finalText.trim() || interimText.trim())
-        }, 2_500)
+        }, 4_000)
       }),
   }
 }

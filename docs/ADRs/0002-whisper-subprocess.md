@@ -21,8 +21,8 @@ OD-02 aprovou Whisper.cpp via **subprocess** do binário oficial `whisper-cli`, 
 | Override | `ELIO_WHISPER_MODEL=tiny\|base\|small` |
 | Onde fica | `%APPDATA%\elio\whisper\` (userData) |
 | Empacote | **não** embute o modelo; download sob demanda (só se fallback for usado / “Preparar fallback”) |
-| CLI | `whisper-cli -m <model> -f <wav> -l pt --prompt "<PT-BR>" -otxt -of <out> -np -nt` |
-| Pós-STT | Auto-envio imediato (sem gate de confirmar/editar — PJ-31) |
+| CLI | `whisper-cli -m <model> -f <wav> -l pt --prompt "<PT-BR>" -bs 8 -otxt -of <out> -np -nt` |
+| Pós-STT | `normalizeWhisperPtBr` (ex.: clima outdoor→atual; descarta alucinações curtas) + auto-envio (sem gate confirmar/editar — PJ-31) |
 
 ## Consequências
 
