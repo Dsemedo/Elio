@@ -20,6 +20,7 @@ import {
 } from '../services/tools/desktop/input'
 import { enrichMessagesWithLocalFacts } from '../services/tools/enrich'
 import { classifyUserIntent } from '../services/tools/router'
+import { formatClockUserReply } from '../services/tools/time'
 import {
   formatActiveTabUnavailable,
   getActiveBrowserTab,
@@ -205,6 +206,19 @@ export function registerChatIpc(): void {
           input.conversationId,
           result.message,
           'elio-desktop',
+        )
+      }
+
+      // B: hora pura → relógio do SO (sem LLM inventar “não sei a hora”).
+      if (
+        classified.lane === 'local_fact' &&
+        classified.tools.needsTime &&
+        !classified.tools.needsWeather
+      ) {
+        return finishAssistantReply(
+          input.conversationId,
+          formatClockUserReply(),
+          'elio-clock',
         )
       }
 

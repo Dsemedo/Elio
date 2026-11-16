@@ -37,6 +37,13 @@ describe('classifyUserIntent — lanes A/B/C/D', () => {
       expect(time.tools.needsTime).toBe(true)
     }
 
+    const timePhrase = classifyUserIntent('Qual é a hora?')
+    expect(timePhrase.lane).toBe('local_fact')
+    if (timePhrase.lane === 'local_fact') {
+      expect(timePhrase.tools.needsTime).toBe(true)
+      expect(timePhrase.tools.needsWeather).toBe(false)
+    }
+
     const weather = classifyUserIntent('como está o tempo?')
     expect(weather.lane).toBe('local_fact')
     if (weather.lane === 'local_fact') {
