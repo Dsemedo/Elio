@@ -236,3 +236,54 @@ export async function firstRecentTrackUri(
   }
   return data.items?.[0]?.track?.uri ?? null
 }
+
+export type SpotifySearchTrack = {
+  uri: string
+  name: string
+  artists: string
+}
+
+/**
+ * Busca a primeira faixa pública pelo nome (Search API).
+ * Token de usuário autenticado basta para catálogo público.
+ */
+export async function searchFirstTrack(
+  accessToken: string,
+  query: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<SpotifySearchTrack | null> {
+  const q = query.trim()
+  if (!q) return null
+  const path = `/search?q=${encodeURIComponent(q)}&type=track&limit=1&market=from_token`
+  const res = await apiFetch(path, accessToken, { method: 'GET' }, fetchImpl)
+  if (res.status === 401) {
+    throw new SpotifyApiError('unauthorized', 'Token Spotify inválido', 401)
+  }
+  if (!res.ok) {
+    throw new SpotifyApiError(
+      'http_error',
+      `Spotify search HTTP ${res.status}`,
+      res.status,
+    )
+  }
+  const data = (await res.json()) as {
+    tracks?: {
+      items?: Array<{
+        uri?: string
+        name?: string
+        artists?: Array<{ name?: string }>
+      }>
+    }
+  }
+  const hit = data.tracks?.items?.[0]
+  if (!hit?.uri) return null
+  const artists = (hit.artists ?? [])
+    .map((a) => a.name)
+    .filter(Boolean)
+    .join(', ')
+  return {
+    uri: hit.uri,
+    name: hit.name ?? q,
+    artists,
+  }
+}

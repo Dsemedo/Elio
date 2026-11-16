@@ -115,7 +115,7 @@ Ordem fixa. Não pular etapas para “features interessantes”.
 
 ## Estado atual (honesto)
 
-Em **v0.17.x** já existem pedaços: Floating Bar, Whisper STT, TTS (off por padrão), opens, Spotify PKCE parcial, clima, cascata de IA, digitar no app e atalhos allowlisted (Ctrl+C/V/A/Z/X/S).
+Em **v0.18.x** já existem pedaços: Floating Bar, Whisper STT, TTS (off por padrão), opens (incl. site no Chrome/Edge, compostos, Maps), Spotify PKCE + play por nome, clima, cascata de IA, digitar no app e atalhos allowlisted (Ctrl+C/V/A/Z/X/S). O que ainda falta na Fatia 1 é sobretudo **TTS ligado no pedido por voz** e confirmação falada pré-ação.
 
 O desalinhamento recente: muitas fatias de engenharia **sem** o loop de companheiro como centro. A partir deste documento, o roadmap gira em torno do loop acima.
 

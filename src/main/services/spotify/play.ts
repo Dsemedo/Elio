@@ -3,6 +3,7 @@ import {
   firstRecentTrackUri,
   listDevices,
   refreshAccessToken,
+  searchFirstTrack,
   startPlayback,
 } from './api'
 import { startSpotifyAuth } from './auth'
@@ -97,6 +98,7 @@ async function ensureFreshTokens(
 async function tryRemotePlay(
   tokens: SpotifyTokenSet,
   runtime: SpotifyRuntime,
+  query: string | null,
 ): Promise<SpotifyActionResult> {
   const fetchImpl = runtime.fetchImpl ?? fetch
   const sleep = runtime.sleep ?? defaultSleep
@@ -115,6 +117,45 @@ async function tryRemotePlay(
       statusLine: 'Abrindo Spotify…',
       message:
         'Abri o Spotify, mas não há aparelho ativo para controle remoto. Abra o app neste PC (Premium) e peça de novo.',
+    }
+  }
+
+  // Play por nome: Search → URI → play
+  if (query) {
+    try {
+      const hit = await searchFirstTrack(tokens.accessToken, query, fetchImpl)
+      if (!hit) {
+        return {
+          ok: true,
+          statusLine: 'Abrindo Spotify…',
+          message: `Abri o Spotify, mas não achei “${query}” na busca. Tente outro nome de faixa.`,
+        }
+      }
+      const playOpts: {
+        deviceId?: string
+        uris: string[]
+        fetchImpl?: typeof fetch
+      } = { uris: [hit.uri], fetchImpl }
+      if (active?.id) playOpts.deviceId = active.id
+      await startPlayback(tokens.accessToken, playOpts)
+      const who = hit.artists ? ` — ${hit.artists}` : ''
+      return {
+        ok: true,
+        statusLine: 'Tocando…',
+        message: `Estou colocando “${hit.name}”${who} no Spotify.`,
+      }
+    } catch (err) {
+      if (err instanceof SpotifyApiError && err.code === 'premium_required') {
+        return { ok: false, statusLine: 'Abrindo Spotify…', message: err.message }
+      }
+      if (err instanceof SpotifyApiError && err.code === 'no_device') {
+        return { ok: true, statusLine: 'Abrindo Spotify…', message: err.message }
+      }
+      const msg =
+        err instanceof SpotifyApiError
+          ? err.message
+          : 'Abri o Spotify, mas não consegui tocar a faixa pedida.'
+      return { ok: true, statusLine: 'Abrindo Spotify…', message: msg }
     }
   }
 
@@ -217,6 +258,7 @@ export async function handleSpotifyIntent(
   }
 
   // spotify_play
+  const query = intent.kind === 'spotify_play' ? intent.query : null
   let openedVia = ''
   try {
     const opened = await openSpotifyApp(runtime.opener)
@@ -232,7 +274,9 @@ export async function handleSpotifyIntent(
     return {
       ok: true,
       statusLine: opening,
-      message: `Abri o Spotify (${openedVia}). Para tocar por voz via API: configure ELIO_SPOTIFY_CLIENT_ID, conecte em Integrações (Premium).`,
+      message: query
+        ? `Abri o Spotify (${openedVia}). Para tocar “${query}” por voz: configure ELIO_SPOTIFY_CLIENT_ID, conecte em Integrações (Premium).`
+        : `Abri o Spotify (${openedVia}). Para tocar por voz via API: configure ELIO_SPOTIFY_CLIENT_ID, conecte em Integrações (Premium).`,
     }
   }
 
@@ -246,7 +290,7 @@ export async function handleSpotifyIntent(
     }
   }
 
-  return tryRemotePlay(tokens, runtime)
+  return tryRemotePlay(tokens, runtime, query)
 }
 
 export function electronSpotifyPaths(userData: string): TokenPaths {

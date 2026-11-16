@@ -6,6 +6,9 @@
 const SITE_ALIASES: Record<string, string> = {
   exame: 'https://www.exame.com',
   google: 'https://www.google.com',
+  googlemaps: 'https://www.google.com/maps',
+  maps: 'https://www.google.com/maps',
+  mapagoogle: 'https://www.google.com/maps',
   youtube: 'https://www.youtube.com',
   gmail: 'https://mail.google.com',
   github: 'https://github.com',
@@ -22,6 +25,7 @@ const SITE_ALIASES: Record<string, string> = {
   reddit: 'https://www.reddit.com',
   netflix: 'https://www.netflix.com',
   spotify: 'https://open.spotify.com',
+  chatgpt: 'https://chatgpt.com',
 }
 
 /** Normaliza rótulo de site: minúsculas, sem acento, só [a-z0-9]. */
