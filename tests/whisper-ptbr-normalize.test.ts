@@ -37,6 +37,12 @@ describe('normalizeWhisperPtBr', () => {
     expect(normalizeWhisperPtBr('Que horas são?')).toBe('Que horas são?')
   })
 
+  it('corrige Qual é a hora com mangling / U+FFFD', () => {
+    expect(normalizeWhisperPtBr('Qual \uFFFD o hora?')).toBe('Qual é a hora?')
+    expect(normalizeWhisperPtBr('Qual e o hora?')).toBe('Qual é a hora?')
+    expect(normalizeWhisperPtBr('qual e a hora')).toBe('Qual é a hora')
+  })
+
   it('colapsa espaços', () => {
     expect(normalizeWhisperPtBr('  clima   outdoor  ')).toBe('clima atual')
   })
