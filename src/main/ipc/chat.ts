@@ -1,4 +1,4 @@
-import { BrowserWindow, ipcMain } from 'electron'
+import { BrowserWindow, clipboard, ipcMain } from 'electron'
 import {
   ChatCancelInputSchema,
   ChatRenameInputSchema,
@@ -14,6 +14,10 @@ import {
   electronDesktopOpener,
   executeDesktopIntent,
 } from '../services/tools/desktop'
+import {
+  createWindowsInputDriver,
+  executeDesktopInputIntent,
+} from '../services/tools/desktop/input'
 import { enrichMessagesWithLocalFacts } from '../services/tools/enrich'
 import { classifyUserIntent } from '../services/tools/router'
 import {
@@ -172,6 +176,24 @@ export function registerChatIpc(): void {
             input.conversationId,
             result.message,
             'elio-spotify',
+          )
+        }
+        if (classified.action === 'desktop_input') {
+          const result =
+            process.platform === 'win32'
+              ? await executeDesktopInputIntent(classified.input, {
+                  driver: createWindowsInputDriver({
+                    readText: () => clipboard.readText(),
+                    writeText: (t) => clipboard.writeText(t),
+                  }),
+                })
+              : await executeDesktopInputIntent(classified.input, {
+                  platform: process.platform,
+                })
+          return finishAssistantReply(
+            input.conversationId,
+            result.message,
+            'elio-desktop-input',
           )
         }
         const result = await executeDesktopIntent(

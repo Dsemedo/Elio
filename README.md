@@ -1,7 +1,7 @@
 # Elio
 
 Assistente pessoal de IA para desktop (**JARVIS MVP**).  
-**v0.15.5** — STT: Speech finaliza com mais margem; Whisper com beam + correção PT-BR (outdoor→atual); 0.15.4 = mic prompt + chip.
+**v0.16.0** — Automação fatia 1: digitar / Enter·Tab·Esc no app em foco. Inclui voz 0.15.5 (Speech + Whisper PT-BR).
 
 Spec UI: [`docs/elio-design-system.md`](./docs/elio-design-system.md) · ADRs: [`docs/ADRs/`](./docs/ADRs/) · Distribuição: [`docs/windows-distribution.md`](./docs/windows-distribution.md)
 
@@ -40,14 +40,15 @@ npm run ensure:electron
 npm run dev
 ```
 
-### O que Douglas deve ver (0.15.5)
+### O que Douglas deve ver (0.16.0)
 
-1. Selo **v0.15.5** — 1ª voz: pedido de mic (prompt Windows se ainda não concedido); Speech primário  
+1. Selo **v0.16.0** — 1ª voz: pedido de mic (prompt Windows se ainda não concedido); Speech primário  
 2. Se negar mic → chip claro (Privacidade → Microfone), **sem** cair no Whisper em silêncio  
 3. Se Speech falhar por outro motivo → status tipo “Speech falhou (rede) — Whisper”  
-4. **“o que está na aba aberta?”** → resposta honesta: precisa de extensão (ainda não incluída)  
-5. **“pesquisa na web sobre Elio”** → abre busca https no navegador (sem crawl genérico)  
-6. **“resume https://pt.wikipedia.org/wiki/Electron”** → abre + lê trecho público (allowlist) e resume via LLM (cascata)  
+4. Bloco de Notas em foco → `digite bom dia` cola o texto; `pressiona enter` envia Enter  
+5. **“o que está na aba aberta?”** → resposta honesta: precisa de extensão (ainda não incluída)  
+6. **“pesquisa na web sobre Elio”** → abre busca https no navegador (sem crawl genérico)  
+7. **“resume https://pt.wikipedia.org/wiki/Electron”** → abre + lê trecho público (allowlist) e resume via LLM (cascata)  
 7. Memória / cascata BYOK / TTS / Spotify / clima como antes  
 8. `npm run dist:win` gera instalador NSIS  
 
@@ -84,9 +85,9 @@ Em **Configurações → Integrações**:
 
 `OPENROUTER_API_KEY` / `OLLAMA_*` no ambiente **têm prioridade** sobre o cofre/arquivo.
 
-### Microfone / fala no Windows (validar 0.15.5)
+### Microfone / fala no Windows (validar 0.16.0)
 
-Confirme o selo **v0.15.5** (`npm pkg get version`).
+Confirme o selo **v0.16.0** (`npm pkg get version`).
 
 ```powershell
 git pull origin main
@@ -137,12 +138,14 @@ Tokens ficam cifrados em `%APPDATA%\elio\secrets\` (Electron `safeStorage` **asy
 
 | Lane | Exemplos | Status |
 |------|----------|--------|
-| **A** PC | abre site / pasta / arquivo / app; **Spotify play/connect** | ✅ allowlist + PKCE |
+| **A** PC | abre site / pasta / arquivo / app; **digite …** / **pressiona enter**; Spotify | ✅ allowlist + digitar via clipboard (ADR 0015) |
 | **B** Fato local | hora, clima | ✅ enrich (Open-Meteo + relógio + geo) |
 | **C** Web context | aba aberta; pesquisa web | ✅ aba = status sem extensão; research = open+fetch allowlist (ADR 0013) |
 | **D** Chat | conversa geral | ✅ LLM cascata BYOK → free → Ollama |
 
-**Não neste PR:** extensão Chrome/Edge, CDP, crawl genérico, OAuth ChatGPT/Gemini, TTS, RPA.
+**Como testar digitar (Windows):** foque um Bloco de Notas → no Elio diga/escreva `digite bom dia` → deve colar no app em foco. `pressiona enter` envia Enter. Sem RPA genérico ainda.
+
+**Não neste PR:** extensão Chrome/Edge, CDP, crawl genérico, cliques por coordenada, atalhos arbitrários.
 
 ### Clima e fuso
 
@@ -189,7 +192,7 @@ Ordem de resolução:
 ### Como testar STT no Windows
 
 1. Confirme idioma de fala pt-BR em **Configurações → Hora e idioma → Fala**  
-2. `npm run dev` → selo **v0.15.5**  
+2. `npm run dev` → selo **v0.16.0**  
 3. Segure o mic na Floating Bar → diga *“Qual é o clima atual do lugar que eu moro?”* → solte  
 4. O texto deve ir **direto** ao chat (sem caixa “Confira o texto”)  
 5. Preferência: “atual” **não** vira “outdoor” (Speech certo; se cair no Whisper, normalização corrige “clima outdoor”)  
@@ -215,7 +218,7 @@ Desligado por padrão. Quando ligado, o Elio **fala as respostas** em pt-BR.
 ### Como habilitar TTS no Windows
 
 1. Instale/ative **voz pt-BR** em **Configurações → Hora e idioma → Fala** (e, se existir, *Vozes* / *Voice access*).  
-2. `npm run dev` → selo **v0.15.5**.  
+2. `npm run dev` → selo **v0.16.0**.  
 3. Na Floating Bar: **⋯ → Falar respostas (TTS)**  
    — ou **Command Center → Configurações → Integrações → Ativar TTS**.  
 4. Envie uma mensagem (texto ou voz). A barra mostra **Falando…**; use **■** ou “Parar fala” para interromper.  
@@ -232,7 +235,7 @@ TTS: SSML escapado; sem shell; edge-tts só Microsoft Speech; texto não vai par
 Pesquisa web: só https; fetch só hosts allowlisted; sem crawl; conteúdo marcado não confiável.  
 Aba ativa: sem extensão = sem leitura (sem CDP).  
 Spotify / OpenRouter: PKCE + `safeStorage`; opens só `spotify:` / `https://open.spotify.com`.  
-Ver `docs/ADRs/0002-whisper-subprocess.md`, `0006-auto-location-weather.md`, `0007-spotify-voice-pkce.md`, `0008-windows-speech-primary-stt.md`, `0009-windows-distribution.md`, `0010-command-center-ux-settings.md`, `0011-ai-cascade-byok.md`, `0012-persistent-memory-settings.md` e `0013-web-context-extension-research.md` e `0014-tts-system-and-edge.md`.
+Ver `docs/ADRs/0002-whisper-subprocess.md`, `0005-desktop-opens-intent-router.md`, `0006-auto-location-weather.md`, `0007-spotify-voice-pkce.md`, `0008-windows-speech-primary-stt.md`, `0009-windows-distribution.md`, `0010-command-center-ux-settings.md`, `0011-ai-cascade-byok.md`, `0012-persistent-memory-settings.md`, `0013-web-context-extension-research.md`, `0014-tts-system-and-edge.md` e `0015-desktop-input-type-keys.md`.
 
 ## Licença
 
