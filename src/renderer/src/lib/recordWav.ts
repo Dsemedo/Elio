@@ -1,7 +1,10 @@
 /** Grava PCM do microfone e devolve WAV 16 kHz mono 16-bit (base64). */
 
 import { isMicMissingMessage } from '@shared/micMessages'
+import { MIC_RELEASE_SETTLE_MS } from '@shared/speechRestart'
 import { sanitizeVoiceUiError, windowsSpeechUserMessage } from '@shared/sttPolicy'
+
+export { MIC_RELEASE_SETTLE_MS } from '@shared/speechRestart'
 
 export { isMicMissingMessage }
 
@@ -98,11 +101,29 @@ export async function probeMicPresence(): Promise<MicPresence> {
 }
 
 /**
- * Pede permissão de mic (prompt do Windows se preciso) e **libera** o device.
- * Necessário antes do Windows Speech: se deixarmos getUserMedia aberto, o
- * Speech Runtime no Electron frequentemente fica sem áudio → “não ouvi nada”.
+ * Garante consentimento de mic sem segurar o device durante o Speech.
+ *
+ * - Se `permissions.query(microphone)` já for `granted`, não chama getUserMedia
+ *   (evita roubar/liberar o mic a cada PTT e a race stop→Speech).
+ * - Caso contrário: getUserMedia (prompt do OS) → stop tracks → settle curto.
+ *   Segurar o stream aberto com o Speech no Electron/Windows costuma deixar o
+ *   Speech Runtime sem áudio → “não ouvi nada”.
  */
 export async function primeMicPermission(): Promise<void> {
+  try {
+    const perms = navigator.permissions
+    if (perms?.query) {
+      const status = await perms.query({
+        name: 'microphone' as PermissionName,
+      })
+      if (status.state === 'granted') {
+        return
+      }
+    }
+  } catch {
+    /* permissions.query / name microphone pode falhar — segue getUserMedia */
+  }
+
   const stream = await navigator.mediaDevices.getUserMedia({
     audio: {
       channelCount: 1,
@@ -114,6 +135,9 @@ export async function primeMicPermission(): Promise<void> {
   for (const track of stream.getTracks()) {
     track.stop()
   }
+  await new Promise<void>((resolve) => {
+    globalThis.setTimeout(resolve, MIC_RELEASE_SETTLE_MS)
+  })
 }
 
 /**

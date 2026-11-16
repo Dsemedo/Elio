@@ -4,7 +4,20 @@
  *
  * Importante: durante o hold, `no-speech` / `onend` NÃO podem encerrar a sessão
  * cedo — senão o usuário fala e, ao soltar, recebe texto vazio.
+ *
+ * Quirk Chromium/Web Speech: NÃO chamar `recognition.start()` de forma síncrona
+ * dentro de `onend` — a sessão anterior ainda não terminou de desmontar e o
+ * `start()` falha (InvalidStateError) ou vira no-op silencioso. Reinício sempre
+ * via setTimeout curto, com flag de intenção (`stopping`) revalidada.
  */
+
+import {
+  SPEECH_RESTART_DELAY_MS,
+  canFinishSpeechStopWithoutEngine,
+  shouldScheduleSpeechRestart,
+} from '@shared/speechRestart'
+
+export { SPEECH_RESTART_DELAY_MS } from '@shared/speechRestart'
 
 export type WindowsSpeechSession = {
   /** Para o reconhecimento e devolve o texto final (ou interim se não houver final). */
@@ -80,15 +93,28 @@ export async function startWindowsSpeech(opts?: {
   let interimText = ''
   let settled = false
   let started = false
+  /** true enquanto o motor reporta sessão ativa (entre onstart e onend). */
+  let listening = false
   /** true depois que o usuário pediu stop/cancel — não reiniciar. */
   let stopping = false
+  let restartTimer: ReturnType<typeof setTimeout> | null = null
   let rejectStart: ((err: Error) => void) | null = null
   let resolveStop: ((text: string) => void) | null = null
   let rejectStop: ((err: Error) => void) | null = null
 
+  const clearRestartTimer = (): void => {
+    if (restartTimer !== null) {
+      globalThis.clearTimeout(restartTimer)
+      restartTimer = null
+    }
+  }
+
+  const bestText = (): string => finalText.trim() || interimText.trim()
+
   const finishOk = (text: string): void => {
     if (settled) return
     settled = true
+    clearRestartTimer()
     resolveStop?.(text)
     resolveStop = null
     rejectStop = null
@@ -97,18 +123,25 @@ export async function startWindowsSpeech(opts?: {
   const finishErr = (err: Error): void => {
     if (settled) return
     settled = true
+    clearRestartTimer()
     rejectStop?.(err)
     resolveStop = null
     rejectStop = null
   }
 
   const tryRestart = (): void => {
-    if (settled || stopping) return
-    try {
-      recognition.start()
-    } catch {
-      /* InvalidStateError se já estiver rodando — ok */
-    }
+    if (!shouldScheduleSpeechRestart({ settled, stopping })) return
+    clearRestartTimer()
+    // Nunca start() síncrono no onend — ver SPEECH_RESTART_DELAY_MS.
+    restartTimer = globalThis.setTimeout(() => {
+      restartTimer = null
+      if (!shouldScheduleSpeechRestart({ settled, stopping }) || listening) return
+      try {
+        recognition.start()
+      } catch (e) {
+        console.info('[elio:speech] restart falhou', e)
+      }
+    }, SPEECH_RESTART_DELAY_MS)
   }
 
   recognition.onresult = (event) => {
@@ -138,24 +171,26 @@ export async function startWindowsSpeech(opts?: {
       return
     }
     // no-speech no meio do hold: o runtime encerra o reconhecimento.
-    // NÃO marcar settled — onend reinicia enquanto o usuário segura.
+    // NÃO marcar settled — onend reinicia (com delay) enquanto o usuário segura.
     if (code === 'no-speech') {
+      console.info('[elio:speech] no-speech — vai reiniciar no onend se PTT ativo')
       return
     }
     if (code === 'aborted') {
-      finishOk(finalText.trim() || interimText.trim())
+      finishOk(bestText())
       return
     }
     finishErr(err)
   }
 
   recognition.onend = () => {
+    listening = false
     if (settled) return
     if (stopping || resolveStop) {
-      finishOk(finalText.trim() || interimText.trim())
+      finishOk(bestText())
       return
     }
-    // Ainda no PTT — reinicia após no-speech / fim natural do motor.
+    // Ainda no PTT — reinicia após o motor desmontar de verdade.
     tryRestart()
   }
 
@@ -163,6 +198,7 @@ export async function startWindowsSpeech(opts?: {
     rejectStart = (e) => reject(e)
     recognition.onstart = () => {
       started = true
+      listening = true
       resolve()
     }
     try {
@@ -176,6 +212,7 @@ export async function startWindowsSpeech(opts?: {
     cancel: () => {
       stopping = true
       settled = true
+      clearRestartTimer()
       resolveStop = null
       rejectStop = null
       try {
@@ -187,12 +224,21 @@ export async function startWindowsSpeech(opts?: {
     stop: () =>
       new Promise<string>((resolve, reject) => {
         if (settled) {
-          resolve(finalText.trim() || interimText.trim())
+          resolve(bestText())
           return
         }
         stopping = true
+        clearRestartTimer()
         resolveStop = resolve
         rejectStop = reject
+
+        // Sessão já acabou (ex.: no-speech) e o restart ainda não armou —
+        // não há onend futuro; devolve o que tiver agora.
+        if (canFinishSpeechStopWithoutEngine({ settled, listening })) {
+          finishOk(bestText())
+          return
+        }
+
         try {
           recognition.stop()
         } catch (e) {
@@ -200,7 +246,7 @@ export async function startWindowsSpeech(opts?: {
         }
         // Margem para o Windows Speech emitir isFinal antes do onend.
         globalThis.setTimeout(() => {
-          finishOk(finalText.trim() || interimText.trim())
+          finishOk(bestText())
         }, 4_000)
       }),
   }

@@ -2,10 +2,12 @@
  * Inicia captura PTT para Windows Speech (primário) ou Whisper (fallback).
  *
  * Ordem no Windows (Electron/Chromium):
- * 1) primeMicPermission — getUserMedia curto para prompt/consentimento do OS
- * 2) libera o device (stop tracks)
- * 3) SpeechRecognition sozinho — se getUserMedia ficar aberto, o Speech Runtime
- *    costuma ficar sem áudio e devolve “não ouvi nada” ao soltar o PTT
+ * 1) primeMicPermission — se mic já granted, skip; senão getUserMedia curto,
+ *    libera tracks e espera settle antes do Speech
+ * 2) SpeechRecognition sozinho — getUserMedia aberto em paralelo costuma
+ *    deixar o Speech Runtime sem áudio (“não ouvi nada”)
+ * 3) No hold, no-speech/onend rearmam o Speech com delay (nunca start síncrono
+ *    no onend — quirk Chromium)
  *
  * Whisper só se o Speech falhar ao **iniciar** (rede/áudio/indisponível).
  * Sem WAV paralelo nesta fala: no-speech → pedir para falar de novo.
