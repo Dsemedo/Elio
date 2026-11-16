@@ -5,8 +5,10 @@ Você fala, ele responde **com som**, confirma e **age no PC** — Spotify, apps
 
 > Elio escuta, responde com voz, confirma e age no PC — com allowlist.
 
-Documento de produto (norte, o quê / para quê, prioridades):  
-**[`docs/produto.md`](./docs/produto.md)**
+| Documento | Conteúdo |
+|-----------|----------|
+| **[`docs/produto.md`](./docs/produto.md)** | O quê, para quem, o que não é, princípios |
+| **[`docs/roadmap.md`](./docs/roadmap.md)** | Fases A–D, DoD, o que está estacionado |
 
 ---
 
@@ -16,21 +18,21 @@ Documento de produto (norte, o quê / para quê, prioridades):
 2. “Toca [música] no Spotify” → “Estou colocando agora” → a música toca  
 3. “Abre o Edge e o Instagram” → confirma e abre
 
-Hoje o microfone ainda é **segurar para falar** (PTT). Wake word (“Ei, Elio”) vem depois que esse loop estiver bom.
+Hoje o microfone ainda é **segurar para falar** (PTT). Wake word (“Ei, Elio”) só depois das Fases A–B do roadmap.
 
 ---
 
-## O que já existe × para onde vamos
+## O que já existe × foco agora
 
-| Já tem base | Próximo foco (nesta ordem) |
-|-------------|----------------------------|
-| Floating Bar + Command Center | **Loop demo:** TTS nas respostas de voz + confirmação falada + ação |
-| Whisper STT + TTS | Spotify por **nome da faixa** |
-| Abrir app / site / pasta | Comandos compostos (ex.: Edge + Instagram) |
-| Spotify (PKCE / play parcial) | Conversa multi-turno |
-| Cascata de IA (OpenRouter / Ollama) | Só então: wake word opcional |
+| Já tem base | Foco (Fase A — nesta ordem) |
+|-------------|------------------------------|
+| Floating Bar + Command Center | TTS na experiência de voz + confirmação falada |
+| Whisper STT (local) | Spotify por **nome da faixa** |
+| Abrir app / site / pasta (1 alvo) | Comandos compostos (Edge + Instagram) |
+| Spotify (PKCE / play parcial) | Só então: multi-turno → wake word |
+| Cascata de IA (OpenRouter / Ollama) | Agentes / Atividades / Slack = **estacionados** |
 
-Detalhe técnico e decisões: [`docs/ADRs/`](./docs/ADRs/) · UI: [`docs/elio-design-system.md`](./docs/elio-design-system.md)
+Detalhe técnico: [`docs/ADRs/`](./docs/ADRs/) · UI: [`docs/elio-design-system.md`](./docs/elio-design-system.md)
 
 ---
 
@@ -46,7 +48,7 @@ Distribuição / assinatura: [`docs/windows-distribution.md`](./docs/windows-dis
 
 ## Desenvolver (Windows)
 
-**Requisitos:** Windows 10/11 x64 · Node.js 22.12+ · microfone · pacote de fala **pt-BR** do Windows.
+**Requisitos:** Windows 10/11 x64 · Node.js 22.12+ · microfone.
 
 ```powershell
 git clone https://github.com/Dsemedo/Elio.git
@@ -59,9 +61,8 @@ npm run dev
 ### Voz e TTS (rápido)
 
 1. **Configurações → Privacidade → Microfone** — apps de desktop permitidos.  
-2. **Hora e idioma → Fala** — português (Brasil).  
-3. No Elio: ligue **Falar respostas** (menu da barra / Integrações) para ouvir o Elio.  
-4. Segure o mic → fale → solte.
+2. No Elio: ligue **Falar respostas** (menu da barra / Integrações) para ouvir o Elio.  
+3. Segure o mic → fale → solte.
 
 STT primário: Whisper local (mesmo caminho no Windows e no Mac).  
 Override opcional: `$env:ELIO_STT_PROVIDER = "whisper"` \| `"windows-speech"` \| `"auto"`.
@@ -88,12 +89,13 @@ npm run dist:win   # instalador NSIS
 
 ## Princípios (resumo)
 
-- **Demo do loop primeiro** — se não dá para mostrar em 30 s, a fatia está errada.  
+- **Demo do loop primeiro** — se não dá para mostrar em ~30 s, a fatia está errada.  
 - **Pedido por voz → resposta falada** (salvo modo silencioso).  
 - **Confirmar e agir** — allowlist, sem `exec` arbitrário.  
-- **PT-BR do dia a dia.**
+- **PT-BR do dia a dia.**  
+- **Público agora:** dogfooding do Douglas; ICP secundário só depois do loop estável.
 
-A fonte completa é [`docs/produto.md`](./docs/produto.md).
+Fonte completa: [`docs/produto.md`](./docs/produto.md) · ordem de build: [`docs/roadmap.md`](./docs/roadmap.md).
 
 ---
 

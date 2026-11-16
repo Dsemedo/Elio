@@ -1,46 +1,46 @@
 # ELIO — Design System & UI Specification
 
-**Versão:** 1.1 (MVP-scoped)  
-**Status:** Fonte viva da verdade de UI · crítica Douglas incorporada (2026-11-15)  
-**Produto:** ELIO — AI Desktop Assistant  
+**Versão:** 1.2 (MVP-scoped · alinhado ao norte de produto)  
+**Status:** Fonte viva da verdade de **UI** · crítica Douglas incorporada (2026-11-15) · alinhamento produto (2026-11-16)  
+**Produto:** Elio — companheiro de voz no desktop Windows  
 **Plataforma inicial:** Windows 10/11  
-**Changelog:** [ds-mvp-changelog.md](./ds-mvp-changelog.md)
+**Norte de produto:** [`produto.md`](./produto.md) · roadmap: [`roadmap.md`](./roadmap.md)
 
-Este documento é a **fonte viva** do design system. Em conflito com notas soltas, vale este arquivo (escopo MVP da v1.1).
+Este documento é a **fonte viva do design system (UI)**. Em conflito de *visual/UX de componentes*, vale este arquivo. Em conflito de *prioridade de produto, público ou roadmap*, valem [`produto.md`](./produto.md) e [`roadmap.md`](./roadmap.md).
 
 ---
 
 # 0. Escopo MVP vs depois
 
-| Camada / feature | MVP (Fase 1) | Depois (Estágio 2+) |
+| Camada / feature | MVP (Fase A–B do roadmap) | Depois / estacionado |
 |---|---|---|
-| Floating Bar (anatomia + estados reais) | Sim | — |
+| Floating Bar (anatomia + estados reais) | Sim — **voz-first** | — |
 | Command Center: chat, histórico, config básica | Sim (restyle leve) | Polimento |
-| Sidebar: Início, Conversas, Configurações | Sim | — |
-| **Atividades** (trilha profunda) | Stub / “em breve” | Real |
-| **Agentes** | Stub / “em breve” | Real |
-| **Memória** avançada | Stub / “em breve” | Real |
-| **Workspace** completo | Fora | Real |
-| Estados **EXECUTING** / **AWAITING_APPROVAL** | Não fingir na UI | Quando o Core tiver ações |
-| SPEAKING (TTS visual rico) | Opcional leve / futuro | Completo |
+| Sidebar: Início, Conversas, Memória, Configurações | Sim | — |
+| Memória explícita (CRUD) | Sim (já existe) | Memória “avançada” = estacionada |
+| **Atividades** (trilha profunda) | Stub / “em breve” | **Estacionado** — sem compromisso de build |
+| **Agentes** | Stub / “em breve” | **Estacionado** — sem compromisso de build |
+| **Workspace** completo | Fora | Só se o norte de produto mudar |
+| Estados **EXECUTING** / **AWAITING_APPROVAL** | Quando o Core tiver ações | — |
+| SPEAKING (TTS visual) | Ligado à Fase A (voz com voz) | Visual rico opcional |
 
-UI pode mostrar entradas como **“em breve”** — honestas, sem simular fluxos que o núcleo ainda não executa.
+UI pode mostrar entradas como **“em breve”** — honestas, sem simular fluxos que o núcleo ainda não executa. Stub **≠** item aprovado no roadmap.
 
 ---
 
-# 1. Visão do produto
+# 1. Visão do produto (UI)
 
-O ELIO é um assistente de inteligência artificial para desktop, projetado para acompanhar o usuário durante suas atividades profissionais e pessoais.
+O Elio é um **companheiro de voz no desktop**: a interface existe para o loop *ouvir → responder com voz → confirmar → agir*. Detalhe canônico em [`produto.md`](./produto.md).
 
-A interface deve transmitir inteligência, simplicidade, sofisticação e confiança.
+A interface deve transmitir inteligência, simplicidade, sofisticação e confiança — sem parecer um dashboard de agentes.
 
-O objetivo não é criar apenas uma interface de chatbot, mas uma experiência de assistente pessoal que esteja sempre acessível, consiga executar tarefas e permita acompanhar suas atividades sem interromper o fluxo de trabalho.
+O objetivo não é um chatbot genérico nem um workspace corporativo, e sim uma experiência **sempre acessível** (barra) + **conversa e configuração** (Command Center) que não atrapalhe o fluxo no Windows.
 
-A experiência será organizada em três níveis:
+Níveis de superfície:
 
-1. **Floating Bar:** interface compacta e flutuante, sempre acessível. **(MVP)**
-2. **Command Center:** ambiente principal de conversação e acompanhamento. **(MVP — base)**
-3. **Workspace:** gerenciamento completo de agentes, memória, provedores e configurações. **(Estágio 2 — depois)**
+1. **Floating Bar:** compacta, flutuante, voz-first. **(MVP)**
+2. **Command Center:** conversas, memória explícita, integrações e dados. **(MVP — base)**
+3. **Workspace / Agentes / Atividades:** **estacionados** — não desenhar como se fossem o futuro próximo.
 
 # 2. Identidade visual
 
@@ -218,10 +218,10 @@ Ambiente principal ao expandir a Floating Bar.
 |---|---|---|
 | Início | Resumo / status | — |
 | Conversas | Chat + histórico | Polimento |
-| Atividades | Stub **“em breve”** | Trilha real |
-| Agentes | Stub **“em breve”** | Workspace / agentes |
-| Memória | Stub **“em breve”** | Memória explícita rica |
-| Configurações | Provedores, PC, prefs | — |
+| Memória | CRUD explícito (já existe) | “Avançada” estacionada |
+| Configurações | Provedores, PC, prefs, dados | — |
+| Atividades | Stub **“em breve”** | **Estacionado** (ver roadmap) |
+| Agentes | Stub **“em breve”** | **Estacionado** (ver roadmap) |
 
 ## 5.3 Visual
 
@@ -229,9 +229,9 @@ Ambiente principal ao expandir a Floating Bar.
 - Sem cards desnecessários; hierarquia clara.
 - Motion 150–250 ms ease-out nas trocas de seção.
 
-# 6. Workspace
+# 6. Workspace / Agentes / Atividades
 
-Camada **Estágio 2** para agentes, memória avançada, provedores profundos e configurações avançadas. **Fora da Fase 1.** Sidebar reserva stubs honestos (“em breve”).
+**Estacionados** no roadmap de produto — não são o próximo horizonte de UI. Sidebar pode manter stubs honestos (“em breve”) sem especificar fluxos, orquestrador ou workspace completo até [`roadmap.md`](./roadmap.md) tirá-los da lista estacionada.
 
 # 7. Tokens de implementação (CSS)
 
@@ -270,7 +270,7 @@ Escopo fechado do DS para implementação imediata (+ tokens §7):
 | **MessageBubble** | Bolhas de chat com tokens |
 | **Sidebar** | Nav do Command Center (+ stubs “em breve”) |
 
-Fora da Fase 1 (não especificar/implementar agora como DS): Workspace, deep Atividades, fluxos de aprovação, orchestrator UI, etc.
+Fora do MVP de UI (não especificar/implementar agora): Workspace, deep Atividades, Agentes, fluxos de aprovação, orchestrator UI, etc.
 
 # 9. Arquitetura UI / Core
 
@@ -300,7 +300,7 @@ Regras:
 - **UI (React) ≠ regras de negócio de IA.** Renderer só apresenta e dispara intenções via IPC.
 - **IPC:** `contextBridge` + schemas **Zod** em todo canal.
 - **UI State Manager** entre janelas Bar e Command Center (estado compartilhado de UI: foco, conversa ativa, status visual).
-- **Core ainda não tem agent orchestrator** — por isso Agentes / EXECUTING / approval ficam Estágio 2; UI não simula.
+- **Agentes / orchestrator estão estacionados** no roadmap — UI não simula EXECUTING / approval até o Core e o produto pedirem.
 - Não reescrever arquitetura Electron nem AI Core “por causa do visual”.
 
 # 10. Requisitos Windows
@@ -325,20 +325,21 @@ Regras:
 7. Motion 150–250 ms ease-out; `prefers-reduced-motion`.
 8. Sidebar com stubs “em breve” onde for Estágio 2; chat/voz/histórico intactos.
 
-# 13. Fases
+# 13. Fases (UI — subordinadas ao roadmap de produto)
 
-| Fase | Conteúdo |
-|---|---|
-| **1 (MVP)** | Tokens + FloatingBar + ChatInput + StatusIndicator + MessageBubble + Sidebar; estados reais; restyle leve do CC |
-| **2** | Command Center completo (Início, Conversas polidas, Configurações) |
-| **3** | Atividades / Agentes / Memória reais + Workspace |
-| **4** | SPEAKING (TTS), EXECUTING / approval (quando Core tiver), polish multi-monitor |
+| Fase UI | Conteúdo | Ligação produto |
+|---|---|---|
+| **1 (MVP)** | Tokens + FloatingBar + ChatInput + StatusIndicator + MessageBubble + Sidebar; estados reais; restyle leve do CC | Suporta Fase A (loop voz) |
+| **2** | Command Center polido (Início, Conversas, Memória, Config); estado SPEAKING alinhado ao TTS | Fases A–B |
+| **3+** | Só o que o [`roadmap.md`](./roadmap.md) tirar de “estacionado” | Não antecipar Agentes/Workspace |
 
 # 14. Fora de escopo imediato
 
-- OAuth Slack/Jira, perfilamento profundo de PC, abrir apps via Ollama, atalho global (OD-20).
-- Agent orchestrator na UI; Workspace full; tema claro.
+- OAuth Slack/Jira, perfilamento profundo de PC, atalho global (OD-20).
+- Agent orchestrator na UI; Workspace full; tema claro; i18n.
 
 ---
 
-**Relacionados:** [ui-direction.md](./ui-direction.md) · [shell-product-brief.md](./shell-product-brief.md) · [architecture.md](./architecture.md) · [decision-log.md](./decision-log.md) · [open-decisions.md](./open-decisions.md) (OD-20)
+**Relacionados (canônicos):** [`produto.md`](./produto.md) · [`roadmap.md`](./roadmap.md) · [`ADRs/`](./ADRs/) · [`windows-distribution.md`](./windows-distribution.md)
+
+Docs antigos citados em versões anteriores (`ui-direction.md`, `shell-product-brief.md`, etc.) **não existem mais neste repo** — não recriar; usar os canônicos acima.
