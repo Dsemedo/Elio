@@ -1,8 +1,8 @@
-# ADR 0017 — Abrir site dinâmico com correção de STT
+# ADR 0018 — Abrir site dinâmico com correção de STT
 
 **Status:** aceito  
 **Data:** 2026-11-16  
-**Versão:** 0.18.0
+**Versão:** 0.18.1
 
 ## Contexto
 

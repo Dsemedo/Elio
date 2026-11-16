@@ -1,4 +1,9 @@
-import { resolveAppId, type AppId } from './apps'
+import {
+  resolveAppId,
+  resolveBrowserAppId,
+  type AppId,
+  type BrowserAppId,
+} from './apps'
 import { resolveFolderAlias, normalizeFolderKey } from './paths'
 import { resolveSiteAlias } from './urls'
 
@@ -8,13 +13,20 @@ import { resolveSiteAlias } from './urls'
  */
 
 export type DesktopIntent =
-  | { kind: 'open_url'; label: string; rawTarget: string }
+  | {
+      kind: 'open_url'
+      label: string
+      rawTarget: string
+      /** Se definido, abre a URL nesse browser allowlisted (Win). */
+      browserId?: BrowserAppId
+    }
   /** Nome livre (jornal, portal…) — resolve URL dinamicamente + corrige STT. */
   | { kind: 'open_site_query'; label: string; query: string }
   | { kind: 'open_folder'; label: string; rawTarget: string }
   | { kind: 'open_file'; label: string; rawTarget: string }
   | { kind: 'open_app'; label: string; appId: AppId }
   | { kind: 'open_explorer'; label: string; rawTarget: string | null }
+  | { kind: 'open_many'; label: string; items: DesktopIntent[] }
 
 /** Pedidos que parecem conversa, não “abrir site/arquivo”. */
 const NON_SITE_OPEN_RE =
@@ -37,13 +49,45 @@ function cleanTarget(raw: string): string {
     .trim()
 }
 
-/**
- * Detecta intenção de abrir. Retorna null se não for comando de open claro.
- */
-export function parseDesktopOpenIntent(text: string): DesktopIntent | null {
-  const rest = stripOpenVerb(text)
-  if (rest === null) return null
+/** Parse de um único alvo (sem o verbo “abre”). */
+function parseSingleOpenTarget(rest: string): DesktopIntent | null {
   if (!rest) return null
+
+  // "Google Maps no Chrome" / "Instagram no Edge"
+  const inBrowser = rest.match(
+    /^(.+?)\s+(?:no|na|pelo|pela|com\s+o|com\s+a)\s+(chrome|google\s*chrome|edge|microsoft\s*edge|msedge|navegador|browser)$/i,
+  )
+  if (inBrowser?.[1] && inBrowser[2]) {
+    const siteLabel = cleanTarget(inBrowser[1])
+    const browserRaw = inBrowser[2]
+    const browserId = resolveBrowserAppId(browserRaw)
+    if (browserId && (resolveSiteAlias(siteLabel) || /^https:\/\//i.test(siteLabel) || /\./.test(siteLabel))) {
+      return {
+        kind: 'open_url',
+        label: siteLabel,
+        rawTarget: siteLabel,
+        browserId,
+      }
+    }
+    // "Chrome no Edge" não faz sentido — cai no fluxo normal
+  }
+
+  // "Chrome com Google Maps" / "Edge no Instagram"
+  const browserWith = rest.match(
+    /^(?:o\s+)?(chrome|google\s*chrome|edge|microsoft\s*edge|msedge)\s+(?:com|em|no|na|para)\s+(?:o\s+|a\s+)?(.+)$/i,
+  )
+  if (browserWith?.[1] && browserWith[2]) {
+    const browserId = resolveBrowserAppId(browserWith[1])
+    const siteLabel = cleanTarget(browserWith[2])
+    if (browserId) {
+      return {
+        kind: 'open_url',
+        label: siteLabel,
+        rawTarget: siteLabel,
+        browserId,
+      }
+    }
+  }
 
   // URL explícita
   if (/^https:\/\//i.test(rest) || /^www\./i.test(rest)) {
@@ -112,7 +156,7 @@ export function parseDesktopOpenIntent(text: string): DesktopIntent | null {
     }
   }
 
-  // App conhecido: "o bloco de notas", "calculadora"
+  // App conhecido: "o bloco de notas", "calculadora", "Chrome", "Edge"
   const appCandidate = cleanTarget(rest)
   const appId = resolveAppId(appCandidate)
   if (appId) {
@@ -128,16 +172,22 @@ export function parseDesktopOpenIntent(text: string): DesktopIntent | null {
     }
   }
 
-  // Site conhecido sem a palavra "site": "abre a Exame" / "abre o Google"
+  // Site conhecido (inclui multi-palavra: "Google Maps")
   if (resolveSiteAlias(appCandidate)) {
     return { kind: 'open_url', label: appCandidate, rawTarget: appCandidate }
   }
 
-  // "a Exame" / "o Google" — artigo + nome
-  const articleSite = rest.match(/^(?:a|o)\s+([A-Za-zÀ-ÿ0-9][\wÀ-ÿ.-]*)$/i)
-  if (articleSite?.[1] && resolveSiteAlias(articleSite[1])) {
+  // "a Exame" / "o Google" — artigo + nome (também "o Google Maps")
+  const articleSite = rest.match(/^(?:a|o)\s+(.+)$/i)
+  if (articleSite?.[1]) {
     const target = cleanTarget(articleSite[1])
-    return { kind: 'open_url', label: target, rawTarget: target }
+    if (resolveSiteAlias(target)) {
+      return { kind: 'open_url', label: target, rawTarget: target }
+    }
+    const nestedApp = resolveAppId(target)
+    if (nestedApp) {
+      return { kind: 'open_app', label: target, appId: nestedApp }
+    }
   }
 
   // Caminho absoluto Windows / relativo com extensão → arquivo
@@ -169,9 +219,60 @@ export function parseDesktopOpenIntent(text: string): DesktopIntent | null {
   return null
 }
 
+/**
+ * Divide “A e B” / “A e o B” em partes para open composto.
+ * Só `\s+e\s+` (não parte “de” em “bloco de notas”).
+ */
+function splitCompoundTargets(rest: string): string[] | null {
+  if (!/\se\s/i.test(rest)) return null
+  const parts = rest
+    .split(/\s+e\s+/i)
+    .map((p) => p.trim())
+    .filter(Boolean)
+  return parts.length >= 2 ? parts : null
+}
+
+/**
+ * Detecta intenção de abrir. Retorna null se não for comando de open claro.
+ */
+export function parseDesktopOpenIntent(text: string): DesktopIntent | null {
+  const rest = stripOpenVerb(text)
+  if (rest === null) return null
+  if (!rest) return null
+
+  // Composto: “o Edge e o Instagram”
+  const compoundParts = splitCompoundTargets(rest)
+  if (compoundParts && compoundParts.length >= 2 && compoundParts.length <= 4) {
+    const items: DesktopIntent[] = []
+    for (const part of compoundParts) {
+      const item = parseSingleOpenTarget(part)
+      if (!item || item.kind === 'open_many') {
+        // Se alguma parte falha, não força composto (deixa LLM).
+        return parseSingleOpenTarget(rest)
+      }
+      items.push(item)
+    }
+    if (items.length >= 2) {
+      return {
+        kind: 'open_many',
+        label: items.map((i) => ('label' in i ? i.label : '?')).join(' e '),
+        items,
+      }
+    }
+  }
+
+  return parseSingleOpenTarget(rest)
+}
+
 export function describeIntent(intent: DesktopIntent): string {
   switch (intent.kind) {
     case 'open_url':
+      if (intent.browserId === 'chrome') {
+        return `Abrindo ${intent.label} no Chrome…`
+      }
+      if (intent.browserId === 'edge') {
+        return `Abrindo ${intent.label} no Edge…`
+      }
       return `Abrindo site ${intent.label}…`
     case 'open_site_query':
       return `Abrindo ${intent.label}…`
@@ -185,5 +286,7 @@ export function describeIntent(intent: DesktopIntent): string {
       return intent.rawTarget
         ? `Abrindo Explorador em ${intent.label}…`
         : 'Abrindo Explorador…'
+    case 'open_many':
+      return `Abrindo ${intent.label}…`
   }
 }
