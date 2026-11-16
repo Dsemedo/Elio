@@ -27,17 +27,17 @@ describe('parseSttPreference', () => {
 })
 
 describe('resolveSttBackend', () => {
-  it('no Windows com SpeechRecognition → windows-speech', () => {
+  it('auto no Windows → whisper (mesmo com SpeechRecognition)', () => {
     expect(
       resolveSttBackend({
         platform: 'win32',
         speechRecognitionAvailable: true,
         preference: 'auto',
       }),
-    ).toBe('windows-speech')
+    ).toBe('whisper')
   })
 
-  it('sem SpeechRecognition → whisper', () => {
+  it('auto sem SpeechRecognition → whisper', () => {
     expect(
       resolveSttBackend({
         platform: 'win32',
@@ -47,10 +47,17 @@ describe('resolveSttBackend', () => {
     ).toBe('whisper')
   })
 
-  it('Linux auto → whisper mesmo com SpeechRecognition', () => {
+  it('auto no Linux / darwin → whisper', () => {
     expect(
       resolveSttBackend({
         platform: 'linux',
+        speechRecognitionAvailable: true,
+        preference: 'auto',
+      }),
+    ).toBe('whisper')
+    expect(
+      resolveSttBackend({
+        platform: 'darwin',
         speechRecognitionAvailable: true,
         preference: 'auto',
       }),
@@ -65,6 +72,16 @@ describe('resolveSttBackend', () => {
         preference: 'whisper',
       }),
     ).toBe('whisper')
+  })
+
+  it('force windows-speech com API → windows-speech', () => {
+    expect(
+      resolveSttBackend({
+        platform: 'win32',
+        speechRecognitionAvailable: true,
+        preference: 'windows-speech',
+      }),
+    ).toBe('windows-speech')
   })
 
   it('force windows-speech sem API → whisper', () => {

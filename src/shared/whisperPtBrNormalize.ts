@@ -60,5 +60,14 @@ export function normalizeWhisperPtBr(raw: string): string {
   text = text.replace(/\btempo\s+outdoor\b/gi, 'tempo atual')
   text = text.replace(/\bhor[aá]rio\s+outdoor\b/gi, 'horário atual')
 
+  // “Qual é a hora?” — Whisper small / encoding ruim: ``, “e”, “o hora”.
+  text = text.replace(/\bqual\s+(?:\uFFFD|e|é)\s+o\s+hora\b/gi, 'Qual é a hora')
+  text = text.replace(/\bqual\s+(?:\uFFFD|e)\s+a\s+hora\b/gi, 'Qual é a hora')
+  text = text.replace(/\bqual\s+\uFFFD\b/gi, 'Qual é')
+  text = text.replace(/\b(é|e)\s+o\s+hora\b/gi, '$1 a hora')
+
+  // Sobras de UTF-8 inválido do whisper-cli.
+  text = text.replace(/\uFFFD+/g, '')
+
   return text.replace(/\s+/g, ' ').trim()
 }

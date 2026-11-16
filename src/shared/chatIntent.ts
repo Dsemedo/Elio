@@ -8,8 +8,9 @@ export type ChatToolIntent = {
   needsWeather: boolean
 }
 
+/** Inclui “qual é a hora” / “qual e a hora” / “qual o hora” (mangling STT). */
 const TIME_RE =
-  /\b(que\s+horas|hor[aá]rio|hora\s+atual|que\s+dia|que\s+data|data\s+de\s+hoje|dia\s+de\s+hoje|hoje\s+[eé]\s+que\s+dia|me\s+diga\s+a\s+hora|qual\s+(a\s+)?hora)\b/i
+  /\b(que\s+horas|hor[aá]rio|hora\s+atual|que\s+dia|que\s+data|data\s+de\s+hoje|dia\s+de\s+hoje|hoje\s+[eé]\s+que\s+dia|me\s+diga\s+a\s+hora|qual\s+(?:[eé]\s+)?(?:a\s+|o\s+)?hora)\b/i
 
 const WEATHER_RE =
   /\b(tempo|clima|temperatura|chuva|chovendo|previs[aã]o|umidade|vento|faz\s+calor|faz\s+frio|como\s+est[aá]\s+o\s+tempo|como\s+est[aá]\s+o\s+clima|est[aá]\s+chovendo)\b/i

@@ -1,4 +1,7 @@
-/** Política de STT: Windows Speech primário no Windows; Whisper só fallback. */
+/**
+ * Política de STT: Whisper primário (Win/Mac/Linux).
+ * Windows Speech só com force explícito (`ELIO_STT_PROVIDER=windows-speech`).
+ */
 
 export type SttPreference = 'auto' | 'windows-speech' | 'whisper'
 export type SttBackend = 'windows-speech' | 'whisper'
@@ -11,26 +14,24 @@ export function parseSttPreference(raw: string | undefined | null): SttPreferenc
 
 /**
  * Escolhe o backend de STT para um PTT.
- * - No Windows com Web Speech disponível → windows-speech (salvo force whisper).
- * - Fora do Windows, ou sem SpeechRecognition → whisper.
+ * - `auto` / `whisper` → sempre Whisper (mesmo caminho no Windows e no Mac).
+ * - `windows-speech` → Web Speech só se a API existir; senão Whisper.
+ *
+ * O `platform` permanece no input para callers/UI; `auto` não ramifica por OS.
  */
 export function resolveSttBackend(input: {
   platform: string
   speechRecognitionAvailable: boolean
   preference?: SttPreference
 }): SttBackend {
+  void input.platform
   const preference = input.preference ?? 'auto'
-
-  if (preference === 'whisper') return 'whisper'
 
   if (preference === 'windows-speech') {
     return input.speechRecognitionAvailable ? 'windows-speech' : 'whisper'
   }
 
-  // auto
-  if (input.platform === 'win32' && input.speechRecognitionAvailable) {
-    return 'windows-speech'
-  }
+  // auto | whisper
   return 'whisper'
 }
 

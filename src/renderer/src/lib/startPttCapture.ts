@@ -1,14 +1,11 @@
 /**
- * Inicia captura PTT para Windows Speech (primário) ou Whisper (fallback).
+ * Inicia captura PTT: Whisper (primário / `auto`) ou Windows Speech (só force).
  *
- * Ordem no Windows (Electron/Chromium):
- * 1) primeMicPermission — getUserMedia curto para prompt/consentimento do OS
+ * Caminho Speech (ELIO_STT_PROVIDER=windows-speech):
+ * 1) primeMicPermission — getUserMedia curto ou skip se já granted
  * 2) libera o device (stop tracks)
- * 3) SpeechRecognition sozinho — se getUserMedia ficar aberto, o Speech Runtime
- *    costuma ficar sem áudio e devolve “não ouvi nada” ao soltar o PTT
- *
- * Whisper só se o Speech falhar ao **iniciar** (rede/áudio/indisponível).
- * Sem WAV paralelo nesta fala: no-speech → pedir para falar de novo.
+ * 3) SpeechRecognition sozinho — getUserMedia aberto em paralelo costuma
+ *    deixar o Speech Runtime sem áudio no Electron/Windows
  */
 
 import {
@@ -39,8 +36,8 @@ export type PttCapture =
     }
 
 /**
- * Permissão de mic → libera device → Windows Speech.
- * Falha recuperável no start do Speech → Whisper com recorder novo.
+ * Caminho opcional (force windows-speech): permissão → libera device → Speech.
+ * Falha recuperável no start → Whisper com recorder novo.
  */
 export async function startWindowsSpeechPtt(opts?: {
   lang?: string

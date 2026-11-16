@@ -33,14 +33,11 @@ function toVoiceStatus(): VoiceStatus {
       process.platform === 'win32' || process.platform === 'linux',
     sttPreference,
     platform: process.platform,
-    hint: onWindows
-      ? assets.ready
-        ? 'Windows Speech primário; Whisper pronto como fallback offline.'
-        : 'Windows Speech primário (sem download). Whisper (~' +
-          `${model.sizeHintMb} MB) só se o Windows Speech falhar — “Preparar fallback” baixa agora.`
-      : assets.ready
-        ? 'Voz pronta (Whisper local) — segure o microfone e fale.'
-        : `Na primeira vez a gente baixa o Whisper (~${model.sizeHintMb} MB, modelo ${model.id}). Precisa de internet uma vez.`,
+    hint: assets.ready
+      ? onWindows
+        ? 'Voz pronta (Whisper local). Windows Speech só com ELIO_STT_PROVIDER=windows-speech.'
+        : 'Voz pronta (Whisper local) — segure o microfone e fale.'
+      : `Na primeira vez a gente baixa o Whisper (~${model.sizeHintMb} MB, modelo ${model.id}). Precisa de internet uma vez.`,
   }
 }
 

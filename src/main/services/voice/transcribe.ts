@@ -22,6 +22,7 @@ import {
 } from './paths'
 import { normalizeWhisperPtBr } from '../../../shared/whisperPtBrNormalize'
 import type { VoiceProgress } from '../../../shared/types'
+import { decodeWhisperOutputBytes } from './decodeOutput'
 
 type WavInfo = {
   sampleRate: number
@@ -170,7 +171,7 @@ async function runWhisperCli(wavPath: string, outBase: string): Promise<string> 
         return
       }
       try {
-        const text = readFileSync(txtPath, 'utf8').trim()
+        const text = decodeWhisperOutputBytes(readFileSync(txtPath))
         resolve(text)
       } catch (readErr) {
         console.error('[elio] voice: leitura .txt falhou', {

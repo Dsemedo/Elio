@@ -566,9 +566,9 @@ export function ChatView({
                   className="btn ghost"
                   disabled={voiceBusy || busy}
                   onClick={() => void prepareVoiceClick()}
-                  title="Baixa o Whisper para usar se o Windows Speech falhar (offline)"
+                  title="Baixa o Whisper (~modelo local) para o PTT"
                 >
-                  {usingWindowsSpeech ? 'Preparar fallback' : 'Preparar voz'}
+                  Preparar voz
                 </button>
               ) : null}
               <button

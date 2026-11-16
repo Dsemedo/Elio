@@ -60,8 +60,9 @@ export const LEGACY_MODEL_FILES = ['ggml-tiny.bin', 'ggml-base.bin'] as const
  * Inclui “atual” de propósito (Whisper `small` costuma manglar para “outdoor”).
  */
 export const WHISPER_INITIAL_PROMPT =
-  'Oi. Qual é o clima atual? Qual é o clima atual do lugar que eu moro? ' +
-  'Como está o tempo hoje? Que horas são? Qual é o horário atual? ' +
+  'Oi. Qual é a hora? Que horas são? Qual é o horário atual? ' +
+  'Qual é o clima atual? Qual é o clima atual do lugar que eu moro? ' +
+  'Como está o tempo hoje? ' +
   'Abre o Chrome. Abre a pasta Downloads. Conectar Spotify. Toca uma música. ' +
   'Obrigado. Por favor.'
 

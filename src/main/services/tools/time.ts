@@ -67,3 +67,9 @@ export function getLocalClock(now: Date = new Date()): LocalClock {
     display: `${weekday}, ${date}, ${time} (${timezone})`,
   }
 }
+
+/** Resposta determinística de hora (sem LLM) — Fatia 1 do loop demo. */
+export function formatClockUserReply(clock: LocalClock = getLocalClock()): string {
+  const hhmm = clock.time.slice(0, 5)
+  return `Agora são ${hhmm} — ${clock.weekday}, ${clock.date} (${clock.timezone}).`
+}

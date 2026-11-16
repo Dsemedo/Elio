@@ -78,7 +78,7 @@ Ordem fixa. Não pular etapas para “features interessantes”.
 - Confirmação falada antes/durante a ação  
 - Spotify: tocar **faixa pelo nome** (não só retomar)  
 - Comandos compostos: Edge + Instagram (e aliases claros)  
-- Windows Speech como STT primário; Whisper só em falha dura (não em “não ouvi”)
+- STT Whisper local (primário Win/Mac); Windows Speech só opcional via env
 
 ### Fatia 2 — Conversa multi-turno
 
@@ -115,7 +115,7 @@ Ordem fixa. Não pular etapas para “features interessantes”.
 
 ## Estado atual (honesto)
 
-Em **v0.16.x** já existem pedaços: Floating Bar, Windows Speech, TTS (off por padrão), opens, Spotify PKCE parcial, clima, cascata de IA, digitar no app.
+Em **v0.17.x** já existem pedaços: Floating Bar, Whisper STT, TTS (off por padrão), opens, Spotify PKCE parcial, clima, cascata de IA, digitar no app.
 
 O desalinhamento recente: muitas fatias de engenharia **sem** o loop de companheiro como centro. A partir deste documento, o roadmap gira em torno do loop acima.
 

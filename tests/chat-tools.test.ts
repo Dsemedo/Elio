@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { detectChatToolIntent } from '../src/main/services/tools/intent'
-import { getLocalClock, DEFAULT_TIMEZONE } from '../src/main/services/tools/time'
+import {
+  formatClockUserReply,
+  getLocalClock,
+  DEFAULT_TIMEZONE,
+} from '../src/main/services/tools/time'
 import {
   resolveWeatherLocationFromEnv,
   weatherCodeToPt,
@@ -11,6 +15,9 @@ describe('detectChatToolIntent', () => {
   it('detecta perguntas de hora em pt-BR', () => {
     expect(detectChatToolIntent('que horas são?').needsTime).toBe(true)
     expect(detectChatToolIntent('Qual a hora agora').needsTime).toBe(true)
+    expect(detectChatToolIntent('Qual é a hora?').needsTime).toBe(true)
+    expect(detectChatToolIntent('qual e a hora').needsTime).toBe(true)
+    expect(detectChatToolIntent('Qual o hora?').needsTime).toBe(true)
     expect(detectChatToolIntent('que dia é hoje?').needsTime).toBe(true)
     expect(detectChatToolIntent('olá').needsTime).toBe(false)
   })
@@ -36,6 +43,8 @@ describe('getLocalClock', () => {
       expect(clock.display).toContain(DEFAULT_TIMEZONE)
       expect(clock.time).toMatch(/^\d{2}:\d{2}:\d{2}$/)
       expect(clock.date).toMatch(/^\d{2}\/\d{2}\/\d{4}$/)
+      expect(formatClockUserReply(clock)).toMatch(/Agora são \d{2}:\d{2}/)
+      expect(formatClockUserReply(clock)).toContain(DEFAULT_TIMEZONE)
     } finally {
       if (prev === undefined) delete process.env['ELIO_TIMEZONE']
       else process.env['ELIO_TIMEZONE'] = prev
