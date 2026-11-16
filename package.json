@@ -1,7 +1,7 @@
 {
   "name": "elio",
   "version": "0.16.0",
-  "description": "Elio — assistente pessoal de IA (JARVIS MVP)",
+  "description": "Elio — companheiro de voz no desktop Windows (ouve, fala e age)",
   "author": "Douglas Semedo Neto",
   "license": "UNLICENSED",
   "private": true,
