@@ -30,4 +30,4 @@ Opções para “digite X no app em foco”:
 - Primeiro passo concreto de automação testável (unit tests com driver mock).
 - Risco residual: digita no **app/campo em foco** — o usuário precisa clicar no destino antes.
 - PowerShell só com `-Command` de script fixo (`shell: false`); não reabre a porta de `exec` arbitrário do ADR 0005 para opens.
-- Próximas fatias possíveis: atalhos allowlisted, clicar em UI Automation, confirmação para ações sensíveis.
+- Próximas fatias possíveis: atalhos allowlisted (**feito na ADR 0016**), clicar em UI Automation, confirmação para ações sensíveis.

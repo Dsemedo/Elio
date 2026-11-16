@@ -39,10 +39,65 @@ describe('parseDesktopInputIntent', () => {
     })
   })
 
-  it('não captura conversa geral nem open', () => {
+  it('reconhece atalhos Ctrl allowlist (pressiona + frases)', () => {
+    expect(parseDesktopInputIntent('pressiona ctrl+c')).toEqual({
+      kind: 'press_key',
+      key: 'copy',
+    })
+    expect(parseDesktopInputIntent('aperta control v')).toEqual({
+      kind: 'press_key',
+      key: 'paste',
+    })
+    expect(parseDesktopInputIntent('tecla ctrl+a')).toEqual({
+      kind: 'press_key',
+      key: 'select_all',
+    })
+    expect(parseDesktopInputIntent('pressiona ctrl+z')).toEqual({
+      kind: 'press_key',
+      key: 'undo',
+    })
+    expect(parseDesktopInputIntent('pressiona ctrl+s')).toEqual({
+      kind: 'press_key',
+      key: 'save',
+    })
+    expect(parseDesktopInputIntent('pressiona ctrl+x')).toEqual({
+      kind: 'press_key',
+      key: 'cut',
+    })
+
+    expect(parseDesktopInputIntent('copia')).toEqual({
+      kind: 'press_key',
+      key: 'copy',
+    })
+    expect(parseDesktopInputIntent('cola')).toEqual({
+      kind: 'press_key',
+      key: 'paste',
+    })
+    expect(parseDesktopInputIntent('seleciona tudo')).toEqual({
+      kind: 'press_key',
+      key: 'select_all',
+    })
+    expect(parseDesktopInputIntent('desfaz')).toEqual({
+      kind: 'press_key',
+      key: 'undo',
+    })
+    expect(parseDesktopInputIntent('salva o arquivo')).toEqual({
+      kind: 'press_key',
+      key: 'save',
+    })
+    expect(parseDesktopInputIntent('recorta')).toEqual({
+      kind: 'press_key',
+      key: 'cut',
+    })
+  })
+
+  it('não captura conversa geral, open nem atalho fora da allowlist', () => {
     expect(parseDesktopInputIntent('olá, tudo bem?')).toBeNull()
     expect(parseDesktopInputIntent('abre o Chrome')).toBeNull()
-    expect(parseDesktopInputIntent('pressiona ctrl+c')).toBeNull()
+    expect(parseDesktopInputIntent('pressiona ctrl+w')).toBeNull()
+    expect(parseDesktopInputIntent('pressiona alt+f4')).toBeNull()
+    expect(parseDesktopInputIntent('copia isso pra mim depois')).toBeNull()
+    expect(parseDesktopInputIntent('salva a conversa no histórico')).toBeNull()
   })
 })
 
@@ -89,10 +144,24 @@ describe('executeDesktopInputIntent', () => {
     expect(key.ok).toBe(true)
     expect(pressKey).toHaveBeenCalledWith('enter')
   })
+
+  it('executa atalho allowlist via driver', async () => {
+    const typeText = vi.fn(async () => undefined)
+    const pressKey = vi.fn(async () => undefined)
+    const driver: DesktopInputDriver = { typeText, pressKey }
+
+    const copy = await executeDesktopInputIntent(
+      { kind: 'press_key', key: 'copy' },
+      { platform: 'win32', driver },
+    )
+    expect(copy.ok).toBe(true)
+    expect(copy.message).toContain('Ctrl+C')
+    expect(pressKey).toHaveBeenCalledWith('copy')
+  })
 })
 
 describe('classifyUserIntent — desktop_input', () => {
-  it('lane A: digitar e tecla', () => {
+  it('lane A: digitar, tecla e atalho', () => {
     const digite = classifyUserIntent('digite bom dia')
     expect(digite.lane).toBe('pc_action')
     if (digite.lane === 'pc_action') {
@@ -106,6 +175,15 @@ describe('classifyUserIntent — desktop_input', () => {
     expect(enter.lane).toBe('pc_action')
     if (enter.lane === 'pc_action') {
       expect(enter.action).toBe('desktop_input')
+    }
+
+    const copy = classifyUserIntent('copia')
+    expect(copy.lane).toBe('pc_action')
+    if (copy.lane === 'pc_action') {
+      expect(copy.action).toBe('desktop_input')
+      if (copy.action === 'desktop_input') {
+        expect(copy.input).toEqual({ kind: 'press_key', key: 'copy' })
+      }
     }
   })
 
