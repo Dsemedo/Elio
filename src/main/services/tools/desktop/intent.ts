@@ -9,10 +9,16 @@ import { resolveSiteAlias } from './urls'
 
 export type DesktopIntent =
   | { kind: 'open_url'; label: string; rawTarget: string }
+  /** Nome livre (jornal, portal…) — resolve URL dinamicamente + corrige STT. */
+  | { kind: 'open_site_query'; label: string; query: string }
   | { kind: 'open_folder'; label: string; rawTarget: string }
   | { kind: 'open_file'; label: string; rawTarget: string }
   | { kind: 'open_app'; label: string; appId: AppId }
   | { kind: 'open_explorer'; label: string; rawTarget: string | null }
+
+/** Pedidos que parecem conversa, não “abrir site/arquivo”. */
+const NON_SITE_OPEN_RE =
+  /\b(conversa|assunto|discuss[aã]o|papo|hist[oó]rico|cap[ií]tulo|ideia|explica|me\s+fala|sobre\s+mim)\b/i
 
 const OPEN_VERB =
   /^(?:por\s+favor\s+|pf\s+|pode\s+)?(?:abre|abrir|abra|abre\s+a[ií])\b[\s,]*/i
@@ -44,13 +50,27 @@ export function parseDesktopOpenIntent(text: string): DesktopIntent | null {
     return { kind: 'open_url', label: rest, rawTarget: rest }
   }
 
-  // "o site da Exame" / "site exame" / "o site https://..."
+  // "o site da Exame" / "site exame" / "o site https://..." / "site do jornal …"
   const siteMatch = rest.match(
     /^(?:o\s+)?site\s+(?:da|do|de|d[aeo])?\s*(.+)$/i,
   )
   if (siteMatch?.[1]) {
     const target = cleanTarget(siteMatch[1])
-    return { kind: 'open_url', label: target, rawTarget: target }
+    if (resolveSiteAlias(target) || /^https:\/\//i.test(target) || /\./.test(target)) {
+      return { kind: 'open_url', label: target, rawTarget: target }
+    }
+    return { kind: 'open_site_query', label: target, query: target }
+  }
+
+  // "o jornal …" / "a revista …" / "o portal …" — quase sempre site; resolve dinâmico.
+  const publicationMatch = rest.match(
+    /^(?:o\s+|a\s+)?(jornal|revista|portal|blog)\s+(.+)$/i,
+  )
+  if (publicationMatch?.[2] && !NON_SITE_OPEN_RE.test(rest)) {
+    const kind = publicationMatch[1] ?? 'jornal'
+    const name = cleanTarget(publicationMatch[2])
+    const query = `${kind} ${name}`.replace(/\s+/g, ' ').trim()
+    return { kind: 'open_site_query', label: query, query }
   }
 
   // "navegador/browser em/no/na X" ou "navegador"
@@ -130,12 +150,19 @@ export function parseDesktopOpenIntent(text: string): DesktopIntent | null {
     return { kind: 'open_file', label: target, rawTarget: target }
   }
 
-  // Sem match claro — não forçar open (deixa o LLM responder).
-  // Evita "abre a conversa" virar ação de desktop.
+  // Hostname solto: "abre opopular.com.br"
   if (normalizeFolderKey(rest).length > 0) {
-    // "abre algo desconhecido" — tenta como site só se parecer hostname
     if (/\./.test(rest) && !/\s/.test(rest)) {
       return { kind: 'open_url', label: rest, rawTarget: cleanTarget(rest) }
+    }
+  }
+
+  // Nome livre após "abre …" → resolução dinâmica (sem lista fechada).
+  // Evita "abre a conversa…" / frases vagas virarem open.
+  if (!NON_SITE_OPEN_RE.test(rest)) {
+    const query = cleanTarget(rest)
+    if (query.length >= 2 && /[a-zA-ZÀ-ÿ]/.test(query)) {
+      return { kind: 'open_site_query', label: query, query }
     }
   }
 
@@ -146,6 +173,8 @@ export function describeIntent(intent: DesktopIntent): string {
   switch (intent.kind) {
     case 'open_url':
       return `Abrindo site ${intent.label}…`
+    case 'open_site_query':
+      return `Abrindo ${intent.label}…`
     case 'open_folder':
       return `Abrindo pasta ${intent.label}…`
     case 'open_file':

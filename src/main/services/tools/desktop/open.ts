@@ -7,11 +7,18 @@ import {
   type PathRoots,
 } from './paths'
 import { resolveAppPath } from './apps'
+import {
+  formatSiteOpenMessage,
+  resolveSiteQueryDynamically,
+  type SiteResolveComplete,
+  type SiteResolveResult,
+} from './siteResolve'
 import { resolveOpenUrl } from './urls'
 
 /**
  * Execução allowlisted: só shell.openExternal (https) e shell.openPath.
  * Sem PowerShell, sem exec arbitrário.
+ * Sites desconhecidos: resolução dinâmica (LLM) + validação https — sem lista fechada.
  */
 
 export type DesktopOpener = {
@@ -27,12 +34,41 @@ export type DesktopActionResult = {
   requiresConfirm?: boolean
 }
 
+export type ResolveSiteFn = (
+  query: string,
+  signal?: AbortSignal,
+) => Promise<SiteResolveResult>
+
 async function pathExists(target: string): Promise<boolean> {
   try {
     await access(target, fsConstants.F_OK)
     return true
   } catch {
     return false
+  }
+}
+
+async function openResolvedSite(
+  opener: DesktopOpener,
+  resolveSite: ResolveSiteFn | undefined,
+  query: string,
+  signal?: AbortSignal,
+): Promise<DesktopActionResult> {
+  if (!resolveSite) {
+    return {
+      ok: false,
+      message: `Não conheço o site “${query}” e não há IA para resolver. Use uma URL https ou conecte OpenRouter/Ollama.`,
+    }
+  }
+  const resolved = await resolveSite(query, signal)
+  if (!resolved.ok) {
+    return { ok: false, message: resolved.reason }
+  }
+  await opener.openExternal(resolved.url)
+  return {
+    ok: true,
+    message: formatSiteOpenMessage(resolved),
+    target: resolved.url,
   }
 }
 
@@ -45,6 +81,9 @@ export async function executeDesktopIntent(
     env?: NodeJS.ProcessEnv
     /** Se true, executa paths risky; senão pede confirmação. */
     confirmRisky?: boolean
+    /** Resolve nome→https (alias + LLM). Obrigatório para open_site_query. */
+    resolveSite?: ResolveSiteFn
+    signal?: AbortSignal
   },
 ): Promise<DesktopActionResult> {
   const roots = opts?.roots ?? defaultPathRoots()
@@ -58,15 +97,30 @@ export async function executeDesktopIntent(
     switch (intent.kind) {
       case 'open_url': {
         const validated = resolveOpenUrl(intent.rawTarget)
-        if (!validated.ok) {
-          return { ok: false, message: validated.reason }
+        if (validated.ok) {
+          await opener.openExternal(validated.url)
+          return {
+            ok: true,
+            message: `${opening.replace(/…$/, '')}: ${validated.url}`,
+            target: validated.url,
+          }
         }
-        await opener.openExternal(validated.url)
-        return {
-          ok: true,
-          message: `${opening.replace(/…$/, '')}: ${validated.url}`,
-          target: validated.url,
-        }
+        // Nome fora da lista → resolução dinâmica (corrige STT sem o usuário).
+        return openResolvedSite(
+          opener,
+          opts?.resolveSite,
+          intent.rawTarget,
+          opts?.signal,
+        )
+      }
+
+      case 'open_site_query': {
+        return openResolvedSite(
+          opener,
+          opts?.resolveSite,
+          intent.query,
+          opts?.signal,
+        )
       }
 
       case 'open_folder': {
@@ -207,4 +261,11 @@ export function parseConfirmOpen(text: string): string | null {
     )
   if (!m?.[1]) return null
   return m[1].replace(/[?.!]+$/g, '').trim()
+}
+
+/** Factory: resolveSite via routeCompletion (ou mock em testes). */
+export function createLlmSiteResolver(
+  complete: SiteResolveComplete,
+): ResolveSiteFn {
+  return (query, signal) => resolveSiteQueryDynamically(query, complete, signal)
 }

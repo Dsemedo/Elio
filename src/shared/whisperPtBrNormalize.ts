@@ -69,5 +69,12 @@ export function normalizeWhisperPtBr(raw: string): string {
   // Sobras de UTF-8 inválido do whisper-cli.
   text = text.replace(/\uFFFD+/g, '')
 
+  // Artigo “o” → “ou” após tipo de publicação (ex.: “jornal ou popular”).
+  // Correção genérica; a resolução dinâmica de site ainda valida via IA.
+  text = text.replace(
+    /\b(jornal|revista|site|portal|página|pagina|blog)\s+ou\s+/gi,
+    '$1 o ',
+  )
+
   return text.replace(/\s+/g, ' ').trim()
 }

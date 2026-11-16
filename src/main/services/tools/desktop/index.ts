@@ -16,9 +16,19 @@ export {
   isRiskyPath,
 } from './paths'
 export { resolveAppId, resolveAppPath } from './apps'
-export { parseConfirmOpen, executeDesktopIntent } from './open'
+export {
+  parseConfirmOpen,
+  executeDesktopIntent,
+  createLlmSiteResolver,
+} from './open'
 export type { DesktopIntent } from './intent'
-export type { DesktopActionResult, DesktopOpener } from './open'
+export type { DesktopActionResult, DesktopOpener, ResolveSiteFn } from './open'
+export {
+  normalizeSiteQueryHeard,
+  parseSiteResolveLlmJson,
+  resolveSiteQueryDynamically,
+  formatSiteOpenMessage,
+} from './siteResolve'
 export {
   parseDesktopInputIntent,
   executeDesktopInputIntent,
