@@ -25,6 +25,13 @@ describe('normalizeSiteQueryHeard', () => {
     expect(n.query.toLowerCase()).toContain('jornal')
     expect(n.query.toLowerCase()).not.toMatch(/^site\b/)
   })
+
+  it('expande Neoadonto → New Odonto e remove “no Edge”', () => {
+    const n = normalizeSiteQueryHeard('clínica Neoadonto no Edge')
+    expect(n.query.toLowerCase()).toMatch(/new\s+odonto/)
+    expect(n.query.toLowerCase()).not.toMatch(/\bedge\b/)
+    expect(n.notes.some((x) => /marca colada/i.test(x))).toBe(true)
+  })
 })
 
 describe('parseSiteResolveLlmJson', () => {
@@ -116,6 +123,24 @@ describe('intent + router — open_site_query', () => {
     expect(lane.lane).toBe('pc_action')
   })
 
+  it('preserva Edge e não mistura browser no nome do site', () => {
+    const a = parseDesktopOpenIntent('Abra o jornal o popular no Edge.')
+    expect(a?.kind).toBe('open_site_query')
+    if (a?.kind === 'open_site_query') {
+      expect(a.browserId).toBe('edge')
+      expect(a.query.toLowerCase()).toContain('popular')
+      expect(a.query.toLowerCase()).not.toMatch(/\bedge\b/)
+    }
+
+    const b = parseDesktopOpenIntent('Abra a clínica Neoadonto no Edge.')
+    expect(b?.kind).toBe('open_site_query')
+    if (b?.kind === 'open_site_query') {
+      expect(b.browserId).toBe('edge')
+      expect(b.query.toLowerCase()).toMatch(/neoadonto|new\s+odonto|cl[ií]nica/)
+      expect(b.query.toLowerCase()).not.toMatch(/\bedge\b/)
+    }
+  })
+
   it('ainda não captura conversa', () => {
     expect(parseDesktopOpenIntent('abre a conversa comigo sobre clima')).toBeNull()
   })
@@ -167,5 +192,44 @@ describe('executeDesktopIntent — site dinâmico', () => {
         source: 'llm',
       }),
     ).toMatch(/corrigi/)
+  })
+
+  it('abre no Edge via openInBrowser (não engole o browser)', async () => {
+    const openedIn: Array<{ browser: string; url: string }> = []
+    const opener: DesktopOpener = {
+      openExternal: async () => {
+        throw new Error('não deveria cair no openExternal')
+      },
+      openPath: async () => '',
+      openInBrowser: async (browserId, url) => {
+        openedIn.push({ browser: browserId, url })
+        return { ok: true }
+      },
+    }
+    const intent = parseDesktopOpenIntent('Abra o jornal o popular no Edge.')
+    expect(intent?.kind).toBe('open_site_query')
+    if (!intent || intent.kind !== 'open_site_query') return
+
+    const result = await executeDesktopIntent(intent, opener, {
+      resolveSite: async (query) => {
+        expect(query.toLowerCase()).not.toMatch(/\bedge\b/)
+        return {
+          ok: true,
+          url: 'https://opopular.com.br/',
+          label: 'O Popular',
+          heard: query,
+          corrected: true,
+          source: 'llm',
+        }
+      },
+    })
+    expect(result.ok).toBe(true)
+    expect(openedIn).toEqual([
+      { browser: 'edge', url: 'https://opopular.com.br/' },
+    ])
+    expect(result.message).toMatch(/no Edge/i)
+    expect(result.message).toMatch(/opopular\.com\.br/)
+    // Correção não deve acusar “no Edge” como parte do nome ouvido.
+    expect(result.message).not.toMatch(/corrigi de “[^”]*\bedge\b[^”]*”/i)
   })
 })
