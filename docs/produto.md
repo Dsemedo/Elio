@@ -187,6 +187,8 @@ O Elio **já** deve agir no PC (abrir site, app, Spotify). No futuro, a mesma id
 
 **Como (resumo):** não scrapear a tela do Outlook. Usar **API oficial** (Microsoft Graph) + operação na **allowlist** + confirmação falada + (opcional) resumo pela IA conectada.
 
+**Energia do PC:** “desliga” / “desliga em 10 minutos” / “cancela o desligamento” é **possível** no Windows via `shutdown.exe` allowlisted + confirmação obrigatória — ver [`conectores.md`](./conectores.md) § A2 (Fase D, depois do loop demo).
+
 Exemplo: “Quais foram os últimos e-mails?” → OAuth Outlook → Graph traz 5 mensagens → lista na UI → se pediu resumo, LLM resume de/assunto/preview → Elio **fala** “Esse foi da Ana: ela pediu o relatório…”.
 
 Arquitetura completa, anti-padrões e checklist de segurança: **[`conectores.md`](./conectores.md)**. Ordem de build: **Fase F** em [`roadmap.md`](./roadmap.md).

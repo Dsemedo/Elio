@@ -80,6 +80,7 @@ Objetivo: fechar a cena canônica em ~30 s.
 Itens já shipped ou úteis, mas **nunca** no lugar da Fase A:
 
 - Digitar / teclas / Ctrl allowlist (polimento, mais apps)
+- **Energia do PC** — desligar / reiniciar / agendar / cancelar (`shutdown.exe` allowlisted + confirmação; ver [`conectores.md`](./conectores.md) § A2)
 - Memória explícita (UX, não “memória avançada”)
 - Distribuição NSIS / auto-update / (depois) assinatura
 - Clima / hora / pesquisa web — manter honestos

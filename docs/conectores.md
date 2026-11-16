@@ -21,10 +21,57 @@ O LLM **não** “tem acesso livre” ao PC ou ao e-mail. Ele só resume o que u
 | Tipo | Exemplos | Como fazemos |
 |------|----------|--------------|
 | **A — Desktop local** | “Abre o Instagram”, “Abre o Edge”, pasta, digitar no foco | Já existe em parte: allowlist `shell.openExternal` / `openPath` / input ([ADR 0005](./ADRs/0005-desktop-opens-intent-router.md), 0015) |
+| **A2 — Energia do PC** | “Desliga o PC”, “desliga em 10 minutos”, “cancela o desligamento” | **Possível no Windows** — ver secção abaixo (ainda não shipped) |
 | **B — Conector de app** | Outlook, Teams, Spotify, calendário | OAuth/API **oficial** + operações na allowlist do conector |
 | **C — LLM / multi-IA** | Explicar, resumir, “faz um site” | Cascata de IAs ([produto horizonte](./produto.md), Fase E) — **depois** dos dados do conector |
 
-“Como estão meus e-mails?” é **B + C**: Graph busca → LLM resume → TTS fala.
+“Como estão meus e-mails?” é **B + C**: Graph busca → LLM resume → TTS fala.  
+“Desliga em dez minutos” é **A2**: intent tipado → binário fixo do Windows → confirmação → agendar / abortar.
+
+---
+
+## A2 — Desligar / reiniciar / cancelar (Windows)
+
+**Sim, é possível.** O Windows já expõe isso de forma oficial (`shutdown.exe`). O Elio não precisa de RPA nem de “clicar no menu Iniciar”.
+
+### Pedidos que queremos aceitar
+
+| Frase do usuário | Operação allowlisted | Comando efetivo (conceito) |
+|------------------|----------------------|----------------------------|
+| “Desliga o computador” | `power.shutdown` agora | `shutdown /s /t 0` (após confirmação) |
+| “Desliga em dez minutos” | `power.shutdown` com delay | `shutdown /s /t 600` |
+| “Reinicia em 5 minutos” | `power.restart` + delay | `shutdown /r /t 300` |
+| “Cancela o desligamento” | `power.abort` | `shutdown /a` |
+
+Delay: parsear pt-BR (“dez minutos”, “em 1 hora”) → segundos com **teto** (ex.: máx. 24 h) via Zod. Sem string livre no shell.
+
+### Como implementar com segurança (quando for a hora)
+
+```text
+1. Router → intent tipado { kind: "power.shutdown", delaySec: 600 }
+2. Confirmação falada obrigatória:
+   - imediato: “Vou desligar o PC agora. Confirma?”
+   - agendado: “Vou desligar em 10 minutos. Confirma?”
+3. Só depois: spawn de argv fixo
+   - arquivo: %SystemRoot%\System32\shutdown.exe
+   - args: ["/s", "/t", "600"]  // números já validados; shell: false
+4. Elio fala: “Combinado — desligo em 10 minutos. Diga ‘cancela o desligamento’ se mudar de ideia.”
+5. “Cancela…” → shutdown /a + TTS
+```
+
+**Não** usar `exec("shutdown " + textoDoUsuario)`, PowerShell interpolado, nem deixar o LLM escolher o comando.
+
+### Regras de produto
+
+1. **Confirmação** sempre (ação destrutiva) — voz e/ou botão na barra.  
+2. **Abort** sempre disponível enquanto o timer estiver ativo.  
+3. **Allowlist fechada:** só desligar / reiniciar / abortar (hibernar/sleep = fatia depois, se quiser).  
+4. **Sem elevação mágica:** desligar a sessão do usuário costuma bastar; se o SO negar, falar o erro — não pedimos UAC escondido.  
+5. **Fora da Fase A:** útil no dia a dia, mas **não** bloqueia a demo canônica (Spotify / Edge / Instagram). Encaixa em **Fase D** (endurecer desktop) quando A estiver verde.
+
+### Estado hoje
+
+Ainda **não** existe no código. O ADR 0005 proíbe `exec` arbitrário para opens; energia exigiria um módulo novo `tools/desktop/power.ts` com argv fixo — exceção **estreita** e testada, no mesmo espírito do input allowlisted (ADR 0015).
 
 ---
 
