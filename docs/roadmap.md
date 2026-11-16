@@ -102,6 +102,23 @@ Hoje só existe o hub OpenRouter + Ollama ([ADR 0011](./ADRs/0011-ai-cascade-byo
 
 **Não fazer na Fase E:** scraping de chat web, login automático em sites, gastar cota sem label, Slack/Jira.
 
+### Fase F — Conectores de produtividade · **depois de A (idealmente A–B)**
+
+Visão e pipeline: [`conectores.md`](./conectores.md).  
+Padrão: OAuth oficial + operação allowlisted + confirmação falada + resumo opcional via LLM (cascata atual ou Fase E).
+
+| # | Entrega | DoD |
+|---|---------|-----|
+| F0 | Contrato de conector + UI Integrações | Interface única (auth, ops, erros); Spotify como referência de PKCE |
+| F1 | Outlook leitura | “Últimos e-mails” → lista (de/assunto/hora) + TTS; scope `Mail.Read` |
+| F2 | Resumo de e-mails | Mesma lista → LLM resume preview → Elio fala sem inventar |
+| F3 | Teams leitura | “Mensagens recentes no Teams” com scope mínimo; mesmo molde |
+| F4 | Opens já existentes | Continuam Tipo A; compostos da Fase A não dependem de F |
+
+**Saída da Fase F:** “Como estão meus e-mails?” e “Resume os últimos” funcionam de ponta a ponta com confirmação falada e sem scrapear Outlook.
+
+**Não fazer na Fase F (ainda):** enviar e-mail, apagar, RPA na UI do Outlook/Teams, tool Graph livre para o LLM.
+
 ### Estacionado (não fazer agora)
 
 Explicitamente **fora** até o loop A–B estar bom (e, para multi-IA, até a Fase E ser aberta):
@@ -110,7 +127,8 @@ Explicitamente **fora** até o loop A–B estar bom (e, para multi-IA, até a Fa
 |------|--------|
 | Agentes / Atividades / Workspace | Puxam para “plataforma”; conflitam com o norte |
 | Slack / Jira | SaaS lateral; não é roteador de LLM |
-| Multi-IA nativa (Claude / ChatGPT / Gemini / Cursor) | **Compromisso de horizonte = Fase E** — stubs UI ok, **zero PRs** antes de A–B |
+| Multi-IA nativa (Claude / ChatGPT / Gemini / Cursor) | **Compromisso = Fase E** — zero PRs antes de A–B |
+| Outlook / Teams / conectores Graph | **Compromisso = Fase F** — zero PRs antes de A (exceto contrato enxuto se destravar A) |
 | Extensão de aba do browser | Lane C honesta; custo alto vs valor no loop |
 | RPA genérico / UI automation ampla | Allowlist > poder total |
 | Tema claro / i18n / Mac como produto | Fora do ICP atual |
@@ -135,10 +153,10 @@ Automação de teclado, extensão, agentes, etc.: **fila atrás**.
 
 Checklist obrigatório no corpo do PR (mesmo informal):
 
-1. Qual fase (A/B/C/D/**E**) isto melhora?  
+1. Qual fase (A/B/C/D/**E**/**F**) isto melhora?  
 2. Melhora a **demo canônica**? Como?  
-3. Introduz risco de segurança (escopo de ação, secrets, rede)?  
-4. Se for “D”, “E” ou estacionado: por que agora (e Fase A já está verde)?
+3. Introduz risco de segurança (escopo de ação, secrets, rede, dados de e-mail)?  
+4. Se for “D”, “E”, “F” ou estacionado: por que agora (e Fase A já está verde)?
 
 Se a resposta a (1) for “nenhuma” e a (2) for “não”, o PR espera.
 
@@ -161,3 +179,4 @@ Não há analytics de produto ainda. Usar:
 | 2026-11-15 | Norte redefinido como companheiro de voz (`produto.md`) |
 | 2026-11-16 | Público-alvo, fases A–D, estacionados e DoD (`roadmap.md`); design system subordinado ao norte |
 | 2026-11-16 | Horizonte multi-IA (Claude/ChatGPT/Gemini/Cursor) + cascata de cotas grátis = **Fase E** |
+| 2026-11-16 | Ações no PC + conectores (Outlook/Teams) = [`conectores.md`](./conectores.md) + **Fase F** |

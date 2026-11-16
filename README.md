@@ -8,7 +8,8 @@ Você fala, ele responde **com som**, confirma e **age no PC** — Spotify, apps
 | Documento | Conteúdo |
 |-----------|----------|
 | **[`docs/produto.md`](./docs/produto.md)** | O quê, para quem, o que não é, princípios |
-| **[`docs/roadmap.md`](./docs/roadmap.md)** | Fases A–D, DoD, o que está estacionado |
+| **[`docs/roadmap.md`](./docs/roadmap.md)** | Fases A–F, DoD, o que está estacionado |
+| **[`docs/conectores.md`](./docs/conectores.md)** | Como agir no PC e em apps (Outlook, Teams, …) |
 
 ---
 

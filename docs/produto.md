@@ -181,6 +181,20 @@ Preferência de provedor pode seguir: pedido explícito do usuário (“usa o Cl
 
 ---
 
+## Horizonte — ações no PC e conectores (Outlook, Teams, …)
+
+O Elio **já** deve agir no PC (abrir site, app, Spotify). No futuro, a mesma ideia vale para **apps com conta**: e-mail, Teams, etc.
+
+**Como (resumo):** não scrapear a tela do Outlook. Usar **API oficial** (Microsoft Graph) + operação na **allowlist** + confirmação falada + (opcional) resumo pela IA conectada.
+
+Exemplo: “Quais foram os últimos e-mails?” → OAuth Outlook → Graph traz 5 mensagens → lista na UI → se pediu resumo, LLM resume de/assunto/preview → Elio **fala** “Esse foi da Ana: ela pediu o relatório…”.
+
+Arquitetura completa, anti-padrões e checklist de segurança: **[`conectores.md`](./conectores.md)**. Ordem de build: **Fase F** em [`roadmap.md`](./roadmap.md).
+
+Isto **não** substitui a Fase A (loop demo). Sem voz+ação básica, conector de e-mail vira só mais um painel.
+
+---
+
 ## Critérios de sucesso
 
 ### Agora (produto pessoal)
@@ -203,6 +217,7 @@ Preferência de provedor pode seguir: pedido explícito do usuário (“usa o Cl
 |-----|--------|
 | **[`produto.md`](./produto.md)** (este) | O quê, para quem, o que não é, princípios |
 | **[`roadmap.md`](./roadmap.md)** | Ordem, fases, DoD, o que está estacionado |
+| **[`conectores.md`](./conectores.md)** | Como agir no PC e em apps (Outlook, Teams, …) |
 | **[`ADRs/`](./ADRs/)** | Como implementar decisões técnicas |
 | **[`elio-design-system.md`](./elio-design-system.md)** | UI visual — **subordinado** ao norte de produto |
 | **[`windows-distribution.md`](./windows-distribution.md)** | Instalador / update / assinatura |
