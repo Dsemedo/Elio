@@ -98,6 +98,25 @@ export async function probeMicPresence(): Promise<MicPresence> {
 }
 
 /**
+ * Pede permissão de mic (prompt do Windows se preciso) e **libera** o device.
+ * Necessário antes do Windows Speech: se deixarmos getUserMedia aberto, o
+ * Speech Runtime no Electron frequentemente fica sem áudio → “não ouvi nada”.
+ */
+export async function primeMicPermission(): Promise<void> {
+  const stream = await navigator.mediaDevices.getUserMedia({
+    audio: {
+      channelCount: 1,
+      echoCancellation: true,
+      noiseSuppression: true,
+    },
+    video: false,
+  })
+  for (const track of stream.getTracks()) {
+    track.stop()
+  }
+}
+
+/**
  * Inicia captura via Web Audio. Chame `stop()` para obter WAV base64.
  * Erros de permissão / device sobem como DOMException / Error.
  */

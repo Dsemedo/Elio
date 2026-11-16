@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  emptySpeechUserMessage,
   extractWindowsSpeechErrorCode,
   isSpeechPermissionDenied,
   parseSttPreference,
@@ -92,10 +93,22 @@ describe('shouldFallbackToWhisper', () => {
     expect(shouldFallbackToWhisper('service-not-allowed')).toBe(false)
   })
 
-  it('cai no Whisper em erros recuperáveis / vazio', () => {
+  it('NÃO cai no Whisper em no-speech / aborted', () => {
+    expect(shouldFallbackToWhisper('no-speech')).toBe(false)
+    expect(shouldFallbackToWhisper('aborted')).toBe(false)
+  })
+
+  it('cai no Whisper em falhas duras ao iniciar o Speech', () => {
     expect(shouldFallbackToWhisper('network')).toBe(true)
     expect(shouldFallbackToWhisper('audio-capture')).toBe(true)
     expect(shouldFallbackToWhisper(null)).toBe(true)
+  })
+})
+
+describe('emptySpeechUserMessage', () => {
+  it('orienta a falar de novo em no-speech', () => {
+    expect(emptySpeechUserMessage('no-speech')).toMatch(/não ouvi|fale/i)
+    expect(emptySpeechUserMessage('no-speech').toLowerCase()).not.toContain('whisper')
   })
 })
 

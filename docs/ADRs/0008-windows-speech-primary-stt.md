@@ -19,7 +19,7 @@ Alternativas:
 ## Decisão
 
 1. **Primário no Windows:** Web Speech API no **renderer** (`lang: 'pt-BR'`, PTT hold-to-talk). Escolhemos A — suficiente no Electron 45 no Windows; evita bridge nativo.
-2. **Fallback:** subprocess `whisper-cli` existente (ADR 0002) quando SpeechRecognition indisponível, erro recuperável, ou texto vazio — WAV paralelo no PTT permite cair no Whisper sem pedir nova fala.
+2. **Fallback:** subprocess `whisper-cli` (ADR 0002) só quando o Speech **falha ao iniciar** (rede/áudio/indisponível). **Não** usar WAV paralelo durante o Speech: no Electron/Windows, `getUserMedia` aberto ao mesmo tempo deixa o Speech Runtime sem áudio → “não ouvi nada”. Fluxo: `primeMicPermission` → libera tracks → Speech sozinho. Texto vazio / `no-speech` → pedir nova fala (Whisper mangla PT-BR).
 3. **Auto-envio** imediato após transcript válido (Floating Bar + Command Center). **Sem** janela de confirmar/editar.
 4. Override: `ELIO_STT_PROVIDER=auto|windows-speech|whisper` (lido no main, exposto em `VoiceStatus.sttPreference`).
 5. Fora do Windows (dev Linux/CI): Whisper permanece o caminho padrão (`auto`).
@@ -32,6 +32,6 @@ Alternativas:
 - Privacidade no caminho primário: áudio tratado pelo stack de fala do OS/Chromium no Windows (não enviamos a um servidor nosso). Whisper fallback continua 100% local.
 - ADR 0002 permanece válido para o **caminho Whisper** (subprocess); deixa de ser o STT default no produto Windows.
 - A sessão Electron deve conceder `media`/`microphone` (além de `geolocation`); um handler só-geo produz `not-allowed` no Speech **sem** chegar ao prompt do Windows. O handler libera o Chromium; o consentimento do SO vem do `getUserMedia`.
-- Ordem PTT: **getUserMedia → SpeechRecognition** (mic-first). Permissão negada (`not-allowed` / `service-not-allowed` / SO `denied`) → **chip PT-BR**, sem Whisper silencioso. Whisper só após falha explícita do Speech (rede, áudio, sem texto, …), com status “Speech falhou (…) — Whisper”.
+- Ordem PTT (**0.16.1**): `primeMicPermission` (getUserMedia curto + **libera** tracks) → **SpeechRecognition sozinho**. Manter getUserMedia aberto durante o Speech no Electron/Windows → mic exclusivo → texto vazio. Permissão negada → chip PT-BR. Whisper só se o Speech falhar ao **iniciar**. `no-speech`/vazio → pedir nova fala. Durante o hold, `no-speech`/`onend` reiniciam o reconhecimento até o `stop()`.
 - UI nunca mostra `WINDOWS_SPEECH_ERROR:…` cru.
-- Pós-0.15.4 (**0.15.5**): margem de finalização do Speech no `stop()` sobe para **4 s** (reduz interim truncado → Whisper); fallback Whisper usa `-bs 8`, prompt com “clima atual” e `normalizeWhisperPtBr` (ex.: outdoor→atual no domínio clima/hora).
+- Pós-0.15.5: margem de finalização do Speech no `stop()` ~**4 s**; fallback Whisper usa `-bs 8`, prompt com “clima atual” e `normalizeWhisperPtBr`.

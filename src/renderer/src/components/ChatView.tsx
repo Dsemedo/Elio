@@ -10,10 +10,10 @@ import type {
 import { isNearBottom, shouldAutoScrollToBottom } from '@shared/chatScroll'
 import { detectChatToolIntent } from '@shared/chatIntent'
 import {
+  emptySpeechUserMessage,
   extractWindowsSpeechErrorCode,
   resolveSttBackend,
   sanitizeVoiceUiError,
-  shouldFallbackToWhisper,
   whisperFallbackStatusMessage,
   windowsSpeechUserMessage,
 } from '@shared/sttPolicy'
@@ -111,7 +111,6 @@ export function ChatView({
       const capture = captureRef.current
       if (capture?.kind === 'windows-speech') {
         capture.session.cancel()
-        capture.recorder.cancel()
       } else if (capture?.kind === 'whisper') {
         capture.recorder.cancel()
       }
@@ -313,7 +312,6 @@ export function ChatView({
       if (elapsed < 400) {
         if (capture.kind === 'windows-speech') {
           capture.session.cancel()
-          capture.recorder.cancel()
         } else {
           capture.recorder.cancel()
         }
@@ -337,26 +335,15 @@ export function ChatView({
         }
 
         if (speechText) {
-          capture.recorder.cancel()
           trimmed = speechText
-        } else if (speechFailed && !shouldFallbackToWhisper(speechErrorCode)) {
-          capture.recorder.cancel()
+        } else {
           setError(
-            windowsSpeechUserMessage(
-              new Error(`WINDOWS_SPEECH_ERROR:${speechErrorCode ?? 'unknown'}`),
-            ),
+            emptySpeechUserMessage(speechFailed ? speechErrorCode : 'no-speech'),
           )
           setVoiceUi('idle')
           setVoiceProgress(null)
           setWhisperFallbackHint(null)
           return
-        } else {
-          setWhisperFallbackHint(
-            whisperFallbackStatusMessage(
-              speechFailed ? speechErrorCode : 'no-speech',
-            ),
-          )
-          trimmed = await transcribeWithWhisper(capture.recorder)
         }
       } else {
         if (capture.speechErrorCode) {
@@ -605,7 +592,6 @@ export function ChatView({
                   const capture = captureRef.current
                   if (capture?.kind === 'windows-speech') {
                     capture.session.cancel()
-                    capture.recorder.cancel()
                   } else if (capture?.kind === 'whisper') {
                     capture.recorder.cancel()
                   }
