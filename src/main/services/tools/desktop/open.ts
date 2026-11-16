@@ -13,13 +13,20 @@ import {
   resolveExistingAppPath,
   type BrowserAppId,
 } from './apps'
+import {
+  formatSiteOpenMessage,
+  resolveSiteQueryDynamically,
+  type SiteResolveComplete,
+  type SiteResolveResult,
+} from './siteResolve'
 import { resolveOpenUrl } from './urls'
 
 const execFileAsync = promisify(execFile)
 
 /**
  * Execução allowlisted: shell.openExternal (https), shell.openPath,
- * e browser allowlisted (chrome/msedge) com URL https validada via execFile.
+ * browser allowlisted (chrome/msedge) com URL https via execFile,
+ * e resolução dinâmica de site (LLM) para nomes fora da lista.
  * Sem PowerShell genérico / sem exec arbitrário.
  */
 
@@ -43,6 +50,11 @@ export type DesktopActionResult = {
   target?: string
   requiresConfirm?: boolean
 }
+
+export type ResolveSiteFn = (
+  query: string,
+  signal?: AbortSignal,
+) => Promise<SiteResolveResult>
 
 async function pathExists(target: string): Promise<boolean> {
   try {
@@ -96,6 +108,30 @@ export async function launchAllowlistedBrowser(
   }
 }
 
+async function openResolvedSite(
+  opener: DesktopOpener,
+  resolveSite: ResolveSiteFn | undefined,
+  query: string,
+  signal?: AbortSignal,
+): Promise<DesktopActionResult> {
+  if (!resolveSite) {
+    return {
+      ok: false,
+      message: `Não conheço o site “${query}” e não há IA para resolver. Use uma URL https ou conecte OpenRouter/Ollama.`,
+    }
+  }
+  const resolved = await resolveSite(query, signal)
+  if (!resolved.ok) {
+    return { ok: false, message: resolved.reason }
+  }
+  await opener.openExternal(resolved.url)
+  return {
+    ok: true,
+    message: formatSiteOpenMessage(resolved),
+    target: resolved.url,
+  }
+}
+
 async function executeOne(
   intent: DesktopIntent,
   opener: DesktopOpener,
@@ -104,6 +140,8 @@ async function executeOne(
     platform: NodeJS.Platform
     env: NodeJS.ProcessEnv
     confirmRisky: boolean
+    resolveSite?: ResolveSiteFn
+    signal?: AbortSignal
   },
 ): Promise<DesktopActionResult> {
   const { roots, platform, env, confirmRisky } = opts
@@ -135,7 +173,13 @@ async function executeOne(
     case 'open_url': {
       const validated = resolveOpenUrl(intent.rawTarget)
       if (!validated.ok) {
-        return { ok: false, message: validated.reason }
+        // Nome fora da lista → resolução dinâmica (corrige STT sem o usuário).
+        return openResolvedSite(
+          opener,
+          opts.resolveSite,
+          intent.rawTarget,
+          opts.signal,
+        )
       }
 
       if (intent.browserId) {
@@ -145,7 +189,6 @@ async function executeOne(
             validated.url,
           )
           if (!launched.ok) {
-            // Fallback: navegador padrão do SO
             await opener.openExternal(validated.url)
             return {
               ok: true,
@@ -188,6 +231,15 @@ async function executeOne(
         message: `${opening.replace(/…$/, '')}: ${validated.url}`,
         target: validated.url,
       }
+    }
+
+    case 'open_site_query': {
+      return openResolvedSite(
+        opener,
+        opts.resolveSite,
+        intent.query,
+        opts.signal,
+      )
     }
 
     case 'open_folder': {
@@ -358,6 +410,9 @@ export async function executeDesktopIntent(
     env?: NodeJS.ProcessEnv
     /** Se true, executa paths risky; senão pede confirmação. */
     confirmRisky?: boolean
+    /** Resolve nome→https (alias + LLM). Obrigatório para open_site_query. */
+    resolveSite?: ResolveSiteFn
+    signal?: AbortSignal
   },
 ): Promise<DesktopActionResult> {
   const roots = opts?.roots ?? defaultPathRoots()
@@ -371,6 +426,8 @@ export async function executeDesktopIntent(
       platform,
       env,
       confirmRisky,
+      ...(opts?.resolveSite ? { resolveSite: opts.resolveSite } : {}),
+      ...(opts?.signal ? { signal: opts.signal } : {}),
     })
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Falha ao abrir'
@@ -387,4 +444,11 @@ export function parseConfirmOpen(text: string): string | null {
     )
   if (!m?.[1]) return null
   return m[1].replace(/[?.!]+$/g, '').trim()
+}
+
+/** Factory: resolveSite via routeCompletion (ou mock em testes). */
+export function createLlmSiteResolver(
+  complete: SiteResolveComplete,
+): ResolveSiteFn {
+  return (query, signal) => resolveSiteQueryDynamically(query, complete, signal)
 }

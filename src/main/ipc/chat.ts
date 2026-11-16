@@ -11,6 +11,7 @@ import {
   type Conversation,
 } from '../../shared/ipc'
 import {
+  createLlmSiteResolver,
   electronDesktopOpener,
   executeDesktopIntent,
 } from '../services/tools/desktop'
@@ -200,12 +201,24 @@ export function registerChatIpc(): void {
         const result = await executeDesktopIntent(
           classified.desktop,
           electronDesktopOpener(),
-          { confirmRisky: classified.confirmRisky },
+          {
+            confirmRisky: classified.confirmRisky,
+            signal: controller.signal,
+            resolveSite: createLlmSiteResolver(async ({ messages, signal }) => {
+              const completion = await routeCompletion({
+                messages,
+                ...(signal ? { signal } : {}),
+              })
+              return { content: completion.content }
+            }),
+          },
         )
         return finishAssistantReply(
           input.conversationId,
           result.message,
-          'elio-desktop',
+          classified.desktop.kind === 'open_site_query'
+            ? 'elio-desktop-site'
+            : 'elio-desktop',
         )
       }
 

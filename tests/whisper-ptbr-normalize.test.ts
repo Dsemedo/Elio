@@ -46,4 +46,11 @@ describe('normalizeWhisperPtBr', () => {
   it('colapsa espaços', () => {
     expect(normalizeWhisperPtBr('  clima   outdoor  ')).toBe('clima atual')
   })
+
+  it('corrige artigo o→ou após jornal/site (mangling STT)', () => {
+    expect(normalizeWhisperPtBr('Abre o jornal ou popular')).toBe(
+      'Abre o jornal o popular',
+    )
+    expect(normalizeWhisperPtBr('abre o site ou g1')).toBe('abre o site o g1')
+  })
 })

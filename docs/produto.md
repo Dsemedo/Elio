@@ -138,7 +138,7 @@ Pessoas que se parecerem com Douglas e possam instalar um `.exe` Windows:
 
 ## Estado atual (honesto)
 
-Em **v0.18.x** já existem pedaços: Floating Bar, Whisper STT, TTS (off por padrão), opens (incl. site no Chrome/Edge, compostos, Maps), Spotify PKCE + play por nome, clima, cascata de IA, digitar no app e atalhos allowlisted (Ctrl+C/V/A/Z/X/S). O que ainda falta na Fatia 1 é sobretudo **TTS ligado no pedido por voz** e confirmação falada pré-ação.
+Em **v0.18.x** já existem pedaços: Floating Bar, Whisper STT, TTS (off por padrão), opens (site no Chrome/Edge, compostos, Maps, site dinâmico com correção de STT), Spotify PKCE + play por nome, clima, cascata de IA, digitar no app e atalhos allowlisted (Ctrl+C/V/A/Z/X/S). O que ainda falta na Fatia 1 é sobretudo **TTS ligado no pedido por voz** e confirmação falada pré-ação.
 
 ---
 
