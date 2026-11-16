@@ -14,17 +14,36 @@ import { tmpdir } from 'node:os'
 import { mkdtemp, rm } from 'node:fs/promises'
 
 describe('parseSpotifyIntent (PT-BR)', () => {
-  it('detecta tocar música no Spotify', () => {
-    expect(parseSpotifyIntent('Elio, tocar música no Spotify')?.kind).toBe(
-      'spotify_play',
-    )
-    expect(parseSpotifyIntent('toca uma música no Spotify')?.kind).toBe(
-      'spotify_play',
-    )
+  it('detecta tocar música no Spotify (genérico)', () => {
+    expect(parseSpotifyIntent('Elio, tocar música no Spotify')).toEqual({
+      kind: 'spotify_play',
+      query: null,
+    })
+    expect(parseSpotifyIntent('toca uma música no Spotify')).toEqual({
+      kind: 'spotify_play',
+      query: null,
+    })
     expect(parseSpotifyIntent('pode tocar uma musica no spotify')?.kind).toBe(
       'spotify_play',
     )
     expect(parseSpotifyIntent('play spotify')?.kind).toBe('spotify_play')
+  })
+
+  it('extrai nome da faixa', () => {
+    expect(parseSpotifyIntent('toca Bohemian Rhapsody no Spotify')).toEqual({
+      kind: 'spotify_play',
+      query: 'Bohemian Rhapsody',
+    })
+    expect(parseSpotifyIntent('toca a faixa Tempo Perdido no Spotify')).toEqual(
+      {
+        kind: 'spotify_play',
+        query: 'Tempo Perdido',
+      },
+    )
+    expect(parseSpotifyIntent('toca essa faixa no Spotify')).toEqual({
+      kind: 'spotify_play',
+      query: null,
+    })
   })
 
   it('detecta conectar / desconectar', () => {
@@ -46,6 +65,10 @@ describe('parseSpotifyIntent (PT-BR)', () => {
     expect(intent).not.toBeNull()
     if (intent) {
       expect(describeSpotifyIntent(intent)).toMatch(/Abrindo Spotify/i)
+    }
+    const named = parseSpotifyIntent('toca Imagine no Spotify')
+    if (named?.kind === 'spotify_play') {
+      expect(describeSpotifyIntent(named)).toMatch(/Imagine/i)
     }
     expect(looksLikeSpotifyCommand('conectar Spotify')).toBe(true)
     expect(looksLikeSpotifyCommand('bom dia')).toBe(false)
@@ -118,7 +141,7 @@ describe('handleSpotifyIntent — fallback open sem client id', () => {
     }
     try {
       const result = await handleSpotifyIntent(
-        { kind: 'spotify_play' },
+        { kind: 'spotify_play', query: null },
         {
           crypto,
           paths: { filePath: join(dir, 'tokens.bin') },
