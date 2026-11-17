@@ -1,204 +1,196 @@
 # Elio — melhoria de latência de voz (pós-Kobi)
 
 **Status:** guia de engenharia (não ADR)  
-**Atualizado:** 2026-11-17 (America/Sao_Paulo) — + acerto STT, Web Speech no Electron, Cursor ≠ SDK  
+**Atualizado:** 2026-11-17 (America/Sao_Paulo) — dogfood = produto vitalício (STT local default)  
 **Âncora:** [`produto.md`](./produto.md) · [`roadmap.md`](./roadmap.md) · ADR 0002 · 0005 · 0008 · 0011  
 **Referência externa:** [Kobi](https://hiagorzandonadi.github.io/kobi/) (produto comercial “companheiro no entalho”)  
-**Público deste doc:** handoff para implementação no Elio (dogfooding Douglas)
+**Público deste doc:** handoff para implementação no Elio (dogfooding = o que será vendido)
 
-Objetivo: fechar o loop que importa no dogfooding — **“oi, tudo bem?”** e **“abre o Google Chrome”** em **~1–3 s**, com transcript **fiel o bastante** para o intent — sem Whisper como caminho crítico. Geração de imagem/site na nuvem **pode demorar**; isso está fora do problema.
+Objetivo: fechar o loop — **“oi, tudo bem?”** e **“abre o Google Chrome”** em **~1–3 s**, com transcript **fiel o bastante** para o intent — no **mesmo formato do produto à venda** (pagamento único / acesso contínuo **sem** o Douglas pagar STT/LLM de nuvem por usuário). Geração de imagem/site na nuvem **pode demorar** e só com **chave do comprador**.
 
 Em conflito com Fase E (multi-IA) ou conectores: **Fase A / este guia vencem** até a checklist §7 estar verde.
 
 ---
 
+## Princípio de produto (obriga a engenharia)
+
+> **Dogfood = SKU.** O caminho que Douglas usa no dia a dia tem que ser o caminho do cliente que pagou vitalício.
+
+| Modelo | Pode? | Por quê |
+|--------|-------|---------|
+| STT / chat **local** no default (custo marginal ≈ R$ 0 por usuário) | **Sim — default** | Escala para 10k vitalícios |
+| Nuvem (Groq, xAI/Grok STT, OpenRouter…) com **chave do usuário** (BYOK) | Sim — **opcional** | Cliente paga a própria cota |
+| Chave do vendedor embutida no instalador / “Groq free do Douglas” para todo mundo | **Não** | 10k usuários estouram a conta; vazamento de key; vitalício ilimitado não fecha |
+| Começar a demo em nuvem free “e trocar depois” | **Não** (decisão Douglas) | Otimiza o caminho errado; a troca nunca é “só config” |
+
+**Nota de nomes:** **Groq** (API rápida de inferência/STT) ≠ **Grok/xAI** (outro provedor). Os dois, se existirem no Elio, são **BYOK opcional** — nunca default do SKU vitalício.
+
+---
+
 ## Veredito
 
-Dá para ficar rápido **e** entender melhor o que foi falado. O Elio **já tem** o roteador de intents ([ADR 0005](./ADRs/0005-desktop-opens-intent-router.md)). O que está matando a sensação de companheiro é:
+Dá para ficar rápido **e** entender melhor o que foi falado **sem** depender de STT pago pelo vendedor. O Elio **já tem** o roteador de intents ([ADR 0005](./ADRs/0005-desktop-opens-intent-router.md)). O que está matando a sensação de companheiro é:
 
 1. **Whisper-first** ([ADR 0008](./ADRs/0008-windows-speech-primary-stt.md) revisado + [ADR 0002](./ADRs/0002-whisper-subprocess.md)): cold start, spawn por fala, `small` **lento e errado** em PT-BR coloquial.
-2. **Cascata de chat** ([ADR 0011](./ADRs/0011-ai-cascade-byok.md)): BYOK → free → Ollama prioriza **cota**, não **latência** — “oi, tudo bem?” pode ir à nuvem à toa.
-3. **TTS off por padrão** (Fase A1 no roadmap): mesmo com STT bom, a demo “não fala”.
+2. **Cascata de chat** ([ADR 0011](./ADRs/0011-ai-cascade-byok.md)): BYOK → free → Ollama prioriza **cota**, não **latência** — e o “free” de hub não é o default do SKU vitalício.
+3. **TTS off por padrão** (Fase A1): mesmo com STT bom, a demo “não fala”.
 
-**Direção de STT para o próximo implementador:** não extrair voz do Cursor; conectar STT de nuvem equivalente (Groq / xAI) no PTT, Whisper só fallback. Detalhe na § “Cursor e STT” e no P0 abaixo.
+**Direção para o próximo implementador:** STT **local** (não Whisper-first, não Web Speech no Electron) como `auto` do produto; nuvem só se o usuário colar a chave dele; chat curto local/template; nunca chave do vendedor no binário.
 
 ---
 
 ## O que é “rápido” neste documento
 
-Do **fim da fala** (soltar o PTT) até:
+Do **fim da fala** (soltar o PTT) até a ação começar ou o TTS emitir o primeiro som.
 
-- a **ação começar** (Chrome abrindo), ou  
-- o **TTS emitir o primeiro som**
+**Meta: ~1–3 segundos** no caminho **local** (o que o cliente vitalício recebe sem configurar nada).
 
-**Meta: ~1–3 segundos.**
-
-Não é “Whisper em 200 ms” isolado — é o pipeline inteiro.
-
-| Pedido | Lane (hoje) | O que deve rodar | Meta |
-|--------|-------------|------------------|------|
-| abre o Google Chrome | `pc_action` | intent → open allowlist | ≤2 s fim a fim |
-| oi, tudo bem? | `chat` (ideal: small-talk) | resposta curta + TTS | ≤3 s até falar |
-| gera uma imagem / um site | chat → cloud | classificar barato → IA conectada | classificar &lt;0,2 s; gerar pode demorar |
-
-“Rápido” e “lento” **não** são no mesmo pedido: o classificador escolhe a lane; só a lane pesada demora.
+| Pedido | Lane | O que deve rodar (SKU) | Meta |
+|--------|------|------------------------|------|
+| abre o Google Chrome | `pc_action` | STT local → intent → open | ≤2 s |
+| oi, tudo bem? | chat curto / template | STT local → resposta curta + TTS (sem nuvem) | ≤3 s |
+| gera uma imagem / um site | cloud | só se houver **BYOK**; senão erro falado honesto | classificar &lt;0,2 s |
 
 ---
 
-## Orçamento de latência (caminho feliz)
+## Orçamento de latência (caminho feliz = local)
 
-| Etapa | Orçamento | Nota no Elio hoje |
-|-------|-----------|-------------------|
-| STT (frase curta) | 0,3–1,0 s | Whisper `small` costuma estourar |
-| `classifyUserIntent` | 0,05–0,2 s | Já ok (regex/aliases PT-BR) |
+| Etapa | Orçamento | Nota |
+|-------|-----------|------|
+| STT local (frase curta) | 0,3–1,0 s | Alvo do novo backend; Whisper `small` estoura |
+| `classifyUserIntent` | 0,05–0,2 s | Já ok |
 | Ação PC | 0,1–0,5 s | Já shipped |
-| Chat curto | 0,5–2,0 s | Free→Ollama pode +1–4 s de rede |
-| TTS início | 0,2–0,8 s | Off por padrão |
+| Chat curto local | 0,5–2,0 s | Template ou Ollama; sem OpenRouter no default do SKU |
+| TTS início | 0,2–0,8 s | Fase A1 — default on na sessão de voz |
 
 ---
 
-## O que o Kobi ensina (sem copiar o produto)
+## Modelo econômico (vitalício)
 
-| Kobi (landing) | Elio |
-|----------------|------|
-| STT / wake word **local**, não Whisper como default | Whisper é primário — principal dor |
-| Comandos do dia a dia = **intents**, não LLM | Já é o modelo ADR 0005 — reforçar |
-| IA local pequena; nuvem só no pesado | Cascata 0011 inverte prioridade na conversa curta |
-| TTS do sistema / voz empacotada | TTS existe; falta default on na sessão de voz |
-| Hold-to-talk + cancelar | PTT já existe |
+Espelho do que o Kobi comunica (sem copiar o produto): **paga o app uma vez**; voz/IA do dia a dia **no PC**; cloud **opcional com chave do cliente**.
 
-Não copiar: pricing, wake word obrigatória, UI de “entalho”, RPA amplo.
+```text
+[Cliente vitalício]
+  STT local  ──► intents / opens / small talk / Ollama
+       │
+       └── (opcional) BYOK Groq | xAI | OpenRouter | …
+              └── só o que o cliente conectou; custo dele
+```
 
----
-
-## Por que o Whisper está doendo (confirmado nos ADRs)
-
-| Problema | Efeito na demo |
-|----------|----------------|
-| Primário em todas as plataformas | Todo PTT paga cold start do `whisper-cli` |
-| Modelo `small` (~466 MB) | 1º uso baixa modelo; PT-BR ainda mangla |
-| Subprocess por fala | Spawn + WAV + `-otxt` a cada turno |
-| Web Speech no Electron instável no PC do Douglas | Volta ao Whisper por estabilidade, não por velocidade |
-| Sem gate de editar transcript | Erro de STT vai direto ao router e quebra a ação |
-| Acerto ruim em fala natural | Pedido certo vira transcript errado → intent/ação errados |
-
-Dois sintomas, mesma causa de produto: **Whisper local `small` não serve como ouvido principal** (atrasa **e** deturpa). “Falar mais devagar” não é a solução.
-
-**Não fazer agora:** subir para `medium`/`large` “para ficar melhor” — piora latência e download. A demo precisa de **STT bom o bastante + intents fortes**.
+Com **10 mil** vitalícios: custo de STT/LLM do vendedor no default ≈ **R$ 0**.  
+Se o default fosse a chave Groq/xAI do Douglas: cada PTT de cada cliente sairia da conta dele — inviável.
 
 ---
 
-## Web Speech no Electron — não repetir o ciclo
+## O que o Kobi ensina (sem copiar)
 
-Histórico (ADR 0008 + dogfooding): o microfone do Windows funcionava (Gravador de Voz OK), mas o caminho **Web Speech (`webkitSpeechRecognition`) no renderer do Electron** ficava em “Não ouvi nada”. Várias rodadas de “arrumar o mic” no mesmo stack **não fecharam**.
-
-| Caminho | O que é de verdade |
-|---------|-------------------|
-| Apps nativos / Gravador | Speech Runtime / áudio do SO |
-| Elio “Windows Speech” atual | API do Chromium no Electron — permissão, device exclusivo, `getUserMedia` + Speech brigando pelo mic |
-
-**Decisão de handoff:** não abrir mais PRs cujo único plano seja “mais um patch no Web Speech do renderer”. Se um dia voltar Speech do Windows, tem que ser **helper nativo (COM) fora do Chromium**, não Web Speech de novo.
+| Kobi | Elio (SKU) |
+|------|------------|
+| STT local no default | **Obrigatório** no dogfood |
+| Comandos = intents | Já ADR 0005 |
+| Nuvem com chave do usuário | BYOK (OpenRouter hoje; STT cloud opcional depois) |
+| Whisper como ouvido principal | **Não** |
+| Web Speech no Electron | **Não** |
 
 ---
 
-## Cursor e STT — o que *não* fazer e o que fazer
+## Por que o Whisper atual não é o STT do SKU
 
-O ditado / voz do **Cursor** parece bom. Isso **não** se extrai:
+| Problema | Efeito |
+|----------|--------|
+| Primário + subprocess | Lento |
+| `small` PT-BR | Interpreta errado em fala natural |
+| Download ~466 MB | Fricção de 1º uso |
+| Não é o “ouvido” que o produto quer vender | Dogfood no caminho errado |
 
-- Não existe SDK/`@cursor/speech` para embutir no Electron do Elio.
-- Ditado e voice chat são **recursos do produto Cursor** (conta logada), não biblioteca redistribuível.
-- Proibido como direção: copiar binário do Cursor, hook na UI, scrapear o IDE.
+**Não fazer:** `medium`/`large` como “solução”.  
+**Não fazer:** trocar Whisper por Groq free do vendedor “só para desenvolver”.
 
-O que o Cursor usa por baixo é, na prática, **STT de nuvem de boa qualidade**. No Elio replica-se a **mesma classe de serviço** com chave própria (BYOK), no main — padrão já usado com OpenRouter:
+---
 
-| Provedor (exemplos) | Papel no Elio |
-|---------------------|---------------|
-| **Groq** `whisper-large-v3-turbo` | PTT rápido; tier free generoso; destravar demo |
-| **xAI STT** (`api.x.ai/v1/stt`, ex. `grok-voice-transcribe-*`) | Mesma família documentada no ecossistema Grok/voz |
-| Whisper local | **Só fallback** offline / falha de rede |
-| Web Speech no Electron | **Fora** do caminho crítico |
+## Web Speech no Electron — não repetir
 
-Fluxo alvo: PTT → gravar áudio (já existe para Whisper) → `POST` STT no **main** (chave só no cofre/`safeStorage`, nunca no renderer) → texto → normalizar → `classifyUserIntent` → ação / chat / cloud.
+Mic do SO OK + “Não ouvi nada” no Electron = stack Web Speech, não “mic quebrado”.  
+**Handoff:** zero PRs de “mais um patch no Web Speech”. Speech do Windows só via **helper COM nativo**, se um dia for a aposta.
+
+---
+
+## Cursor e STT de nuvem
+
+Cursor ditado **não** se extrai (sem SDK). Qualidade boa ≈ STT de nuvem.
+
+No Elio vitalício isso vira **Integração opcional (BYOK)**, não default:
+
+| Peça | Papel no SKU |
+|------|----------------|
+| Sherpa-ONNX / Vosk pt-BR (ou COM Speech) | **Default** — incluído no que foi vendido |
+| Groq / xAI STT | Opcional; chave do **cliente** no `safeStorage` |
+| Whisper.cpp | Fallback local degradado, se ainda valer a pena |
+| Chave do Douglas no instalador | **Proibido** |
 
 ---
 
 ## Plano de melhoria (ordem)
 
-### P0 — STT de nuvem no PTT (direção preferida para o próximo PR)
+### P0 — STT local de produto (direção do próximo PR)
 
-**Escolha default sugerida para destravar dogfooding:** Groq (ou xAI) como `ELIO_STT_PROVIDER` no PTT; Whisper só se rede/chave falhar.
+Implementar o ouvido que o cliente vitalício recebe **sem cadastrar cartão nem colar key**.
 
-| Item | Detalhe |
-|------|---------|
-| Entrada | WAV/WebM que o PTT já captura |
-| Saída | transcript PT-BR → pipeline atual |
-| Segredo | chave no main / Integrações (mesmo espírito do OpenRouter) |
-| Política | atualizar `sttPolicy` + ADR 0008 |
-| Offline | opens/`pc_action` ainda devem funcionar se o transcript vier de fallback Whisper; sem rede e sem Whisper quente → erro falado honesto |
+| Opção (escolher uma e ADR) | Prós | Contras |
+|----------------------------|------|---------|
+| **Sherpa-ONNX ou Vosk pt-BR** embutido/baixado no 1º uso | Offline, custo R$ 0/usuário, controlável no Electron | Empacotar modelo; calibrar PT-BR |
+| **Helper COM** Windows Speech (fora do Chromium) | Bom PT-BR do SO, grátis | Só Windows; trabalho nativo |
+| Whisper `auto` | — | **Rejeitado** como default |
+| Groq/xAI free do vendedor | — | **Rejeitado** como default / dogfood principal |
 
-**DoD:** checklist §7 itens 1–2 verdes com fala natural (não só ditado lento).
+**DoD:** checklist §7 com **rede desligada** (itens 1–2 e 4) — é o teste do SKU vitalício.
 
-Alternativas (depois ou em paralelo, se BYOK de STT for indesejável):
+### P0 — Chat curto local (não cascata de cota)
 
-| Opção | Quando faz sentido |
-|-------|--------------------|
-| Sherpa-ONNX / Vosk pt-BR | Quer 100% offline sem Whisper |
-| Bridge COM Windows Speech | Investimento maior; só se valer o nativo de verdade |
-| Whisper `auto` | **Não** — só fallback |
+No SKU: small talk / cumprimento → template ou Ollama local.  
+OpenRouter / Groq LLM só com BYOK ou pedido explícito.  
+ADR 0011 permanece para quem **conectou** chave; não manda o default vitalício para free de hub.
 
-### P0 — Separar latência de chat da cascata de cotas
+### P1 — BYOK de STT/LLM (opcional)
 
-ADR 0011 continua válido para **cota / tarefa pesada**. Para lane `chat` **curta** (cumprimento, 1 frase), preferir:
+UI Integrações: “Conectar Groq / xAI / OpenRouter”.  
+Melhora acerto/latência **para quem quer**; zero custo para quem não conecta.  
+Nunca embutir key de produção do vendedor.
 
-1. Ollama já quente **ou** provedor de baixa latência (ex. Groq),  
-2. só depois OpenRouter `:free` / BYOK.
+### P1 — Intents + normalização + small talk
 
-Quando o usuário pedir uma IA explícita (“usa o Claude”) ou o intent for pesado (“gera imagem”, “faz um site”), usar a cascata de cotas / Fase E.
-
-**DoD:** “oi, tudo bem?” não depende de round-trip OpenRouter se Ollama estiver up.
-
-### P1 — Intents blindados + normalização pré-router
-
-- Aliases à prova de STT: chrome / google chrome / edge / spotify / instagram / “abre o…”.  
-- Expandir normalização (hoje em `whisperPtBrNormalize`) **antes** de `classifyUserIntent`, também para opens.  
-- **Invariante:** “abre o Chrome” **nunca** cai em lane `chat`/LLM. Se cair, o bug é transcript ou classificador — não “IA lenta”.
-
-### P1 — Small talk sem LLM (opcional, alto impacto)
-
-Lane ou pré-filtro para `oi` / `tudo bem` / `bom dia` → resposta curta + TTS, sem modelo. Só escala para LLM se não casar. Imita a “resposta imediata” do Kobi sem GPU.
+Aliases chrome/spotify; normalizar pré-router; `oi`/`bom dia` sem LLM.
 
 ### P2 — Fase A1 / A2 (TTS)
 
-Ligar fala na sessão de voz + confirmação falada pré-ação. Já no [`roadmap.md`](./roadmap.md); não compete com multi-IA.
+Fala na sessão de voz + confirmação falada.
 
 ---
 
 ## Roteamento para IA conectada
 
-Sim: depois do texto, classificar e escalar. O classificador é barato; o trabalho pesado que demora.
-
-| Sinal | Rota |
-|-------|------|
-| abre / toca / timer / volume / desliga… | `pc_action` local |
-| oi / bom dia / tudo bem | chat curto local ou template |
-| gera imagem / faz um site / código longo | IA conectada |
-| “usa o Claude / o GPT” | forçar provedor |
-| confiança baixa no intent | pedir de novo **ou** escalar chat |
+| Sinal | Rota no SKU |
+|-------|-------------|
+| abre / toca / … | `pc_action` local |
+| oi / bom dia | local / template |
+| gera imagem / site / código longo | BYOK cloud; senão “conecte uma IA” falado |
+| “usa o Claude” | só se conectado |
 
 ---
 
-## Checklist de dogfooding (pass/fail)
+## Checklist de dogfooding (= aceite do SKU)
 
 | # | Teste | Passa se |
 |---|-------|----------|
-| 1 | PTT: “abre o Google Chrome” (fala natural) | Transcript certo o bastante + Chrome em ≤2 s |
-| 2 | PTT: “oi, tudo bem?” | TTS começa em ≤3 s |
-| 3 | PTT: “toca [música] no Spotify” | Intent Spotify, sem ir ao chat LLM |
-| 4 | Sem rede + fallback | Com Whisper em disco: ainda abre app; sem STT: erro falado, sem mentir |
-| 5 | “gera uma imagem de um gato” | Roteia cloud; geração pode demorar |
-| 6 | Regressão | Sem chave STT no renderer/logs; Web Speech não volta como `auto` |
+| 1 | “abre o Google Chrome” **sem rede** | Transcript ok + ≤2 s |
+| 2 | “oi, tudo bem?” **sem rede** | TTS ≤3 s (template/Ollama) |
+| 3 | Spotify por nome | Intent, sem LLM de hub |
+| 4 | Instalação limpa, **sem** colar key de STT | Default local funciona |
+| 5 | Sem BYOK + “gera uma imagem” | Erro falado honesto (não usa key do vendedor) |
+| 6 | Com BYOK STT (opcional) | Usa a chave do usuário; nunca loga a key |
+| 7 | Regressão | Web Speech ≠ `auto`; sem secret no renderer/instalador |
 
-Não abrir PRs de Fase E enquanto **1** e **2** estiverem vermelhos.
+Não abrir Fase E enquanto **1, 2, 4 e 7** estiverem vermelhos.
 
 ---
 
@@ -206,21 +198,19 @@ Não abrir PRs de Fase E enquanto **1** e **2** estiverem vermelhos.
 
 | Doc | Papel |
 |-----|--------|
-| Este | *Como melhorar latência + acerto de STT agora* (engenharia + ordem de handoff) |
-| `produto.md` | Norte (o quê / para quem) |
-| `roadmap.md` | Quando (Fase A primeiro) |
-| ADRs | Decisões já tomadas; este guia **motiva** revisão de 0008 (e nuance de 0011 para chat curto) |
+| Este | Latência + acerto + **formato do SKU vitalício** |
+| `produto.md` | Norte |
+| `roadmap.md` | Fase A primeiro |
+| ADRs | Revisar 0008 (default STT); nuance 0011 (chat curto local no SKU) |
 
 ---
 
-## Brief de handoff (passar para quem for implementar no Elio)
+## Brief de handoff (colar no PR)
 
-Copiar/colar como prompt de PR:
-
-1. **Não** extrair reconhecimento de voz do Cursor; **não** insistir em Web Speech no Electron.  
-2. Implementar **STT de nuvem no PTT** (preferência: Groq `whisper-large-v3-turbo` ou xAI `/v1/stt`) com chave no main/`safeStorage`; Whisper = fallback.  
-3. Atualizar `sttPolicy` + ADR 0008; telemetria leve PTT→transcript→ação (latência, sem texto de fala nos logs).  
-4. Rota de **chat curto por latência** (Ollama/rápido antes de OpenRouter free).  
-5. P1: normalização + aliases de opens; small talk sem LLM se couber no mesmo PR sem estourar escopo.  
-6. Critério de pronto = checklist §7 itens **1, 2 e 6** verdes.  
-7. Só depois: Fase A1/A2 TTS se ainda faltarem; Fase E continua estacionada.
+1. Dogfood = produto vitalício: **STT local default**, custo R$ 0/usuário no caminho feliz.  
+2. **Não** começar com Groq/xAI free do vendedor; **não** extrair Cursor; **não** Web Speech no Electron.  
+3. Implementar Sherpa/Vosk **ou** helper COM; Whisper só fallback degradado se fizer sentido.  
+4. Chat curto local/template; nuvem só BYOK.  
+5. Proibido: API key do vendedor no instalador, env de produção commitado, key no renderer.  
+6. Pronto = checklist **1, 2, 4, 7**.  
+7. BYOK Groq/xAI = P1 opcional depois do local verde. TTS A1/A2 em seguida. Fase E estacionada.
