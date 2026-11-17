@@ -52,7 +52,7 @@ Objetivo: fechar a cena canônica em ~30 s.
 | A2 | Confirmação falada | Antes/durante ação allowlisted, Elio **fala** o que vai fazer |
 | A3 | Spotify por nome de faixa | “Toca [X] no Spotify” → busca + play (Premium); falha falada se sem Premium / sem device |
 | A4 | Opens compostos | “Abre o Edge e o Instagram” → dois alvos; aliases claros (`edge` → msedge quando possível) |
-| A5 | STT estável pt-BR | Whisper (ou política vigente) entende os pedidos da demo sem “forçar” |
+| A5 | STT estável pt-BR | Whisper (ou política vigente) entende os pedidos da demo sem “forçar”. Guia: [`melhoria-latencia-voz-pos-kobi.md`](./melhoria-latencia-voz-pos-kobi.md) |
 
 **Saída da Fase A:** gravação/demo em que Douglas só usa voz e completa a cena canônica.
 

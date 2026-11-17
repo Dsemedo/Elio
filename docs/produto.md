@@ -227,6 +227,7 @@ Isto **não** substitui a Fase A (loop demo). Sem voz+ação básica, conector d
 | **[`roadmap.md`](./roadmap.md)** | Ordem, fases, DoD, o que está estacionado |
 | **[`conectores.md`](./conectores.md)** | Como agir no PC e em apps (Outlook, Teams, …) |
 | **[`analise-jarvis.md`](./analise-jarvis.md)** | O que aprender de OpenJarvis / Jev (e o que ignorar) |
+| **[`melhoria-latencia-voz-pos-kobi.md`](./melhoria-latencia-voz-pos-kobi.md)** | Latência voz/STT pós-Kobi — tirar Whisper do caminho crítico da demo |
 | **[`ADRs/`](./ADRs/)** | Como implementar decisões técnicas |
 | **[`elio-design-system.md`](./elio-design-system.md)** | UI visual — **subordinado** ao norte de produto |
 | **[`windows-distribution.md`](./windows-distribution.md)** | Instalador / update / assinatura |
