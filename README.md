@@ -31,7 +31,7 @@ Hoje o microfone ainda é **segurar para falar** (PTT). Wake word (“Ei, Elio�
 | Já tem base | Foco (Fase A — nesta ordem) |
 |-------------|------------------------------|
 | Floating Bar + Command Center | **A0:** STT local novo + cérebro local + escalate BYOK |
-| Whisper STT (provisório) + TTS | **Loop demo:** TTS + confirmação falada |
+| Sherpa STT (pt-BR) + TTS | **Loop demo:** TTS + confirmação falada |
 | Abrir app / site / pasta / browser + site | Opens compostos + Spotify por nome |
 | Digitar + teclas/atalhos allowlist | Conversa multi-turno; wake word depois |
 | Spotify (PKCE + play por **nome**) | Multi-IA nativa = **Fase E** (após A0) |
@@ -69,8 +69,9 @@ npm run dev
 2. No Elio: ligue **Falar respostas** (menu da barra / Integrações) para ouvir o Elio.  
 3. Segure o mic → fale → solte.
 
-STT **hoje** no código: Whisper local (`auto`). **Alvo:** STT local novo (Sherpa/Vosk) + cérebro local — [ADR 0019](./docs/ADRs/0019-local-stt-brain-cascade-byok.md).  
-Override opcional: `$env:ELIO_STT_PROVIDER = "whisper"` \| `"windows-speech"` \| `"auto"`.
+STT primário: Sherpa-ONNX local pt-BR (`auto`). Whisper = fallback.  
+Override: `$env:ELIO_STT_PROVIDER = "auto"` \| `"sherpa"` \| `"whisper"` \| `"windows-speech"`.  
+Cérebro local + cascata BYOK: [ADR 0019](./docs/ADRs/0019-local-stt-brain-cascade-byok.md).
 
 ### Integrações opcionais
 

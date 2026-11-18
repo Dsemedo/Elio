@@ -2,9 +2,9 @@
 
 ## Status
 
-**Supersedido em direção (2026-11-18) por [ADR 0019](./0019-local-stt-brain-cascade-byok.md):** o *alvo* de `auto` deixa de ser Whisper. Alvo = STT local novo (Sherpa-ONNX / Vosk pt-BR, ou helper COM Windows fora do Chromium). Whisper = fallback degradado. Web Speech / Windows Speech Runtime no renderer permanece **fora** do `auto` (só force `ELIO_STT_PROVIDER=windows-speech`).
+**Supersedido em direção (2026-11-18) por [ADR 0019](./0019-local-stt-brain-cascade-byok.md); A0a implementado:** `auto` = **Sherpa-ONNX** (NeMo CTC pt-BR) via subprocess. Whisper = fallback / `ELIO_STT_PROVIDER=whisper`. Web Speech / Windows Speech Runtime no renderer permanece **fora** do `auto` (só force `ELIO_STT_PROVIDER=windows-speech`).
 
-**Estado do código até A0a:** Whisper ainda é o `auto` em todas as plataformas (decisão operacional de 2026-11-16). Motivo histórico: no Electron do Douglas o Web Speech seguia em “Não ouvi nada” (0.16.1–0.16.2) apesar do mic do SO funcionar — bloqueava o loop demo. **Não** reabrir patches nesse stack Web Speech.
+Motivo histórico do Whisper-as-auto (2026-11-16): no Electron do Douglas o Web Speech seguia em “Não ouvi nada” — **não** reabrir patches nesse stack.
 
 Histórico da decisão original (Speech primário no Windows) permanece abaixo como contexto.
 
@@ -23,17 +23,17 @@ Alternativas reavaliadas:
 | **C. Whisper-first (subprocess)** | Já implementado; Win/Mac/Linux iguais; offline | Download ~466 MB; PT-BR do `small` imperfeito |
 | **D. STT cloud** | Melhor PT-BR | Rede, custo, privacidade |
 
-## Decisão (histórica 2026-11-16 → supersedida em alvo por ADR 0019)
+## Decisão (atual — A0a)
 
-1. **Código atual (`auto`):** Whisper via `whisper-cli` (ADR 0002) em **todas** as plataformas — inclusive Windows — até o PR A0a.
-2. **Alvo de produto (`auto`):** STT local novo ([ADR 0019](./0019-local-stt-brain-cascade-byok.md)); Whisper só fallback; Web Speech ≠ `auto`.
-3. **Windows Speech (renderer):** só com `ELIO_STT_PROVIDER=windows-speech` (e API disponível). Sem WAV paralelo no caminho Speech (getUserMedia aberto + Speech → mic exclusivo no Electron).
+1. **Primário (`auto` / `sherpa`):** Sherpa-ONNX `sherpa-onnx-offline` + modelo NeMo CTC pt-BR int8 ([ADR 0019](./0019-local-stt-brain-cascade-byok.md)).
+2. **Fallback:** se Sherpa falhar no ensure/transcribe → Whisper (ADR 0002). Force: `ELIO_STT_PROVIDER=whisper`.
+3. **Windows Speech (renderer):** só com `ELIO_STT_PROVIDER=windows-speech` (e API disponível). Sem WAV paralelo no caminho Speech.
 4. **Auto-envio** imediato após transcript válido. **Sem** janela de confirmar/editar.
-5. Override atual: `ELIO_STT_PROVIDER=auto|windows-speech|whisper` (main → `VoiceStatus.sttPreference`) — será estendido quando o STT novo entrar.
+5. Override: `ELIO_STT_PROVIDER=auto|sherpa|whisper|windows-speech`.
 6. Melhoria via Whisper `medium`/`large` ou STT cloud na conta do vendedor: **rejeitado** (ADR 0019).
 
 ## Consequências
 
-- 1º PTT no Windows ainda pode baixar o modelo Whisper (~466 MB) enquanto Whisper for o `auto` no código.
-- Caminho Speech experimental continua no código para quem forçar o env — **não** é o default.
-- Próximo PR de STT deve atualizar `sttPolicy` + este ADR + ADR 0002 para refletir o backend novo como `auto`.
+- 1º PTT baixa Sherpa (~binário + ~126 MB modelo) em `%APPDATA%\elio\sherpa\`.
+- Whisper permanece instalável como fallback (userData/whisper).
+- Caminho Speech experimental continua só com force — **não** é o default.

@@ -14,7 +14,7 @@ Este documento responde **quando** e **em que ordem**. Não redefine o norte —
 | Capacidade | Estado | Nota |
 |------------|--------|------|
 | Floating Bar + PTT | Base pronta | Hold-to-talk |
-| STT (Whisper local) | **Legado / provisório** | Ainda é `auto` no código; **alvo** = STT local novo (A0a / ADR 0019) |
+| STT (Sherpa local pt-BR) | **A0a** | `auto` = Sherpa-ONNX; Whisper = fallback / force |
 | Cérebro local (small talk / escalate) | **Falta** | “oi” ainda cai no hub; A0b–A0c |
 | TTS (system / edge) | Parcial | **Off por padrão** — desalinha a frase-norte |
 | Confirmação falada antes da ação | Parcial | Status textual; TTS fala resposta final se ligado |

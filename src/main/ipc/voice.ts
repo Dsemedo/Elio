@@ -8,6 +8,11 @@ import { readMicAccessStatus } from '../micAccess'
 import { WHISPER_RELEASE, resolveWhisperModel } from '../services/voice/constants'
 import { ensureVoiceAssets, voiceAssetsStatus } from '../services/voice/download'
 import { friendlyVoiceError, logVoiceError } from '../services/voice/errors'
+import {
+  SHERPA_MODEL_ID,
+  SHERPA_MODEL_SIZE_HINT_MB,
+  SHERPA_RELEASE,
+} from '../services/voice/sherpa'
 import { readSttPreferenceFromEnv } from '../services/voice/sttPreference'
 import { transcribeWavBase64 } from '../services/voice/transcribe'
 import type { MicAccessSnapshot, VoiceProgress } from '../../shared/types'
@@ -20,24 +25,35 @@ function broadcastProgress(progress: VoiceProgress): void {
 
 function toVoiceStatus(): VoiceStatus {
   const assets = voiceAssetsStatus()
-  const model = resolveWhisperModel()
   const sttPreference = readSttPreferenceFromEnv()
   const onWindows = process.platform === 'win32'
+  const engine = assets.engine
+  const whisperModel = resolveWhisperModel()
+
+  const modelId = engine === 'sherpa' ? SHERPA_MODEL_ID : whisperModel.id
+  const version = engine === 'sherpa' ? SHERPA_RELEASE : WHISPER_RELEASE
+  const sizeHint =
+    engine === 'sherpa' ? SHERPA_MODEL_SIZE_HINT_MB : whisperModel.sizeHintMb
+
   return {
     ready: assets.ready,
     binaryReady: assets.binaryReady,
     modelReady: assets.modelReady,
-    modelId: model.id,
-    whisperVersion: WHISPER_RELEASE,
-    supported:
-      process.platform === 'win32' || process.platform === 'linux',
+    modelId,
+    whisperVersion: version,
+    sttEngine: engine,
+    supported: process.platform === 'win32' || process.platform === 'linux',
     sttPreference,
     platform: process.platform,
     hint: assets.ready
-      ? onWindows
-        ? 'Voz pronta (Whisper local). Windows Speech só com ELIO_STT_PROVIDER=windows-speech.'
-        : 'Voz pronta (Whisper local) — segure o microfone e fale.'
-      : `Na primeira vez a gente baixa o Whisper (~${model.sizeHintMb} MB, modelo ${model.id}). Precisa de internet uma vez.`,
+      ? engine === 'sherpa'
+        ? onWindows
+          ? 'Voz pronta (Sherpa local pt-BR). Whisper só com ELIO_STT_PROVIDER=whisper.'
+          : 'Voz pronta (Sherpa local pt-BR) — segure o microfone e fale.'
+        : onWindows
+          ? 'Voz pronta (Whisper). Windows Speech só com ELIO_STT_PROVIDER=windows-speech.'
+          : 'Voz pronta (Whisper) — segure o microfone e fale.'
+      : `Na primeira vez a gente baixa o reconhecimento local (~${sizeHint} MB, ${engine}). Precisa de internet uma vez.`,
   }
 }
 

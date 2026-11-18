@@ -1,23 +1,26 @@
 /**
- * Política de STT: Whisper primário (Win/Mac/Linux).
- * Windows Speech só com force explícito (`ELIO_STT_PROVIDER=windows-speech`).
+ * Política de STT (ADR 0019 / A0a):
+ * - `auto` → Sherpa-ONNX (local pt-BR)
+ * - `whisper` → Whisper.cpp (fallback / force)
+ * - `windows-speech` → Web Speech só com force; senão Whisper
  */
 
-export type SttPreference = 'auto' | 'windows-speech' | 'whisper'
-export type SttBackend = 'windows-speech' | 'whisper'
+export type SttPreference = 'auto' | 'windows-speech' | 'whisper' | 'sherpa'
+export type SttBackend = 'windows-speech' | 'whisper' | 'sherpa'
 
 export function parseSttPreference(raw: string | undefined | null): SttPreference {
   const v = (raw ?? '').trim().toLowerCase()
-  if (v === 'whisper' || v === 'windows-speech' || v === 'auto') return v
+  if (v === 'whisper' || v === 'windows-speech' || v === 'auto' || v === 'sherpa') {
+    return v
+  }
   return 'auto'
 }
 
 /**
  * Escolhe o backend de STT para um PTT.
- * - `auto` / `whisper` → sempre Whisper (mesmo caminho no Windows e no Mac).
- * - `windows-speech` → Web Speech só se a API existir; senão Whisper.
- *
- * O `platform` permanece no input para callers/UI; `auto` não ramifica por OS.
+ * - `auto` / `sherpa` → Sherpa-ONNX
+ * - `whisper` → Whisper
+ * - `windows-speech` → Web Speech se API existir; senão Whisper
  */
 export function resolveSttBackend(input: {
   platform: string
@@ -31,8 +34,17 @@ export function resolveSttBackend(input: {
     return input.speechRecognitionAvailable ? 'windows-speech' : 'whisper'
   }
 
-  // auto | whisper
-  return 'whisper'
+  if (preference === 'whisper') {
+    return 'whisper'
+  }
+
+  // auto | sherpa
+  return 'sherpa'
+}
+
+/** True se o backend grava WAV e manda ao main (Sherpa ou Whisper). */
+export function isLocalWavBackend(backend: SttBackend): boolean {
+  return backend === 'sherpa' || backend === 'whisper'
 }
 
 /**
@@ -62,11 +74,11 @@ export function isSpeechPermissionDenied(
 }
 
 /**
- * Erros ao **iniciar** o Speech que justificam cair no Whisper.
+ * Erros ao **iniciar** o Speech que justificam cair no WAV local (Whisper/Sherpa).
  *
- * NÃO cai no Whisper quando:
+ * NÃO cai quando:
  * - permissão negada
- * - no-speech / aborted / texto vazio (pedir para falar de novo — Whisper mangla PT-BR)
+ * - no-speech / aborted / texto vazio
  *
  * `null`/desconhecido no start → ainda permite fallback.
  */

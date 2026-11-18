@@ -199,11 +199,12 @@ export const VoiceStatusSchema = z.object({
   ready: z.boolean(),
   binaryReady: z.boolean(),
   modelReady: z.boolean(),
-  modelId: z.enum(['tiny', 'base', 'small']),
+  modelId: z.enum(['tiny', 'base', 'small', 'pt-nemo-ctc']),
   whisperVersion: z.string().min(1),
+  sttEngine: z.enum(['sherpa', 'whisper']),
   supported: z.boolean(),
   hint: z.string(),
-  sttPreference: z.enum(['auto', 'windows-speech', 'whisper']),
+  sttPreference: z.enum(['auto', 'windows-speech', 'whisper', 'sherpa']),
   platform: z.string().min(1),
 })
 

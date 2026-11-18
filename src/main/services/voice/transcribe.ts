@@ -9,7 +9,7 @@ import {
   WHISPER_BEAM_SIZE,
   WHISPER_INITIAL_PROMPT,
 } from './constants'
-import { ensureVoiceAssets } from './download'
+import { ensureWhisperVoiceAssets } from './download'
 import {
   assertPathInsideWhisper,
   binaryPath,
@@ -23,6 +23,15 @@ import {
 import { normalizeWhisperPtBr } from '../../../shared/whisperPtBrNormalize'
 import type { VoiceProgress } from '../../../shared/types'
 import { decodeWhisperOutputBytes } from './decodeOutput'
+import { readSttPreferenceFromEnv } from './sttPreference'
+import {
+  ensureSherpaAssets,
+  ensureSherpaDirs,
+  isSherpaReady,
+  redactSherpaPath,
+  runSherpaOffline,
+  sherpaTempDir,
+} from './sherpa'
 
 type WavInfo = {
   sampleRate: number
@@ -123,7 +132,6 @@ async function runWhisperCli(wavPath: string, outBase: string): Promise<string> 
     const child = spawn(cli, args, {
       shell: false,
       windowsHide: true,
-      // cwd no bin: no Windows as DLLs do Whisper ficam ao lado do exe.
       cwd: binDir,
       env: {
         ...process.env,
@@ -183,14 +191,42 @@ async function runWhisperCli(wavPath: string, outBase: string): Promise<string> 
   })
 }
 
-export async function transcribeWavBase64(
-  audioBase64: string,
+function prefersSherpa(): boolean {
+  const pref = readSttPreferenceFromEnv()
+  return pref === 'auto' || pref === 'sherpa'
+}
+
+async function transcribeWithSherpa(
+  wav: Buffer,
   onProgress?: (p: VoiceProgress) => void,
-): Promise<{ text: string }> {
+): Promise<string> {
+  ensureSherpaDirs()
+  if (!isSherpaReady()) {
+    await ensureSherpaAssets(onProgress)
+  }
+  if (!isSherpaReady()) {
+    throw new Error('SHERPA_MISSING: Sherpa não está instalado')
+  }
+
+  const id = randomUUID()
+  const wavPath = join(sherpaTempDir(), `${id}.wav`)
+  try {
+    writeFileSync(wavPath, wav)
+    const raw = await runSherpaOffline(wavPath)
+    return normalizeWhisperPtBr(raw)
+  } finally {
+    rmSync(wavPath, { force: true })
+  }
+}
+
+async function transcribeWithWhisper(
+  wav: Buffer,
+  onProgress?: (p: VoiceProgress) => void,
+): Promise<string> {
   ensureWhisperDirs()
 
   if (!isBinaryReady() || !isModelReady()) {
-    await ensureVoiceAssets(onProgress)
+    await ensureWhisperVoiceAssets(onProgress)
   }
 
   if (!isBinaryReady()) {
@@ -198,12 +234,6 @@ export async function transcribeWavBase64(
   }
   if (!isModelReady()) {
     throw new Error('MODEL_MISSING: modelo Whisper ausente')
-  }
-
-  const wav = decodeBase64Wav(audioBase64)
-  const info = parseWavHeader(wav)
-  if (info.durationMs < MIN_AUDIO_MS) {
-    throw new Error('AUDIO_TOO_SHORT: fale um pouco mais (áudio muito curto)')
   }
 
   const id = randomUUID()
@@ -214,7 +244,44 @@ export async function transcribeWavBase64(
   try {
     writeFileSync(wavPath, wav)
     const raw = await runWhisperCli(wavPath, outBase)
-    const text = normalizeWhisperPtBr(raw)
+    return normalizeWhisperPtBr(raw)
+  } finally {
+    rmSync(wavPath, { force: true })
+    rmSync(txtPath, { force: true })
+  }
+}
+
+export async function transcribeWavBase64(
+  audioBase64: string,
+  onProgress?: (p: VoiceProgress) => void,
+): Promise<{ text: string }> {
+  const wav = decodeBase64Wav(audioBase64)
+  const info = parseWavHeader(wav)
+  if (info.durationMs < MIN_AUDIO_MS) {
+    throw new Error('AUDIO_TOO_SHORT: fale um pouco mais (áudio muito curto)')
+  }
+
+  const forceWhisper = readSttPreferenceFromEnv() === 'whisper'
+
+  try {
+    let text: string
+    if (!forceWhisper && prefersSherpa()) {
+      try {
+        text = await transcribeWithSherpa(wav, onProgress)
+      } catch (sherpaErr) {
+        console.error('[elio] voice: Sherpa falhou — tentando Whisper', {
+          message:
+            sherpaErr instanceof Error
+              ? sherpaErr.message.slice(0, 200)
+              : String(sherpaErr).slice(0, 200),
+          tmp: redactSherpaPath(sherpaTempDir()),
+        })
+        text = await transcribeWithWhisper(wav, onProgress)
+      }
+    } else {
+      text = await transcribeWithWhisper(wav, onProgress)
+    }
+
     if (!text) {
       throw new Error('AUDIO_TOO_SHORT: não deu para entender — tente falar de novo')
     }
@@ -229,8 +296,5 @@ export async function transcribeWavBase64(
       ...detail,
     })
     throw err
-  } finally {
-    rmSync(wavPath, { force: true })
-    rmSync(txtPath, { force: true })
   }
 }

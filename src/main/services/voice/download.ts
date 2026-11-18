@@ -38,6 +38,8 @@ import {
   whisperTempDir,
 } from './paths'
 import type { VoiceProgress } from '../../../shared/types'
+import { ensureSherpaAssets, sherpaAssetsStatus } from './sherpa'
+import { readSttPreferenceFromEnv } from './sttPreference'
 
 const execFileAsync = promisify(execFile)
 
@@ -501,7 +503,7 @@ async function ensureModel(onProgress?: ProgressEmitter): Promise<void> {
   }
 }
 
-export async function ensureVoiceAssets(onProgress?: ProgressEmitter): Promise<{
+export async function ensureWhisperVoiceAssets(onProgress?: ProgressEmitter): Promise<{
   binaryReady: boolean
   modelReady: boolean
 }> {
@@ -509,10 +511,39 @@ export async function ensureVoiceAssets(onProgress?: ProgressEmitter): Promise<{
     ensureWhisperDirs()
     await ensureBinary(onProgress)
     await ensureModel(onProgress)
-    emit(onProgress, 'idle', 100, 'Voz pronta')
+    emit(onProgress, 'idle', 100, 'Voz Whisper pronta')
     return { binaryReady: isBinaryReady(), modelReady: isModelReady() }
   } catch (err) {
     throw normalizeVoiceEnsureError(err)
+  }
+}
+
+/**
+ * Prepara o STT primário conforme preferência:
+ * - auto/sherpa → Sherpa (ADR 0019)
+ * - whisper → Whisper
+ * - windows-speech → Whisper (fallback WAV se Speech falhar)
+ */
+export async function ensureVoiceAssets(onProgress?: ProgressEmitter): Promise<{
+  binaryReady: boolean
+  modelReady: boolean
+}> {
+  const pref = readSttPreferenceFromEnv()
+
+  if (pref === 'whisper' || pref === 'windows-speech') {
+    return ensureWhisperVoiceAssets(onProgress)
+  }
+
+  // auto | sherpa
+  try {
+    const sherpa = await ensureSherpaAssets(onProgress)
+    emit(onProgress, 'idle', 100, 'Voz pronta (Sherpa)')
+    return sherpa
+  } catch (sherpaErr) {
+    logVoiceError('voice: Sherpa ensure falhou — caindo no Whisper', sherpaErr, {
+      where: redactPath(whisperRoot()),
+    })
+    return ensureWhisperVoiceAssets(onProgress)
   }
 }
 
@@ -520,8 +551,38 @@ export function voiceAssetsStatus(): {
   binaryReady: boolean
   modelReady: boolean
   ready: boolean
+  engine: 'sherpa' | 'whisper'
 } {
-  const binaryReady = isBinaryReady()
-  const modelReady = isModelReady()
-  return { binaryReady, modelReady, ready: binaryReady && modelReady }
+  const pref = readSttPreferenceFromEnv()
+  const sherpa = sherpaAssetsStatus()
+  const whisperReady = isBinaryReady() && isModelReady()
+
+  if (pref === 'whisper' || pref === 'windows-speech') {
+    return {
+      binaryReady: isBinaryReady(),
+      modelReady: isModelReady(),
+      ready: whisperReady,
+      engine: 'whisper',
+    }
+  }
+
+  if (sherpa.ready) {
+    return { ...sherpa, engine: 'sherpa' }
+  }
+
+  if (whisperReady) {
+    return {
+      binaryReady: true,
+      modelReady: true,
+      ready: true,
+      engine: 'whisper',
+    }
+  }
+
+  return {
+    binaryReady: sherpa.binaryReady,
+    modelReady: sherpa.modelReady,
+    ready: false,
+    engine: 'sherpa',
+  }
 }
