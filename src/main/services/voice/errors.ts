@@ -4,6 +4,7 @@ const KNOWN_PREFIXES = [
   'AUDIO_TOO_SHORT',
   'AUDIO_INVALID',
   'WHISPER_MISSING',
+  'SHERPA_MISSING',
   'MODEL_MISSING',
   'DOWNLOAD_FAILED',
   'EXTRACT_FAILED',
@@ -67,7 +68,7 @@ export function normalizeVoiceEnsureError(err: unknown): Error {
     code === 'ABORT_ERR'
   ) {
     return new Error(
-      'DOWNLOAD_FAILED: tempo esgotado ao baixar o Whisper. Tente de novo com internet estável.',
+      'DOWNLOAD_FAILED: tempo esgotado ao baixar o modelo de voz. Tente de novo com internet estável.',
     )
   }
 
@@ -81,13 +82,13 @@ export function normalizeVoiceEnsureError(err: unknown): Error {
     lower.includes('network')
   ) {
     return new Error(
-      'DOWNLOAD_FAILED: sem conexão para baixar o Whisper. Confira a internet e tente de novo.',
+      'DOWNLOAD_FAILED: sem conexão para baixar o modelo de voz. Confira a internet e tente de novo.',
     )
   }
 
   if (code === 'EPERM' || code === 'EACCES' || code === 'EBUSY' || code === 'EEXIST') {
     return new Error(
-      'INSTALL_FAILED: o Windows bloqueou a instalação do Whisper (permissão ou antivírus). Tente de novo.',
+      'INSTALL_FAILED: o Windows bloqueou a instalação da voz (permissão ou antivírus). Tente de novo.',
     )
   }
 
@@ -104,26 +105,29 @@ export function friendlyVoiceError(raw: string): string {
   if (raw.startsWith('WHISPER_MISSING')) {
     return 'O Whisper não está disponível. Use “Preparar voz” ou verifique a internet.'
   }
+  if (raw.startsWith('SHERPA_MISSING')) {
+    return 'O reconhecimento local (Sherpa) não está disponível. Use “Preparar voz” ou verifique a internet.'
+  }
   if (raw.startsWith('MODEL_MISSING')) {
     return 'O modelo de voz ainda não foi baixado. Use “Preparar voz”.'
   }
   if (raw.startsWith('EXTRACT_FAILED')) {
-    return 'Baixei o Whisper, mas não consegui extrair no Windows. Tente de novo (antivírus pode bloquear).'
+    return 'Baixei o modelo de voz, mas não consegui extrair. Tente de novo (antivírus pode bloquear).'
   }
   if (raw.startsWith('INSTALL_FAILED')) {
-    return 'Não consegui instalar o Whisper nesta pasta. Feche o antivírus temporariamente e tente de novo.'
+    return 'Não consegui instalar o reconhecimento de voz nesta pasta. Feche o antivírus temporariamente e tente de novo.'
   }
   if (raw.startsWith('DOWNLOAD_FAILED')) {
     if (/tempo esgotado|timeout|abort/i.test(raw)) {
-      return 'O download do Whisper demorou demais. Confira a internet e tente de novo.'
+      return 'O download do modelo de voz demorou demais. Confira a internet e tente de novo.'
     }
     if (/sem conexão|ENOTFOUND|ECONN|fetch failed|network/i.test(raw)) {
-      return 'Sem conexão para baixar o Whisper. Confira a internet e tente de novo.'
+      return 'Sem conexão para baixar o modelo de voz. Confira a internet e tente de novo.'
     }
     if (/HTTP 429|HTTP 5\d\d/i.test(raw)) {
       return 'O servidor do modelo está ocupado. Espere um minuto e tente de novo.'
     }
-    return 'Falha no download do Whisper. Confira a internet e tente de novo.'
+    return 'Falha no download do modelo de voz. Confira a internet e tente de novo.'
   }
   if (raw.startsWith('UNSUPPORTED_PLATFORM')) {
     return 'Voz no MVP é para Windows 10/11 x64.'

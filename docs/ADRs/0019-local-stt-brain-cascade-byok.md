@@ -1,6 +1,6 @@
 # ADR 0019 — STT local + cérebro local + cascata só BYOK (SKU vitalício)
 
-**Status:** aceito (direção de produto; implementação em PRs futuros — Fase A0a–A0c)  
+**Status:** aceito — A0b/A0c (cérebro) e A0a (Sherpa STT) em implementação; TTS/Fase E ainda futuros  
 **Data:** 2026-11-18  
 **Guia de handoff:** [`docs/melhoria-latencia-voz-pos-kobi.md`](../melhoria-latencia-voz-pos-kobi.md)  
 **Supersede parcialmente:** ADR 0002 (papel de Whisper), ADR 0008 (alvo de `auto`)  

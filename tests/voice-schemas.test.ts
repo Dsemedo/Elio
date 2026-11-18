@@ -20,14 +20,16 @@ describe('voice IPC contracts', () => {
       ready: false,
       binaryReady: false,
       modelReady: false,
-      modelId: 'small',
-      whisperVersion: 'v1.9.2',
+      modelId: 'pt-nemo-ctc',
+      whisperVersion: 'v2.0.1',
+      sttEngine: 'sherpa',
       supported: true,
       hint: 'baixar',
       sttPreference: 'auto',
       platform: 'win32',
     })
-    expect(status.modelId).toBe('small')
+    expect(status.modelId).toBe('pt-nemo-ctc')
+    expect(status.sttEngine).toBe('sherpa')
     expect(status.sttPreference).toBe('auto')
   })
 
@@ -53,6 +55,7 @@ describe('voice IPC contracts', () => {
   it('mapeia erros de voz para mensagens amigáveis', () => {
     expect(friendlyVoiceError('AUDIO_TOO_SHORT: x')).toMatch(/curto/i)
     expect(friendlyVoiceError('WHISPER_MISSING: x')).toMatch(/Whisper/i)
+    expect(friendlyVoiceError('SHERPA_MISSING: x')).toMatch(/Sherpa|local/i)
     expect(friendlyVoiceError('DOWNLOAD_FAILED: x')).toMatch(/download/i)
     expect(friendlyVoiceError('EXTRACT_FAILED: x')).toMatch(/extrair/i)
     expect(friendlyVoiceError('algo-interno-com-path')).toMatch(/digitar/i)

@@ -139,9 +139,9 @@ Pessoas que se parecerem com Douglas e possam instalar um `.exe` Windows:
 
 ## Estado atual (honesto)
 
-Em **v0.18.x** já existem pedaços: Floating Bar, **Whisper STT** (ainda o `auto` no código — legado até A0a), TTS (off por padrão), opens (site no Chrome/Edge, compostos, Maps, site dinâmico com correção de STT), Spotify PKCE + play por nome, clima, cascata de IA (ainda usada demais para chat/“oi”), digitar no app e atalhos allowlisted (Ctrl+C/V/A/Z/X/S).
+Em **v0.18.x+** já existem pedaços: Floating Bar, **Sherpa STT** (`auto`, pt-BR) com Whisper como fallback, cérebro local (small talk / escalate), TTS (off por padrão), opens (site no Chrome/Edge, compostos, Maps, site dinâmico), Spotify PKCE + play por nome, clima, cascata de IA (só pedidos pesados / chat residual), digitar no app e atalhos allowlisted.
 
-**Alvo vigente** ([ADR 0019](./ADRs/0019-local-stt-brain-cascade-byok.md)): STT local novo + cérebro local (small talk / opens offline) + escalação `CLOUD:kind` só com BYOK. O que ainda falta na Fatia 1 perceptível inclui **A0a–A0c**, depois **TTS ligado no pedido por voz** e confirmação falada pré-ação.
+**Norte vigente** ([ADR 0019](./ADRs/0019-local-stt-brain-cascade-byok.md)): STT + cérebro locais; cascata só BYOK. O que ainda falta na Fatia 1 perceptível: **TTS ligado no pedido por voz**, confirmação falada pré-ação, metas A5 de latência no uso real.
 
 ---
 

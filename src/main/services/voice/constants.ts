@@ -85,6 +85,7 @@ export const DOWNLOAD_RETRY_DELAY_MS = 1_500
 
 export type VoiceErrorCode =
   | 'WHISPER_MISSING'
+  | 'SHERPA_MISSING'
   | 'MODEL_MISSING'
   | 'AUDIO_TOO_SHORT'
   | 'AUDIO_INVALID'

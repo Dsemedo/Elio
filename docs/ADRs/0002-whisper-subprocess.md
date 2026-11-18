@@ -3,7 +3,7 @@
 ## Status
 
 Aceito como **integração técnica** (subprocess).  
-**Papel de produto revisado 2026-11-18 ([ADR 0019](./0019-local-stt-brain-cascade-byok.md)):** Whisper deixa de ser o *alvo* primário do SKU; permanece **fallback degradado** (e, até o PR A0a, ainda é o `auto` no código).
+**Papel de produto revisado 2026-11-18 ([ADR 0019](./0019-local-stt-brain-cascade-byok.md) / A0a):** Whisper é **fallback degradado** (`ELIO_STT_PROVIDER=whisper` ou se Sherpa falhar). Primário = Sherpa-ONNX.
 
 ## Contexto
 
@@ -13,7 +13,7 @@ OD-02 aprovou Whisper.cpp via **subprocess** do binário oficial `whisper-cli`, 
 
 | Item | Valor |
 |------|--------|
-| Papel no produto | **Fallback degradado** (alvo de `auto` = ADR 0019). Até A0a, o código ainda usa Whisper como `auto`. Windows Speech só com force (ADR 0008) |
+| Papel no produto | **Fallback degradado** (`auto` = Sherpa — ADR 0019/0008). Windows Speech só com force |
 | Integração | `child_process.spawn` no **main** (`shell: false`, argv em array) |
 | Binário pin | whisper.cpp **v1.9.2** — `whisper-bin-x64.zip` (Windows) / `whisper-bin-ubuntu-x64.tar.gz` (Linux) |
 | Extract Windows | `tar.exe -xf` (bsdtar Win10+) no `.zip`; fallback `Expand-Archive`; limpeza temp best-effort |

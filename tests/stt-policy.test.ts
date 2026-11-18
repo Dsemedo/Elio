@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   emptySpeechUserMessage,
   extractWindowsSpeechErrorCode,
+  isLocalWavBackend,
   isSpeechPermissionDenied,
   parseSttPreference,
   resolveSttBackend,
@@ -16,6 +17,7 @@ describe('parseSttPreference', () => {
   it('aceita valores conhecidos', () => {
     expect(parseSttPreference('auto')).toBe('auto')
     expect(parseSttPreference('WHISPER')).toBe('whisper')
+    expect(parseSttPreference('sherpa')).toBe('sherpa')
     expect(parseSttPreference('windows-speech')).toBe('windows-speech')
   })
 
@@ -27,41 +29,51 @@ describe('parseSttPreference', () => {
 })
 
 describe('resolveSttBackend', () => {
-  it('auto no Windows → whisper (mesmo com SpeechRecognition)', () => {
+  it('auto → sherpa (ADR 0019 / A0a)', () => {
     expect(
       resolveSttBackend({
         platform: 'win32',
         speechRecognitionAvailable: true,
         preference: 'auto',
       }),
-    ).toBe('whisper')
+    ).toBe('sherpa')
   })
 
-  it('auto sem SpeechRecognition → whisper', () => {
+  it('auto sem SpeechRecognition → sherpa', () => {
     expect(
       resolveSttBackend({
         platform: 'win32',
         speechRecognitionAvailable: false,
         preference: 'auto',
       }),
-    ).toBe('whisper')
+    ).toBe('sherpa')
   })
 
-  it('auto no Linux / darwin → whisper', () => {
+  it('auto no Linux / darwin → sherpa', () => {
     expect(
       resolveSttBackend({
         platform: 'linux',
         speechRecognitionAvailable: true,
         preference: 'auto',
       }),
-    ).toBe('whisper')
+    ).toBe('sherpa')
     expect(
       resolveSttBackend({
         platform: 'darwin',
         speechRecognitionAvailable: true,
         preference: 'auto',
       }),
-    ).toBe('whisper')
+    ).toBe('sherpa')
+  })
+
+  it('force sherpa', () => {
+    expect(
+      resolveSttBackend({
+        platform: 'win32',
+        speechRecognitionAvailable: true,
+        preference: 'sherpa',
+      }),
+    ).toBe('sherpa')
   })
 
   it('force whisper ignora disponibilidade', () => {
@@ -92,6 +104,12 @@ describe('resolveSttBackend', () => {
         preference: 'windows-speech',
       }),
     ).toBe('whisper')
+  })
+
+  it('sherpa e whisper são WAV local', () => {
+    expect(isLocalWavBackend('sherpa')).toBe(true)
+    expect(isLocalWavBackend('whisper')).toBe(true)
+    expect(isLocalWavBackend('windows-speech')).toBe(false)
   })
 })
 

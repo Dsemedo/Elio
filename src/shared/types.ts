@@ -142,14 +142,19 @@ export type ChatUpdatedEvent = {
   conversation?: Conversation
 }
 
-export type VoiceModelId = 'tiny' | 'base' | 'small'
+export type VoiceModelId = 'tiny' | 'base' | 'small' | 'pt-nemo-ctc'
+
+export type VoiceSttEngine = 'sherpa' | 'whisper'
 
 export type VoiceStatus = {
   ready: boolean
   binaryReady: boolean
   modelReady: boolean
   modelId: VoiceModelId
+  /** Versão do engine primário (Sherpa ou Whisper). */
   whisperVersion: string
+  /** Engine efetivo pronto (ou alvo quando ainda baixando). */
+  sttEngine: VoiceSttEngine
   supported: boolean
   hint: string
   /**
