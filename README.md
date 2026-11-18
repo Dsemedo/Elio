@@ -30,7 +30,7 @@ Hoje o microfone ainda é **segurar para falar** (PTT). Wake word (“Ei, Elio�
 
 | Já tem base | Foco (Fase A — nesta ordem) |
 |-------------|------------------------------|
-| Floating Bar + Command Center | **A0:** STT local novo + cérebro local + escalate BYOK |
+| Floating Bar + Command Center (some fora do desktop) | **A0:** STT local novo + cérebro local + escalate BYOK |
 | Sherpa STT (pt-BR) + TTS | **Loop demo:** TTS + confirmação falada |
 | Abrir app / site / pasta / browser + site | Opens compostos + Spotify por nome |
 | Digitar + teclas/atalhos allowlist | Conversa multi-turno; wake word depois |

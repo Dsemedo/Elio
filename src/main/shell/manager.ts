@@ -10,8 +10,11 @@ import {
 } from 'electron'
 import { join } from 'node:path'
 import { IpcChannels } from '../../shared/channels'
-import { FocusTracker } from './focusTracker'
-import { resolveFocusLossBehavior } from './focusPolicy'
+import { FocusTracker, type FocusState } from './focusTracker'
+import {
+  resolveFocusLossBehavior,
+  resolveShellForegroundAction,
+} from './focusPolicy'
 
 const isDev = !app.isPackaged
 
@@ -24,11 +27,10 @@ const BAR_OVERLAY_H = 240
 export type ShellSurface = 'bar' | 'panel'
 
 /**
- * Shell: Floating Bar always-on-top + Command Center.
+ * Shell: Floating Bar + Command Center.
  * - Barra preenche a BrowserWindow (~420×58); sem chrome/padding externo
- * - Perda de foco: painel pode recolher; barra permanece (DS / feedback Douglas)
- * - Ocultar barra: só menu/bandeja (ou preferência futura hideBarOnBlur)
- * - Voltar barra oculta: bandeja (atalho global = OD-20)
+ * - Default: barra só na área de trabalho / Elio; some com outro app em foco
+ * - Voltar: área de trabalho, bandeja, ou atalho global (OD-20)
  */
 export class ShellManager {
   private bar: BrowserWindow | null = null
@@ -39,8 +41,11 @@ export class ShellManager {
   private blurHideTimer: ReturnType<typeof setTimeout> | null = null
   private readonly focus = new FocusTracker()
   private quitting = false
-  /** Preferência futura; default false = barra fica no desktop. */
-  private hideBarOnBlur = false
+  /**
+   * Se true, mantém barra por cima de apps (legado).
+   * Default false = some fora do desktop (feedback Douglas).
+   */
+  private keepBarOverApps = false
 
   start(): void {
     app.on('before-quit', () => {
@@ -345,6 +350,10 @@ export class ShellManager {
     return nativeImage.createFromBitmap(buf, { width: size, height: size })
   }
 
+  private focusPrefs() {
+    return { keepBarOverApps: this.keepBarOverApps }
+  }
+
   private scheduleFocusLoss(): void {
     this.clearBlurTimer()
     // Debounce: clique barra→painel / troca entre janelas do Elio.
@@ -353,54 +362,74 @@ export class ShellManager {
       const anyFocused = this.windows().some((w) => w.isFocused())
       if (anyFocused) return
 
-      const fg = this.focus.getState().foregroundIsElio
-      // Windows: se FG ainda é Elio, não age. Se FG desconhecido, age no blur.
-      if (process.platform === 'win32' && fg === true) return
+      const { foregroundKind, foregroundIsElio } = this.focus.getState()
+      // Windows: Elio ou área de trabalho → não esconde; no máximo restaura.
+      if (process.platform === 'win32') {
+        if (foregroundIsElio === true || foregroundKind === 'elio') return
+        if (foregroundKind === 'desktop') {
+          this.restoreBarIfHiddenByFocus()
+          return
+        }
+      }
 
       this.applyFocusLoss()
     }, 280)
   }
 
-  private onFocusChange(state: {
-    elioFocused: boolean
-    foregroundIsElio: boolean | null
-  }): void {
+  private onFocusChange(state: FocusState): void {
     if (this.quitting) return
 
-    if (state.elioFocused) {
-      this.hiddenByFocus = false
+    const action = resolveShellForegroundAction(
+      state.foregroundKind,
+      this.focusPrefs(),
+    )
+
+    if (action === 'show-bar' || state.elioFocused) {
       this.clearBlurTimer()
+      this.restoreBarIfHiddenByFocus()
       return
     }
 
-    if (
-      process.platform === 'win32' &&
-      state.foregroundIsElio === false &&
-      !state.elioFocused
-    ) {
+    if (action === 'hide-all') {
+      this.applyFocusLoss()
+      return
+    }
+
+    if (action === 'hide-panel-only') {
       this.applyFocusLoss()
     }
   }
 
-  /** Aplica política de perda de foco (default: só recolhe o Command Center). */
+  /** Volta a barra (sem roubar foco) se o foco a tinha escondido. */
+  private restoreBarIfHiddenByFocus(): void {
+    if (!this.hiddenByFocus) return
+    this.hiddenByFocus = false
+    this.showBar()
+    this.broadcastShellState()
+  }
+
+  /**
+   * Aplica política de perda de foco.
+   * Default: esconde barra + painel (segundo plano / bandeja).
+   * Com keepBarOverApps: só recolhe o Command Center.
+   */
   private applyFocusLoss(): void {
     this.setBarOverlay(false)
-    const behavior = resolveFocusLossBehavior({
-      hideBarOnBlur: this.hideBarOnBlur,
-    })
+    const behavior = resolveFocusLossBehavior(this.focusPrefs())
 
     if (behavior === 'hide-all') {
       this.hiddenByFocus = true
+      // Não reabrir o painel ao voltar pelo desktop — só a barra.
+      this.panelOpen = false
       this.hideShell()
       return
     }
 
-    // keep-bar-hide-panel (default DS)
+    // keep-bar-hide-panel (legado)
     this.hiddenByFocus = false
     if (this.isPanelOpen()) {
       this.closePanel()
     }
-    // Garante barra visível mesmo se algum caminho a escondeu.
     if (this.bar && !this.bar.isDestroyed() && !this.bar.isVisible()) {
       this.bar.showInactive()
     }
