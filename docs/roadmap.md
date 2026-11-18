@@ -1,9 +1,9 @@
 # Elio — roadmap de produto
 
 **Status:** vigente  
-**Atualizado:** 2026-11-16  
-**Âncora:** [`produto.md`](./produto.md)  
-**Versão base:** v0.17.x
+**Atualizado:** 2026-11-18  
+**Âncora:** [`produto.md`](./produto.md) · [ADR 0019](./ADRs/0019-local-stt-brain-cascade-byok.md) · [`melhoria-latencia-voz-pos-kobi.md`](./melhoria-latencia-voz-pos-kobi.md)  
+**Versão base:** v0.18.x
 
 Este documento responde **quando** e **em que ordem**. Não redefine o norte — se conflitar com [`produto.md`](./produto.md), o produto vence.
 
@@ -14,13 +14,14 @@ Este documento responde **quando** e **em que ordem**. Não redefine o norte —
 | Capacidade | Estado | Nota |
 |------------|--------|------|
 | Floating Bar + PTT | Base pronta | Hold-to-talk |
-| STT (Whisper local) | Base pronta | Primário; Speech opcional via env |
+| STT (Whisper local) | **Legado / provisório** | Ainda é `auto` no código; **alvo** = STT local novo (A0a / ADR 0019) |
+| Cérebro local (small talk / escalate) | **Falta** | “oi” ainda cai no hub; A0b–A0c |
 | TTS (system / edge) | Parcial | **Off por padrão** — desalinha a frase-norte |
 | Confirmação falada antes da ação | Parcial | Status textual; TTS fala resposta final se ligado |
 | Abrir app / site / pasta | Base pronta | Um alvo por frase; Edge = browser genérico |
 | Comandos compostos (Edge + Instagram) | **Falta** | Centro da demo |
 | Spotify PKCE + resume/recent | Parcial | **Falta** tocar faixa **pelo nome** |
-| Cascata IA (OpenRouter / Ollama) | Base pronta | Hub único; **multi-IA nativa = Fase E** |
+| Cascata IA (OpenRouter / Ollama) | Base pronta | Hub para quem conectou; **não** é ouvido nem default de “oi”; multi-IA nativa = Fase E |
 | Digitar / teclas / Ctrl allowlist | Já shipped | Útil, mas **não** é Fatia 1 |
 | Memória explícita CRUD | Já shipped | Suficiente; “avançada” estacionada |
 | Pesquisa web leve | Já shipped | Secundário ao loop |
@@ -28,7 +29,7 @@ Este documento responde **quando** e **em que ordem**. Não redefine o norte —
 | Wake word | Stub UI | Só após Fases A–B |
 | Agentes / Atividades / Slack / Jira | Stub UI | **Estacionado** — não é compromisso |
 
-**Veredito:** dá para falar, transcrever, abrir **uma** coisa, retomar Spotify e (se ligar TTS) ouvir a resposta. A demo canônica (“toca [música] + abre Edge e Instagram + Elio fala confirmando”) **ainda não é o que o código entrega**.
+**Veredito:** dá para falar, transcrever (Whisper), abrir **uma** coisa, retomar Spotify e (se ligar TTS) ouvir a resposta. Ainda **não** fecha SKU offline (“oi” / opens sem hub) nem a demo canônica completa. Próximo desbloqueio da Fase A: **A0a–A0c**.
 
 ---
 
@@ -38,23 +39,28 @@ Este documento responde **quando** e **em que ordem**. Não redefine o norte —
 
 Exceção só com justificativa explícita no PR: segurança, regressão, ou desbloqueio direto da Fase A.
 
+**Fase E completa** (multi-provedor nativo) só depois de **A0a–A0c** verdes — checklist do guia itens **1, 2, 4, 5, 7** ([`melhoria-latencia-voz-pos-kobi.md`](./melhoria-latencia-voz-pos-kobi.md) §9).
+
 ---
 
 ## Fases
 
 ### Fase A — Loop demo (PTT) · **agora**
 
-Objetivo: fechar a cena canônica em ~30 s.
+Objetivo: fechar a cena canônica em ~30 s **e** o default SKU (ouve/decide no PC, sem key do vendedor).
 
 | # | Entrega | DoD |
 |---|---------|-----|
+| **A0a** | Ouvido local novo como `auto` | Sherpa-ONNX / Vosk (ou COM nativo); Whisper só fallback; Web Speech ≠ `auto`; ADR 0008/0002 alinhados ao [ADR 0019](./ADRs/0019-local-stt-brain-cascade-byok.md) |
+| **A0b** | Small talk / resposta curta **sem** hub | “oi, tudo bem?” funciona **sem rede**; sem `routeCompletion` no default |
+| **A0c** | Router `LOCAL` vs `CLOUD:kind` + manifesto | Pedido pesado sem IA conectada → fala “conecte uma IA”; **não** chama API do vendedor |
 | A1 | TTS na experiência de voz | Pedido por voz → resposta falada **sem** o usuário caçar o toggle (default on em sessão de voz, ou onboarding que liga na 1ª fala; modo silencioso explícito) |
 | A2 | Confirmação falada | Antes/durante ação allowlisted, Elio **fala** o que vai fazer |
 | A3 | Spotify por nome de faixa | “Toca [X] no Spotify” → busca + play (Premium); falha falada se sem Premium / sem device |
 | A4 | Opens compostos | “Abre o Edge e o Instagram” → dois alvos; aliases claros (`edge` → msedge quando possível) |
-| A5 | STT estável pt-BR | Whisper (ou política vigente) entende os pedidos da demo sem “forçar” |
+| A5 | STT local atinge metas pt-BR | Após soltar PTT: open ≤ **2 s**, “oi”+TTS ≤ **3 s**; fala natural serve ao intent (não “forçar” ditado) |
 
-**Saída da Fase A:** gravação/demo em que Douglas só usa voz e completa a cena canônica.
+**Saída da Fase A:** gravação/demo em que Douglas só usa voz e completa a cena canônica; install limpa sem colar key ainda ouve e age no básico.
 
 ### Fase B — Conversa multi-turno · **depois de A**
 
@@ -87,22 +93,23 @@ Itens já shipped ou úteis, mas **nunca** no lugar da Fase A:
 - Clima / hora / pesquisa web — manter honestos
 - Cascata IA atual (OpenRouter) — estabilidade e erros falados (preparação leve para E, sem multi-provedor ainda)
 
-### Fase E — Roteador multi-IA · **depois de A–B (no mínimo)**
+### Fase E — Roteador multi-IA · **depois de A0a–A0c (+ idealmente A–B)**
 
-Visão de produto: [`produto.md` → Horizonte multi-IA](./produto.md#horizonte--roteador-multi-ia-não-é-fase-a).  
-Hoje só existe o hub OpenRouter + Ollama ([ADR 0011](./ADRs/0011-ai-cascade-byok.md)). Esta fase **expande** para IAs conectadas de verdade.
+Visão de produto: [`produto.md` → Horizonte multi-IA](./produto.md#horizonte--roteador-multi-ia-não-é-fase-a-não-é-ouvido).  
+Pré-requisito: cérebro local já classifica `CLOUD:kind` e pede conexão se faltar BYOK ([ADR 0019](./ADRs/0019-local-stt-brain-cascade-byok.md)).  
+Hoje só existe o hub OpenRouter + Ollama ([ADR 0011](./ADRs/0011-ai-cascade-byok.md)) — para quem **já conectou** chave, em turnos já escalados. Esta fase **expande** para IAs conectadas de verdade. **Não é STT** e **não** é default de “oi”.
 
 | # | Entrega | DoD |
 |---|---------|-----|
 | E1 | Conectar provedores (API oficial / BYOK) | Claude, ChatGPT (OpenAI), Gemini no cofre; UI Integrações deixa de ser stub mentiroso |
 | E2 | Cascata de cotas | Pago → grátis do mesmo → próxima IA (pago/grátis) → Ollama → erro falado |
-| E3 | Roteamento por pedido | “Faz um site / explica este código” usa IA conectada; label **quem** atendeu |
+| E3 | Roteamento por pedido | Pedidos já classificados `CLOUD:*` usam IA conectada; label **quem** atendeu |
 | E4 | Budget enforce real | Contadores persistidos; estouro detectado (402/429); sem chute |
 | E5 | Cursor (quando houver caminho) | Abrir/rotear para Cursor **só** com integração oficial ou fluxo documentado — sem gambiarra de UI |
 
 **Saída da Fase E:** usuário com várias contas (sem assinatura) esgota grátis da IA A e o Elio **sozinho** passa a usar grátis da IA B; com assinatura, preferência paga é óbvia.
 
-**Não fazer na Fase E:** scraping de chat web, login automático em sites, gastar cota sem label, Slack/Jira.
+**Não fazer na Fase E:** scraping de chat web, login automático em sites, gastar cota sem label, Slack/Jira, STT cloud na conta do vendedor.
 
 ### Fase F — Conectores de produtividade · **depois de A (idealmente A–B)**
 
@@ -129,7 +136,7 @@ Explicitamente **fora** até o loop A–B estar bom (e, para multi-IA, até a Fa
 |------|--------|
 | Agentes / Atividades / Workspace | Puxam para “plataforma”; conflitam com o norte |
 | Slack / Jira | SaaS lateral; não é roteador de LLM |
-| Multi-IA nativa (Claude / ChatGPT / Gemini / Cursor) | **Compromisso = Fase E** — zero PRs antes de A–B |
+| Multi-IA nativa (Claude / ChatGPT / Gemini / Cursor) | **Compromisso = Fase E** — zero PRs antes de A0a–A0c (e idealmente A–B) |
 | Outlook / Teams / conectores Graph | **Compromisso = Fase F** — zero PRs antes de A (exceto contrato enxuto se destravar A) |
 | Extensão de aba do browser | Lane C honesta; custo alto vs valor no loop |
 | RPA genérico / UI automation ampla | Allowlist > poder total |
@@ -142,12 +149,14 @@ Stubs na UI podem permanecer como “em breve” — **sem** PR de implementaç�
 
 ## Ordem de PRs sugerida (Fase A)
 
-1. **A1 + A2** — voz com voz + confirmação falada (menor fricção perceptível)  
-2. **A4** — opens compostos + alias Edge real  
-3. **A3** — Spotify search + play por nome  
-4. **A5** — só se a demo ainda falhar por STT  
+1. **A0b + A0c** — small talk local + escalate/manifesto (desbloqueia offline / SKU sem mexer no binário STT ainda)  
+2. **A0a** — STT local novo como `auto` (Sherpa/Vosk ou COM); Whisper fallback  
+3. **A5** — fechar metas de latência/qualidade pt-BR no ouvido novo  
+4. **A1 + A2** — voz com voz + confirmação falada  
+5. **A4** — opens compostos + alias Edge real  
+6. **A3** — Spotify search + play por nome  
 
-Automação de teclado, extensão, agentes, etc.: **fila atrás**.
+Automação de teclado, extensão, agentes, Fase E completa, etc.: **fila atrás** (E só após A0a–A0c).
 
 ---
 
@@ -155,10 +164,10 @@ Automação de teclado, extensão, agentes, etc.: **fila atrás**.
 
 Checklist obrigatório no corpo do PR (mesmo informal):
 
-1. Qual fase (A/B/C/D/**E**/**F**) isto melhora?  
-2. Melhora a **demo canônica**? Como?  
-3. Introduz risco de segurança (escopo de ação, secrets, rede, dados de e-mail)?  
-4. Se for “D”, “E”, “F” ou estacionado: por que agora (e Fase A já está verde)?
+1. Qual fase (A/B/C/D/**E**/**F**, incluindo A0a–A0c) isto melhora?  
+2. Melhora a **demo canônica** ou o **default SKU offline**? Como?  
+3. Introduz risco de segurança (escopo de ação, secrets, rede, dados de e-mail, key do vendedor)?  
+4. Se for “D”, “E”, “F” ou estacionado: por que agora (e A0a–A0c / Fase A já estão verdes)?
 
 Se a resposta a (1) for “nenhuma” e a (2) for “não”, o PR espera.
 
@@ -183,3 +192,4 @@ Não há analytics de produto ainda. Usar:
 | 2026-11-16 | Horizonte multi-IA (Claude/ChatGPT/Gemini/Cursor) + cascata de cotas grátis = **Fase E** |
 | 2026-11-16 | Ações no PC + conectores (Outlook/Teams) = [`conectores.md`](./conectores.md) + **Fase F** |
 | 2026-11-16 | Análise OpenJarvis / Jev / zouhir → [`analise-jarvis.md`](./analise-jarvis.md); digest “Bom dia” na inspiração B+F |
+| 2026-11-18 | STT + cérebro locais + cascata só BYOK = [ADR 0019](./ADRs/0019-local-stt-brain-cascade-byok.md) + guia [`melhoria-latencia-voz-pos-kobi.md`](./melhoria-latencia-voz-pos-kobi.md); Fase A ganha A0a–A0c; Fase E após A0 |

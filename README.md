@@ -3,12 +3,14 @@
 **Companheiro de voz no desktop Windows.**  
 Você fala, ele responde **com som**, confirma e **age no PC** — Spotify, apps, sites — com limites claros de segurança.
 
-> Elio escuta, responde com voz, confirma e age no PC — com allowlist.
+> Elio ouve e decide no PC, responde com voz, confirma e age — com allowlist. Nuvem só com chave do usuário.
 
 | Documento | Conteúdo |
 |-----------|----------|
 | **[`docs/produto.md`](./docs/produto.md)** | O quê, para quem, o que não é, princípios |
-| **[`docs/roadmap.md`](./docs/roadmap.md)** | Fases A–F, DoD, o que está estacionado |
+| **[`docs/roadmap.md`](./docs/roadmap.md)** | Fases A–F (incl. A0a–A0c), DoD, o que está estacionado |
+| **[`docs/ADRs/0019-local-stt-brain-cascade-byok.md`](./docs/ADRs/0019-local-stt-brain-cascade-byok.md)** | Decisão: STT + cérebro locais; cascata só BYOK |
+| **[`docs/melhoria-latencia-voz-pos-kobi.md`](./docs/melhoria-latencia-voz-pos-kobi.md)** | Guia / brief de implementação voz + latência |
 | **[`docs/conectores.md`](./docs/conectores.md)** | Como agir no PC e em apps (Outlook, Teams, …) |
 | **[`docs/analise-jarvis.md`](./docs/analise-jarvis.md)** | O que pegar de OpenJarvis / Jev (referência) |
 
@@ -28,13 +30,12 @@ Hoje o microfone ainda é **segurar para falar** (PTT). Wake word (“Ei, Elio�
 
 | Já tem base | Foco (Fase A — nesta ordem) |
 |-------------|------------------------------|
-| Floating Bar + Command Center | **Loop demo:** TTS nas respostas de voz + confirmação falada |
-| Whisper STT + TTS | Conversa multi-turno |
-| Abrir app / site / pasta / browser + site | Só então: wake word opcional |
-| Digitar + teclas/atalhos allowlist | Multi-IA nativa (Claude/ChatGPT/Gemini/…) = **Fase E** |
-| Spotify (PKCE + play por **nome**) | |
-| Comandos compostos (Edge + Instagram) | |
-| Cascata de IA (OpenRouter / Ollama) | |
+| Floating Bar + Command Center | **A0:** STT local novo + cérebro local + escalate BYOK |
+| Whisper STT (provisório) + TTS | **Loop demo:** TTS + confirmação falada |
+| Abrir app / site / pasta / browser + site | Opens compostos + Spotify por nome |
+| Digitar + teclas/atalhos allowlist | Conversa multi-turno; wake word depois |
+| Spotify (PKCE + play por **nome**) | Multi-IA nativa = **Fase E** (após A0) |
+| Cascata de IA (OpenRouter / Ollama) | Só pedidos escalados + chave do usuário |
 
 Detalhe técnico: [`docs/ADRs/`](./docs/ADRs/) · UI: [`docs/elio-design-system.md`](./docs/elio-design-system.md)
 
@@ -68,14 +69,14 @@ npm run dev
 2. No Elio: ligue **Falar respostas** (menu da barra / Integrações) para ouvir o Elio.  
 3. Segure o mic → fale → solte.
 
-STT primário: Whisper local (mesmo caminho no Windows e no Mac).  
+STT **hoje** no código: Whisper local (`auto`). **Alvo:** STT local novo (Sherpa/Vosk) + cérebro local — [ADR 0019](./docs/ADRs/0019-local-stt-brain-cascade-byok.md).  
 Override opcional: `$env:ELIO_STT_PROVIDER = "whisper"` \| `"windows-speech"` \| `"auto"`.
 
 ### Integrações opcionais
 
 | Integração | Para quê |
 |------------|----------|
-| OpenRouter / Ollama | Conversa (cascata BYOK → free → local) |
+| OpenRouter / Ollama | Pedidos pesados / chat legado (cascata BYOK → free → local); não é o ouvido |
 | Spotify Premium + Client ID | Play remoto (`ELIO_SPOTIFY_CLIENT_ID`) |
 | Localização Windows | Clima da sua cidade |
 

@@ -1,17 +1,17 @@
 # Elio — documento de produto
 
 **Status:** vigente  
-**Atualizado:** 2026-11-16 (roteador multi-IA no horizonte)  
-**Versão do produto referenciada:** v0.17.x  
+**Atualizado:** 2026-11-18 (STT + cérebro local; cascata só BYOK / SKU vitalício)  
+**Versão do produto referenciada:** v0.18.x  
 **Público:** quem for construir, priorizar, desenhar ou falar sobre o Elio
 
-Este é o **norte do produto**. Em conflito com roadmap antigo, fatias de PR, design system ou notas soltas, **vale este documento** para *o quê* e *para quem*. O *quando* está em [`roadmap.md`](./roadmap.md). O *como* técnico está nas [`ADRs`](./ADRs/).
+Este é o **norte do produto**. Em conflito com roadmap antigo, fatias de PR, design system ou notas soltas, **vale este documento** para *o quê* e *para quem*. O *quando* está em [`roadmap.md`](./roadmap.md). O *como* técnico está nas [`ADRs`](./ADRs/). Decisão de voz/cascata: [ADR 0019](./ADRs/0019-local-stt-brain-cascade-byok.md) · handoff [`melhoria-latencia-voz-pos-kobi.md`](./melhoria-latencia-voz-pos-kobi.md).
 
 ---
 
 ## Frase-norte
 
-> **Elio escuta, responde com voz, confirma e age no PC — com allowlist.**
+> **Elio ouve e decide no PC, responde com voz, confirma e age — com allowlist. Nuvem só com chave do usuário.**
 
 Tudo que entra no roadmap precisa servir a essa frase. Se não servir, é depois — ou não é Elio.
 
@@ -56,7 +56,7 @@ Se esse loop não fecha ponta a ponta, o restante é secundário.
 | Trabalho a fazer | Falar com o PC e ver ação real (música, apps, sites) sem abrir menus |
 | Critério de sucesso | Usa o Elio sozinho, sem “forçar a demo”, pelo menos uma vez por dia |
 
-O Elio é, nesta fase, um **produto pessoal em evolução**. Não há go-to-market, pricing nem onboarding multi-usuário. Toda priorização serve primeiro a esse dogfooding.
+O Elio é, nesta fase, um **produto pessoal em evolução**. Não há go-to-market ativo nem onboarding multi-usuário ainda. Toda priorização serve primeiro a esse dogfooding — e o dogfood **já** é o formato do SKU vitalício futuro: ouvir + decidir + opens + “oi” **sem** o vendedor pagar STT/LLM por cliente ([ADR 0019](./ADRs/0019-local-stt-brain-cascade-byok.md)).
 
 ### Secundário (só depois do loop estável) — ICP
 
@@ -66,7 +66,7 @@ Pessoas que se parecerem com Douglas e possam instalar um `.exe` Windows:
 - Usam **Windows** como máquina principal
 - Querem **voz → ação** (Spotify, browser, apps), não um segundo ChatGPT na barra
 - Aceitam **limites explícitos** (allowlist, confirmação) em troca de previsibilidade e privacidade
-- Preferem **local quando possível** (Whisper, Ollama) e, no horizonte, **várias IAs conectadas** com cascata de cotas (Fase E)
+- Preferem **STT + cérebro locais** no dia a dia; nuvem só se **conectarem** IAs (BYOK / Fase E) — nunca key embutida do vendedor
 
 ### Não é público (agora)
 
@@ -88,11 +88,11 @@ Pessoas que se parecerem com Douglas e possam instalar um `.exe` Windows:
 | Plataforma | Windows 10/11 (x64) |
 | Idioma | PT-BR nativo (STT, TTS, intents) |
 | Diferencial | Conversa curta + **ação allowlisted** + resposta falada |
-| Privacidade | Local quando possível; secrets no cofre do SO; sem escuta contínua obrigatória |
-| Estágio | Produto pessoal → eventual compartilhamento controlado (releases) |
+| Privacidade | Ouve e decide no PC; secrets no cofre do SO; sem escuta contínua obrigatória |
+| Estágio | Produto pessoal → SKU vitalício (dogfood = o que será vendido) |
 
 **Uma frase de posicionamento:**  
-*O Elio é o companheiro que fala com você no Windows e faz o que você pediu — com confirmação e allowlist — em português do Brasil.*
+*O Elio é o companheiro que ouve e decide no Windows, fala com você e faz o que você pediu — com confirmação e allowlist — em português do Brasil; nuvem só com a sua chave.*
 
 ---
 
@@ -117,7 +117,7 @@ Pessoas que se parecerem com Douglas e possam instalar um `.exe` Windows:
 | Conversa curta + ação | Só router de intents sem personalidade |
 | TTS ligado na experiência de voz | App mudo com texto na barra |
 | Opens e APIs com allowlist | Shell/`exec` arbitrário ou RPA cego |
-| Privacidade local quando possível | Escuta contínua obrigatória |
+| Ouve e decide no PC (STT + cérebro locais) | Escuta contínua obrigatória; STT/LLM na conta do vendedor |
 | Produto pessoal com demo clara | Kit de fatias de engenharia sem demo |
 | Floating Bar voz-first | Dashboard de agentes / atividades / Jira |
 
@@ -131,40 +131,48 @@ Pessoas que se parecerem com Douglas e possam instalar um `.exe` Windows:
 4. **Allowlist > poder total.** Menos ações confiáveis > RPA genérico frágil.  
 5. **PT-BR real.** STT/TTS e intents para português do dia a dia.  
 6. **Um norte.** Este doc descreve *para quê* e *para quem*; ADRs descrevem *como*; [`roadmap.md`](./roadmap.md) descreve *quando*. Em dúvida de prioridade, **este doc vence**.  
-7. **Dogfood > feature.** Se Douglas não sente valor no dia a dia, não shipamos “plataforma”.  
-8. **IA conectada, não IA escondida.** Quando o Elio usar Claude, ChatGPT, Gemini, Cursor etc., o usuário **vê qual** atendeu — e a cascata de cotas é previsível (abaixo).
+7. **Dogfood > feature.** Se Douglas não sente valor no dia a dia, não shipamos “plataforma”. Dogfood = formato do SKU vitalício.  
+8. **IA conectada, não IA escondida.** Quando o Elio usar Claude, ChatGPT, Gemini, Cursor etc., o usuário **vê qual** atendeu — e a cascata de cotas é previsível (abaixo).  
+9. **Zero key do vendedor.** STT e cérebro de porta são locais. Nuvem só com chave/cota que o **usuário** conectou. Proibido embutir key do Douglas (ou de qualquer vendedor) no instalador/default.
 
 ---
 
 ## Estado atual (honesto)
 
-Em **v0.18.x** já existem pedaços: Floating Bar, Whisper STT, TTS (off por padrão), opens (site no Chrome/Edge, compostos, Maps, site dinâmico com correção de STT), Spotify PKCE + play por nome, clima, cascata de IA, digitar no app e atalhos allowlisted (Ctrl+C/V/A/Z/X/S). O que ainda falta na Fatia 1 é sobretudo **TTS ligado no pedido por voz** e confirmação falada pré-ação.
+Em **v0.18.x** já existem pedaços: Floating Bar, **Whisper STT** (ainda o `auto` no código — legado até A0a), TTS (off por padrão), opens (site no Chrome/Edge, compostos, Maps, site dinâmico com correção de STT), Spotify PKCE + play por nome, clima, cascata de IA (ainda usada demais para chat/“oi”), digitar no app e atalhos allowlisted (Ctrl+C/V/A/Z/X/S).
+
+**Alvo vigente** ([ADR 0019](./ADRs/0019-local-stt-brain-cascade-byok.md)): STT local novo + cérebro local (small talk / opens offline) + escalação `CLOUD:kind` só com BYOK. O que ainda falta na Fatia 1 perceptível inclui **A0a–A0c**, depois **TTS ligado no pedido por voz** e confirmação falada pré-ação.
 
 ---
 
-## Horizonte — roteador multi-IA (não é Fase A)
+## Horizonte — roteador multi-IA (não é Fase A; não é ouvido)
 
-Isto **não** compete com o loop demo agora. É o futuro desejado depois que o companheiro de voz estiver sólido. Detalhe de ordem: **Fase E** em [`roadmap.md`](./roadmap.md). Base técnica atual: cascata OpenRouter → free → Ollama ([ADR 0011](./ADRs/0011-ai-cascade-byok.md)).
+Isto **não** compete com o loop demo agora e **não** é o caminho de “oi” / opens. É o futuro para pedidos **pesados** depois que o companheiro de voz local estiver sólido. Detalhe de ordem: **Fase E** em [`roadmap.md`](./roadmap.md) — só após A0a–A0c verdes. Base técnica atual do hub: OpenRouter → free → Ollama ([ADR 0011](./ADRs/0011-ai-cascade-byok.md)), restrita a quem **já conectou** chave e a turnos que o cérebro local classificou como `CLOUD:*`.
 
 ### Experiência desejada
 
-1. A pessoa **conecta** no Elio as IAs que usa (ex.: Claude, ChatGPT, Gemini, Cursor — quando houver caminho oficial).  
-2. Pede algo ao Elio em voz ou texto: código, “faz um site com IA”, dúvida, etc.  
-3. O Elio **direciona** o pedido para uma IA conectada adequada (não obriga a pessoa a abrir outro app e copiar o prompt).  
-4. Se ela tem **assinatura / cota paga** naquela IA → usa essa cota.  
-5. Se **não** tem assinatura, mas tem conta / chave com **tokens grátis** → o Elio gasta essa cota grátis até esgotar.  
-6. Quando a cota grátis **estoura**, o Elio **passa automaticamente** para a próxima IA conectada que ainda tenha cota grátis (ou paga, se existir).  
-7. Se nenhuma IA restar → fallback local (Ollama) ou resposta falada honesta: “suas cotas acabaram”.
+1. No dia a dia, STT + cérebro **locais** atendem o turno (ação, small talk ou “conecte uma IA”).  
+2. A pessoa **conecta** no Elio as IAs que usa (ex.: Claude, ChatGPT, Gemini, Cursor — quando houver caminho oficial).  
+3. Pede algo pesado em voz ou texto: código, “faz um site com IA”, gera imagem, etc.  
+4. O cérebro local classifica `CLOUD:kind` e **direciona** para uma IA conectada adequada (não obriga a pessoa a abrir outro app e copiar o prompt).  
+5. Sem provedor conectado para aquele `kind` → resposta falada: “conecte uma IA em Integrações” — **sem** gastar conta do vendedor.  
+6. Se ela tem **assinatura / cota paga** naquela IA → usa essa cota.  
+7. Se **não** tem assinatura, mas tem conta / chave com **tokens grátis** → o Elio gasta essa cota grátis até esgotar.  
+8. Quando a cota grátis **estoura**, o Elio **passa automaticamente** para a próxima IA conectada que ainda tenha cota grátis (ou paga, se existir).  
+9. Se nenhuma IA restar → fallback local (Ollama) ou resposta falada honesta: “suas cotas acabaram”.
 
 ### Política de cascata (produto)
 
 ```text
-assinatura/pago da IA preferida
-  → cota grátis da mesma IA
-    → próxima IA conectada (pago, senão grátis)
-      → … até esgotar a fila
-        → Ollama local (se ligado)
-          → erro falado (sem inventar resposta)
+cérebro LOCAL decide CLOUD:kind
+  → tem provedor conectado?
+      não → fala “conecte uma IA”
+      sim → assinatura/pago da IA preferida
+            → cota grátis da mesma IA
+              → próxima IA conectada (pago, senão grátis)
+                → … até esgotar a fila
+                  → Ollama local (se ligado)
+                    → erro falado (sem inventar resposta)
 ```
 
 Preferência de provedor pode seguir: pedido explícito do usuário (“usa o Claude”) → tipo de tarefa (código vs prosa) → ordem configurada nas Integrações.
@@ -173,14 +181,16 @@ Preferência de provedor pode seguir: pedido explícito do usuário (“usa o Cl
 
 | Não é | Por quê |
 |-------|---------|
-| O Elio “ser” o ChatGPT | Ele **roteia** e fala/age; a IA conectada gera quando precisar de LLM |
+| O Elio “ser” o ChatGPT | Ele **ouve/decide no PC**, fala/age; a IA conectada gera só no pedido pesado |
+| Default de “oi” / opens | Small talk e opens são locais — cascata não entra |
+| STT na nuvem / key do vendedor | Ouvido sempre local; SKU vitalício ([ADR 0019](./ADRs/0019-local-stt-brain-cascade-byok.md)) |
 | Scraping / login fantasma em sites de chat | Só **APIs oficiais** ou fluxos que a plataforma permitir (ToS + segurança) |
 | Gastar tokens **sem** o usuário saber | Sempre mostrar/servir label: quem atendeu (ex.: “Claude · cota grátis”) |
-| Substituir a Fase A | Sem loop voz+ação, multi-IA é chat genérico com cascata |
+| Substituir a Fase A / A0 | Sem loop voz+ação local, multi-IA é chat genérico com cascata |
 
 ### Segurança (obrigatório neste horizonte)
 
-- Chaves e tokens só no **cofre** do SO (`safeStorage`); nunca no renderer, logs ou export sem redaction.  
+- Chaves e tokens só no **cofre** do SO (`safeStorage`); nunca no renderer, logs, instalador ou export sem redaction.  
 - Cascata só entre provedores que o usuário **conectou** de propósito.  
 - Sem compartilhar a mesma chave entre processos não confiáveis.  
 - Respeitar ToS e limites de cada provedor; esgotamento = 402/429 (ou sinal oficial), não chute.
@@ -225,9 +235,10 @@ Isto **não** substitui a Fase A (loop demo). Sem voz+ação básica, conector d
 |-----|--------|
 | **[`produto.md`](./produto.md)** (este) | O quê, para quem, o que não é, princípios |
 | **[`roadmap.md`](./roadmap.md)** | Ordem, fases, DoD, o que está estacionado |
+| **[`melhoria-latencia-voz-pos-kobi.md`](./melhoria-latencia-voz-pos-kobi.md)** | Handoff: ouvir, decidir, escalar, checklist SKU |
 | **[`conectores.md`](./conectores.md)** | Como agir no PC e em apps (Outlook, Teams, …) |
 | **[`analise-jarvis.md`](./analise-jarvis.md)** | O que aprender de OpenJarvis / Jev (e o que ignorar) |
-| **[`ADRs/`](./ADRs/)** | Como implementar decisões técnicas |
+| **[`ADRs/`](./ADRs/)** | Como implementar decisões técnicas (voz/cascata: [0019](./ADRs/0019-local-stt-brain-cascade-byok.md)) |
 | **[`elio-design-system.md`](./elio-design-system.md)** | UI visual — **subordinado** ao norte de produto |
 | **[`windows-distribution.md`](./windows-distribution.md)** | Instalador / update / assinatura |
 
