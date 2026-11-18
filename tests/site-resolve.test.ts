@@ -25,6 +25,14 @@ describe('normalizeSiteQueryHeard', () => {
     expect(n.query.toLowerCase()).toContain('jornal')
     expect(n.query.toLowerCase()).not.toMatch(/^site\b/)
   })
+
+  it('remove “no Edge” sem reescrever a marca localmente', () => {
+    const n = normalizeSiteQueryHeard('clínica Neoadonto no Edge')
+    expect(n.query.toLowerCase()).toContain('neoadonto')
+    expect(n.query.toLowerCase()).not.toMatch(/\bedge\b/)
+    // Marcas coladas/mangladas são responsabilidade do LLM, não de regex por marca.
+    expect(n.notes.some((x) => /marca colada|new odonto/i.test(x))).toBe(false)
+  })
 })
 
 describe('parseSiteResolveLlmJson', () => {
@@ -102,6 +110,37 @@ describe('resolveSiteQueryDynamically', () => {
     )
     expect(complete).toHaveBeenCalled()
   })
+
+  it('marca mangled pelo STT vai ao LLM sem hardcode local', async () => {
+    const complete = vi.fn(async (req) => {
+      const user = req.messages.find(
+        (m: { role: string; content: string }) => m.role === 'user',
+      )
+      expect(user?.content).toContain('Neoadonto')
+      const system = req.messages.find(
+        (m: { role: string; content: string }) => m.role === 'system',
+      )
+      // Prompt genérico: sem regra amarrada a uma marca.
+      expect(system?.content).not.toMatch(/New Odonto/i)
+      expect(system?.content).toMatch(/mangling|STT|confiança/i)
+      return {
+        content:
+          '{"label":"New Odonto","url":"https://www.newodonto.com.br/"}',
+      }
+    })
+    const r = await resolveSiteQueryDynamically(
+      'clínica Neoadonto no Edge',
+      complete,
+    )
+    expect(r.ok).toBe(true)
+    if (r.ok) {
+      expect(r.source).toBe('llm')
+      expect(r.corrected).toBe(true)
+      expect(r.label).toBe('New Odonto')
+      expect(r.url).toMatch(/^https:\/\//)
+    }
+    expect(complete).toHaveBeenCalledOnce()
+  })
 })
 
 describe('intent + router — open_site_query', () => {
@@ -114,6 +153,24 @@ describe('intent + router — open_site_query', () => {
 
     const lane = classifyUserIntent('abre o jornal ou popular')
     expect(lane.lane).toBe('pc_action')
+  })
+
+  it('preserva Edge e não mistura browser no nome do site', () => {
+    const a = parseDesktopOpenIntent('Abra o jornal o popular no Edge.')
+    expect(a?.kind).toBe('open_site_query')
+    if (a?.kind === 'open_site_query') {
+      expect(a.browserId).toBe('edge')
+      expect(a.query.toLowerCase()).toContain('popular')
+      expect(a.query.toLowerCase()).not.toMatch(/\bedge\b/)
+    }
+
+    const b = parseDesktopOpenIntent('Abra a clínica Neoadonto no Edge.')
+    expect(b?.kind).toBe('open_site_query')
+    if (b?.kind === 'open_site_query') {
+      expect(b.browserId).toBe('edge')
+      expect(b.query.toLowerCase()).toContain('neoadonto')
+      expect(b.query.toLowerCase()).not.toMatch(/\bedge\b/)
+    }
   })
 
   it('ainda não captura conversa', () => {
@@ -167,5 +224,44 @@ describe('executeDesktopIntent — site dinâmico', () => {
         source: 'llm',
       }),
     ).toMatch(/corrigi/)
+  })
+
+  it('abre no Edge via openInBrowser (não engole o browser)', async () => {
+    const openedIn: Array<{ browser: string; url: string }> = []
+    const opener: DesktopOpener = {
+      openExternal: async () => {
+        throw new Error('não deveria cair no openExternal')
+      },
+      openPath: async () => '',
+      openInBrowser: async (browserId, url) => {
+        openedIn.push({ browser: browserId, url })
+        return { ok: true }
+      },
+    }
+    const intent = parseDesktopOpenIntent('Abra o jornal o popular no Edge.')
+    expect(intent?.kind).toBe('open_site_query')
+    if (!intent || intent.kind !== 'open_site_query') return
+
+    const result = await executeDesktopIntent(intent, opener, {
+      resolveSite: async (query) => {
+        expect(query.toLowerCase()).not.toMatch(/\bedge\b/)
+        return {
+          ok: true,
+          url: 'https://opopular.com.br/',
+          label: 'O Popular',
+          heard: query,
+          corrected: true,
+          source: 'llm',
+        }
+      },
+    })
+    expect(result.ok).toBe(true)
+    expect(openedIn).toEqual([
+      { browser: 'edge', url: 'https://opopular.com.br/' },
+    ])
+    expect(result.message).toMatch(/no Edge/i)
+    expect(result.message).toMatch(/opopular\.com\.br/)
+    // Correção não deve acusar “no Edge” como parte do nome ouvido.
+    expect(result.message).not.toMatch(/corrigi de “[^”]*\bedge\b[^”]*”/i)
   })
 })

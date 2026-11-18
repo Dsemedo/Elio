@@ -112,7 +112,12 @@ async function openResolvedSite(
   opener: DesktopOpener,
   resolveSite: ResolveSiteFn | undefined,
   query: string,
-  signal?: AbortSignal,
+  opts?: {
+    signal?: AbortSignal
+    browserId?: BrowserAppId
+    platform?: NodeJS.Platform
+    env?: NodeJS.ProcessEnv
+  },
 ): Promise<DesktopActionResult> {
   if (!resolveSite) {
     return {
@@ -120,10 +125,50 @@ async function openResolvedSite(
       message: `Não conheço o site “${query}” e não há IA para resolver. Use uma URL https ou conecte OpenRouter/Ollama.`,
     }
   }
-  const resolved = await resolveSite(query, signal)
+  const resolved = await resolveSite(query, opts?.signal)
   if (!resolved.ok) {
     return { ok: false, message: resolved.reason }
   }
+
+  const browserId = opts?.browserId
+  if (browserId) {
+    if (opener.openInBrowser) {
+      const launched = await opener.openInBrowser(browserId, resolved.url)
+      if (!launched.ok) {
+        await opener.openExternal(resolved.url)
+        return {
+          ok: true,
+          message: `${launched.reason} ${formatSiteOpenMessage(resolved)} (navegador padrão)`,
+          target: resolved.url,
+        }
+      }
+      const browserLabel = browserId === 'chrome' ? 'Chrome' : 'Edge'
+      return {
+        ok: true,
+        message: formatSiteOpenMessage(resolved, browserLabel),
+        target: resolved.url,
+      }
+    }
+    const launched = await launchAllowlistedBrowser(browserId, resolved.url, {
+      ...(opts?.platform ? { platform: opts.platform } : {}),
+      ...(opts?.env ? { env: opts.env } : {}),
+    })
+    if (!launched.ok) {
+      await opener.openExternal(resolved.url)
+      return {
+        ok: true,
+        message: `${launched.reason} ${formatSiteOpenMessage(resolved)} (navegador padrão)`,
+        target: resolved.url,
+      }
+    }
+    const browserLabel = browserId === 'chrome' ? 'Chrome' : 'Edge'
+    return {
+      ok: true,
+      message: formatSiteOpenMessage(resolved, browserLabel),
+      target: resolved.url,
+    }
+  }
+
   await opener.openExternal(resolved.url)
   return {
     ok: true,
@@ -174,12 +219,12 @@ async function executeOne(
       const validated = resolveOpenUrl(intent.rawTarget)
       if (!validated.ok) {
         // Nome fora da lista → resolução dinâmica (corrige STT sem o usuário).
-        return openResolvedSite(
-          opener,
-          opts.resolveSite,
-          intent.rawTarget,
-          opts.signal,
-        )
+        return openResolvedSite(opener, opts.resolveSite, intent.rawTarget, {
+          platform,
+          env,
+          ...(opts.signal ? { signal: opts.signal } : {}),
+          ...(intent.browserId ? { browserId: intent.browserId } : {}),
+        })
       }
 
       if (intent.browserId) {
@@ -234,12 +279,12 @@ async function executeOne(
     }
 
     case 'open_site_query': {
-      return openResolvedSite(
-        opener,
-        opts.resolveSite,
-        intent.query,
-        opts.signal,
-      )
+      return openResolvedSite(opener, opts.resolveSite, intent.query, {
+        platform,
+        env,
+        ...(opts.signal ? { signal: opts.signal } : {}),
+        ...(intent.browserId ? { browserId: intent.browserId } : {}),
+      })
     }
 
     case 'open_folder': {

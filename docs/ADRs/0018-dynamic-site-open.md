@@ -2,7 +2,7 @@
 
 **Status:** aceito  
 **Data:** 2026-11-16  
-**Versão:** 0.18.1
+**Versão:** 0.18.2
 
 ## Contexto
 
@@ -29,3 +29,9 @@ A allowlist de aliases (`exame`, `google`, `instagram`…) não escala: Douglas 
 - Precisa OpenRouter/Ollama para nomes fora da lista; aliases e URLs https seguem offline.
 - Risco residual: LLM pode apontar domínio errado com confiança — mitigado por https-only + mensagem explícita do que abriu.
 - “Cria um site com IA” continua fora de escopo (outra ferramenta).
+
+## Atualização 0.18.2
+
+- “X no Edge/Chrome” preserva `browserId` também em `open_site_query` (antes só aliases).
+- Normalização local: remove sufixo de browser do nome; **sem** hardcode de marcas.
+- Correção de marcas/mangling (STT colado, New↔Neo, etc.) fica no **LLM** via prompt genérico; se não houver confiança no domínio oficial, `url` null (não inventar host).

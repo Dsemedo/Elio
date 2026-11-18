@@ -21,7 +21,13 @@ export type DesktopIntent =
       browserId?: BrowserAppId
     }
   /** Nome livre (jornal, portal…) — resolve URL dinamicamente + corrige STT. */
-  | { kind: 'open_site_query'; label: string; query: string }
+  | {
+      kind: 'open_site_query'
+      label: string
+      query: string
+      /** Se definido, abre a URL resolvida nesse browser allowlisted (Win). */
+      browserId?: BrowserAppId
+    }
   | { kind: 'open_folder'; label: string; rawTarget: string }
   | { kind: 'open_file'; label: string; rawTarget: string }
   | { kind: 'open_app'; label: string; appId: AppId }
@@ -49,27 +55,55 @@ function cleanTarget(raw: string): string {
     .trim()
 }
 
+const BROWSER_SUFFIX_RE =
+  /^(.+?)\s+(?:no|na|pelo|pela|com\s+o|com\s+a)\s+(chrome|google\s*chrome|edge|microsoft\s*edge|msedge|navegador|browser)\s*[?.!]*$/i
+
+/** Separa “X no Edge/Chrome” → alvo + browser (sem exigir alias). */
+export function splitSiteAndBrowser(rest: string): {
+  site: string
+  browserId: BrowserAppId
+} | null {
+  const m = rest
+    .trim()
+    .replace(/[?.!]+$/g, '')
+    .trim()
+    .match(BROWSER_SUFFIX_RE)
+  if (!m?.[1] || !m[2]) return null
+  const browserId = resolveBrowserAppId(m[2])
+  if (!browserId) return null
+  const site = cleanTarget(m[1])
+  if (!site) return null
+  // Evita “Chrome no Edge” / app no browser.
+  if (resolveAppId(site)) return null
+  return { site, browserId }
+}
+
 /** Parse de um único alvo (sem o verbo “abre”). */
 function parseSingleOpenTarget(rest: string): DesktopIntent | null {
   if (!rest) return null
 
-  // "Google Maps no Chrome" / "Instagram no Edge"
-  const inBrowser = rest.match(
-    /^(.+?)\s+(?:no|na|pelo|pela|com\s+o|com\s+a)\s+(chrome|google\s*chrome|edge|microsoft\s*edge|msedge|navegador|browser)$/i,
-  )
-  if (inBrowser?.[1] && inBrowser[2]) {
-    const siteLabel = cleanTarget(inBrowser[1])
-    const browserRaw = inBrowser[2]
-    const browserId = resolveBrowserAppId(browserRaw)
-    if (browserId && (resolveSiteAlias(siteLabel) || /^https:\/\//i.test(siteLabel) || /\./.test(siteLabel))) {
+  // "Google Maps no Chrome" / "jornal O Popular no Edge" (alias OU dinâmico)
+  const withBrowser = splitSiteAndBrowser(rest)
+  if (withBrowser) {
+    const { site, browserId } = withBrowser
+    if (
+      resolveSiteAlias(site) ||
+      /^https:\/\//i.test(site) ||
+      /\./.test(site)
+    ) {
       return {
         kind: 'open_url',
-        label: siteLabel,
-        rawTarget: siteLabel,
+        label: site,
+        rawTarget: site,
         browserId,
       }
     }
-    // "Chrome no Edge" não faz sentido — cai no fluxo normal
+    return {
+      kind: 'open_site_query',
+      label: site,
+      query: site,
+      browserId,
+    }
   }
 
   // "Chrome com Google Maps" / "Edge no Instagram"
@@ -107,12 +141,18 @@ function parseSingleOpenTarget(rest: string): DesktopIntent | null {
   }
 
   // "o jornal …" / "a revista …" / "o portal …" — quase sempre site; resolve dinâmico.
+  // Browser já foi separado acima; aqui o nome não deve carregar “no Edge”.
   const publicationMatch = rest.match(
     /^(?:o\s+|a\s+)?(jornal|revista|portal|blog)\s+(.+)$/i,
   )
   if (publicationMatch?.[2] && !NON_SITE_OPEN_RE.test(rest)) {
     const kind = publicationMatch[1] ?? 'jornal'
     const name = cleanTarget(publicationMatch[2])
+      .replace(
+        /\s+(?:no|na|pelo|pela|com\s+o|com\s+a)\s+(chrome|google\s*chrome|edge|microsoft\s*edge|msedge|navegador|browser)$/i,
+        '',
+      )
+      .trim()
     const query = `${kind} ${name}`.replace(/\s+/g, ' ').trim()
     return { kind: 'open_site_query', label: query, query }
   }
@@ -275,6 +315,12 @@ export function describeIntent(intent: DesktopIntent): string {
       }
       return `Abrindo site ${intent.label}…`
     case 'open_site_query':
+      if (intent.browserId === 'chrome') {
+        return `Abrindo ${intent.label} no Chrome…`
+      }
+      if (intent.browserId === 'edge') {
+        return `Abrindo ${intent.label} no Edge…`
+      }
       return `Abrindo ${intent.label}…`
     case 'open_folder':
       return `Abrindo pasta ${intent.label}…`
