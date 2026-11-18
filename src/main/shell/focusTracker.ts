@@ -117,6 +117,7 @@ export class FocusTracker {
         foregroundKind = classifyForeground({
           pid: sample.pid,
           className: sample.className,
+          iconic: sample.iconic,
           ourPids: this.ourPids,
         })
         foregroundIsElio = foregroundKind === 'elio'
@@ -141,7 +142,9 @@ export class FocusTracker {
   private async windowsForegroundSample(): Promise<{
     pid: number
     className: string
+    iconic: boolean
   } | null> {
+    // pid \t className \t iconic(0|1)
     const script = `
 Add-Type @"
 using System;
@@ -152,15 +155,17 @@ public class ElioFg {
   [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint pid);
   [DllImport("user32.dll", CharSet = CharSet.Unicode)]
   public static extern int GetClassName(IntPtr hWnd, StringBuilder lpClassName, int nMaxCount);
+  [DllImport("user32.dll")] public static extern bool IsIconic(IntPtr hWnd);
 }
 "@
 $h = [ElioFg]::GetForegroundWindow()
-if ($h -eq [IntPtr]::Zero) { Write-Output "0\`t"; exit 0 }
+if ($h -eq [IntPtr]::Zero) { Write-Output "0\`t\`t0"; exit 0 }
 $pidOut = 0
 [void][ElioFg]::GetWindowThreadProcessId($h, [ref]$pidOut)
 $sb = New-Object System.Text.StringBuilder 256
 [void][ElioFg]::GetClassName($h, $sb, $sb.Capacity)
-Write-Output ("{0}\`t{1}" -f $pidOut, $sb.ToString())
+$iconic = if ([ElioFg]::IsIconic($h)) { 1 } else { 0 }
+Write-Output ("{0}\`t{1}\`t{2}" -f $pidOut, $sb.ToString(), $iconic)
 `.trim()
 
     try {
@@ -170,10 +175,12 @@ Write-Output ("{0}\`t{1}" -f $pidOut, $sb.ToString())
         { timeout: 1500, windowsHide: true, encoding: 'utf8' },
       )
       const line = stdout.trim().split(/\r?\n/).pop() ?? ''
-      const [pidRaw, ...classParts] = line.split('\t')
-      const pid = Number.parseInt(pidRaw ?? '', 10)
+      const parts = line.split('\t')
+      const pid = Number.parseInt(parts[0] ?? '', 10)
       if (!Number.isFinite(pid) || pid <= 0) return null
-      return { pid, className: classParts.join('\t').trim() }
+      const className = (parts[1] ?? '').trim()
+      const iconic = (parts[2] ?? '').trim() === '1'
+      return { pid, className, iconic }
     } catch {
       return null
     }
