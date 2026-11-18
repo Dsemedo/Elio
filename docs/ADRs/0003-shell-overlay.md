@@ -1,29 +1,35 @@
 # ADR 0003 — Shell: Floating Bar + Command Center
 
-**Status:** aceito (atualizado 0.5.1)  
-**Data:** 2026-11-15
+**Status:** aceito (atualizado 0.18.3)  
+**Data:** 2026-11-15 · **Revisto:** 2026-11-18
 
 ## Contexto
 
-OD-19 / DS v1.1: Floating Bar no topo, Command Center ao expandir. Feedback Douglas (v0.5.0): moldura preta externa, placeholder de texto como identidade, e auto-hide no blur.
+OD-19 / DS v1.1: Floating Bar no topo, Command Center ao expandir.  
+Feedback Douglas (v0.5.0): moldura preta externa, placeholder, auto-hide no blur.  
+Feedback Douglas (2026-11-18): a barra **não** deve cobrir um programa em uso — só na área de trabalho; com app em foco, fica em segundo plano (bandeja).
 
 ## Decisão
 
 1. Duas `BrowserWindow`: **bar** (frameless, `alwaysOnTop`, **420×58** preenchendo a janela) e **panel** (Command Center).
 2. Mesmo renderer; superfície via `?surface=bar|panel`. Fundo da bar = transparente (sem chrome/padding preto).
 3. Segurança inalterada: `contextIsolation`, sem `nodeIntegration`, `sandbox`, preload CJS, IPC com canais fixos + Zod.
-4. **Perda de foco (default):** recolhe só o Command Center; **Floating Bar permanece** (`focusPolicy` → `keep-bar-hide-panel`). Preferência futura `hideBarOnBlur` pode esconder tudo.
-5. Ocultar a barra: menu “Ocultar (bandeja)” ou ação explícita. Trazer de volta: **bandeja**. Atalho global = OD-20.
-6. Idle voz-primeiro: mic PTT; stub “palavra de ativação · em breve”; campo de texto sob demanda (sem placeholder “Pergunte ao Elio…”).
-7. Computador: snapshot via Node `os` — sem native addon.
-8. Integrações Slack/Jira: “em breve”.
+4. **Foreground (default):**
+   - **Área de trabalho** (HWND `Progman` / `WorkerW`) ou **próprio Elio** → Floating Bar visível (`showInactive`, sem roubar foco).
+   - **Outro app** em primeiro plano → esconde barra + painel (`hiddenByFocus`); processo segue na **bandeja**.
+   - Voltar à área de trabalho restaura a barra automaticamente.
+5. Preferência interna `keepBarOverApps` (default off) restaura o legado: barra always-on-top sobre apps; só recolhe o Command Center.
+6. Ocultar explícito: IPC/menu; trazer de volta: **bandeja** ou desktop. Atalho global = OD-20.
+7. Idle voz-primeiro: mic PTT; stub “palavra de ativação · em breve”; campo de texto sob demanda.
+8. Computador: snapshot via Node `os` — sem native addon.
 
 ## Limitações (honestas)
 
-- Detecção de foco no Windows é best-effort (polling + PowerShell) — usada sobretudo para recolher o painel.
-- Sem atalho global até OD-20.
+- Detecção no Windows é best-effort (polling ~700 ms + PowerShell/user32).
+- Sem atalho global até OD-20 (bandeja / voltar ao desktop).
+- Fullscreen exclusivo / UAC / Secure Desktop podem falhar a classificação.
 - CPU % é amostragem curta.
 
 ## Consequências
 
-Douglas vê a barra sempre acessível no desktop; painel pode sumir ao focar outro app; bandeja cobre ocultação explícita.
+Douglas vê a barra no desktop limpo; ao abrir Chrome/Edge/etc. o Elio some da frente e volta pela bandeja ou ao clicar na área de trabalho.
