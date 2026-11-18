@@ -51,7 +51,11 @@ describe('classifyForeground', () => {
 
   it('reconhece PID do Elio', () => {
     expect(
-      classifyForeground({ pid: 100, className: 'Chrome_WidgetWin_1', ourPids: our }),
+      classifyForeground({
+        pid: 100,
+        className: 'Chrome_WidgetWin_1',
+        ourPids: our,
+      }),
     ).toBe('elio')
   })
 
@@ -64,21 +68,51 @@ describe('classifyForeground', () => {
     ).toBe('desktop')
   })
 
+  it('bandeja / shell ambient conta como desktop (sem clique no wallpaper)', () => {
+    expect(
+      classifyForeground({
+        pid: 999,
+        className: 'Shell_TrayWnd',
+        ourPids: our,
+      }),
+    ).toBe('desktop')
+    expect(
+      classifyForeground({
+        pid: 999,
+        className: 'Shell_SecondaryTrayWnd',
+        ourPids: our,
+      }),
+    ).toBe('desktop')
+  })
+
+  it('HWND minimizado (IsIconic) conta como desktop', () => {
+    expect(
+      classifyForeground({
+        pid: 999,
+        className: 'Chrome_WidgetWin_1',
+        iconic: true,
+        ourPids: our,
+      }),
+    ).toBe('desktop')
+  })
+
   it('Explorer de pastas não é desktop', () => {
     expect(
       classifyForeground({
         pid: 999,
         className: 'CabinetWClass',
+        iconic: false,
         ourPids: our,
       }),
     ).toBe('other')
   })
 
-  it('app comum é other', () => {
+  it('app comum visível é other', () => {
     expect(
       classifyForeground({
         pid: 999,
         className: 'Chrome_WidgetWin_1',
+        iconic: false,
         ourPids: our,
       }),
     ).toBe('other')
