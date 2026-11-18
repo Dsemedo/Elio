@@ -1,8 +1,10 @@
-# ADR 0008 — Windows Speech (opcional); Whisper primário (PJ-31 → revisão)
+# ADR 0008 — Windows Speech (opcional); Whisper como `auto` provisório (PJ-31 → revisão)
 
 ## Status
 
-**Supersedido em parte (2026-11-16):** Whisper voltou a ser o STT **primário** em todas as plataformas (`auto`). Web Speech / Windows Speech Runtime permanece só com force explícito (`ELIO_STT_PROVIDER=windows-speech`). Motivo: no Electron do Douglas o Web Speech seguia em “Não ouvi nada” (0.16.1–0.16.2) apesar do mic do SO funcionar — bloqueava o loop demo. Manter um único caminho local (Whisper) também não fecha o Mac.
+**Supersedido em direção (2026-11-18) por [ADR 0019](./0019-local-stt-brain-cascade-byok.md):** o *alvo* de `auto` deixa de ser Whisper. Alvo = STT local novo (Sherpa-ONNX / Vosk pt-BR, ou helper COM Windows fora do Chromium). Whisper = fallback degradado. Web Speech / Windows Speech Runtime no renderer permanece **fora** do `auto` (só force `ELIO_STT_PROVIDER=windows-speech`).
+
+**Estado do código até A0a:** Whisper ainda é o `auto` em todas as plataformas (decisão operacional de 2026-11-16). Motivo histórico: no Electron do Douglas o Web Speech seguia em “Não ouvi nada” (0.16.1–0.16.2) apesar do mic do SO funcionar — bloqueava o loop demo. **Não** reabrir patches nesse stack Web Speech.
 
 Histórico da decisão original (Speech primário no Windows) permanece abaixo como contexto.
 
@@ -21,17 +23,17 @@ Alternativas reavaliadas:
 | **C. Whisper-first (subprocess)** | Já implementado; Win/Mac/Linux iguais; offline | Download ~466 MB; PT-BR do `small` imperfeito |
 | **D. STT cloud** | Melhor PT-BR | Rede, custo, privacidade |
 
-## Decisão (atual)
+## Decisão (histórica 2026-11-16 → supersedida em alvo por ADR 0019)
 
-1. **Primário (`auto`):** Whisper via `whisper-cli` (ADR 0002) em **todas** as plataformas — inclusive Windows.
-2. **Windows Speech:** só com `ELIO_STT_PROVIDER=windows-speech` (e API disponível). Sem WAV paralelo no caminho Speech (getUserMedia aberto + Speech → mic exclusivo no Electron).
-3. **Auto-envio** imediato após transcript válido. **Sem** janela de confirmar/editar.
-4. Override: `ELIO_STT_PROVIDER=auto|windows-speech|whisper` (main → `VoiceStatus.sttPreference`).
-5. Melhoria de PT-BR do Whisper (modelo maior, cloud, híbrido) fica fora deste ADR — próximo passo de produto se o `small` incomodar o demo.
+1. **Código atual (`auto`):** Whisper via `whisper-cli` (ADR 0002) em **todas** as plataformas — inclusive Windows — até o PR A0a.
+2. **Alvo de produto (`auto`):** STT local novo ([ADR 0019](./0019-local-stt-brain-cascade-byok.md)); Whisper só fallback; Web Speech ≠ `auto`.
+3. **Windows Speech (renderer):** só com `ELIO_STT_PROVIDER=windows-speech` (e API disponível). Sem WAV paralelo no caminho Speech (getUserMedia aberto + Speech → mic exclusivo no Electron).
+4. **Auto-envio** imediato após transcript válido. **Sem** janela de confirmar/editar.
+5. Override atual: `ELIO_STT_PROVIDER=auto|windows-speech|whisper` (main → `VoiceStatus.sttPreference`) — será estendido quando o STT novo entrar.
+6. Melhoria via Whisper `medium`/`large` ou STT cloud na conta do vendedor: **rejeitado** (ADR 0019).
 
 ## Consequências
 
-- 1º PTT no Windows pode baixar o modelo Whisper (~466 MB) se ainda não estiver em `%APPDATA%\elio\whisper\`.
-- Mesmo fluxo de voz no Mac depois — sem amarrar o produto ao Speech Runtime.
-- Caminho Speech experimental continua no código para quem forçar o env.
-- ADR 0002: Whisper deixa de ser “só fallback” e volta a ser o **default** do produto.
+- 1º PTT no Windows ainda pode baixar o modelo Whisper (~466 MB) enquanto Whisper for o `auto` no código.
+- Caminho Speech experimental continua no código para quem forçar o env — **não** é o default.
+- Próximo PR de STT deve atualizar `sttPolicy` + este ADR + ADR 0002 para refletir o backend novo como `auto`.
