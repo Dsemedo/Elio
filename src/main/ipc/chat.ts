@@ -19,8 +19,13 @@ import {
   createWindowsInputDriver,
   executeDesktopInputIntent,
 } from '../services/tools/desktop/input'
+import {
+  speakNeedConnection,
+  userHasProvider,
+} from '../services/tools/capabilities'
 import { enrichMessagesWithLocalFacts } from '../services/tools/enrich'
 import { classifyUserIntent } from '../services/tools/router'
+import { localSmallTalkReply } from '../services/tools/smallTalk'
 import { formatClockUserReply } from '../services/tools/time'
 import {
   formatActiveTabUnavailable,
@@ -167,9 +172,30 @@ export function registerChatIpc(): void {
     try {
       /**
        * Router de intents (PT-BR):
-       * A = pc_action · B = local_fact · C = web_context (aba/pesquisa) · D = chat/LLM
+       * A = pc_action · B = local_fact · C = web_context ·
+       * escalate CLOUD:kind · local_reply (small talk) · D = chat/LLM
        */
       const classified = classifyUserIntent(input.content)
+
+      if (classified.lane === 'local_reply') {
+        return finishAssistantReply(
+          input.conversationId,
+          localSmallTalkReply(input.content),
+          'elio-local',
+        )
+      }
+
+      if (classified.lane === 'escalate') {
+        const hasProvider = await userHasProvider(classified.kind)
+        if (!hasProvider) {
+          return finishAssistantReply(
+            input.conversationId,
+            speakNeedConnection(classified.kind),
+            'elio-need-connection',
+          )
+        }
+        // Tem BYOK: segue para a cascata ADR 0011 abaixo (mesmo histórico).
+      }
 
       if (classified.lane === 'pc_action') {
         if (classified.action === 'spotify') {

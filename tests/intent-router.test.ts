@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { classifyUserIntent, laneLabel } from '../src/main/services/tools/router'
 
-describe('classifyUserIntent — lanes A/B/C/D', () => {
+describe('classifyUserIntent — lanes A/B/C/escalate/local/D', () => {
   it('A: ação no PC (abrir site/pasta)', () => {
     const site = classifyUserIntent('abre o site da Exame')
     expect(site.lane).toBe('pc_action')
@@ -70,13 +70,42 @@ describe('classifyUserIntent — lanes A/B/C/D', () => {
     }
   })
 
-  it('D: conversa geral', () => {
-    expect(classifyUserIntent('olá, tudo bem?').lane).toBe('chat')
+  it('local_reply: small talk sem hub', () => {
+    const oi = classifyUserIntent('olá, tudo bem?')
+    expect(oi.lane).toBe('local_reply')
+    if (oi.lane === 'local_reply') {
+      expect(oi.kind).toBe('small_talk')
+    }
+    expect(classifyUserIntent('oi').lane).toBe('local_reply')
+    expect(classifyUserIntent('bom dia').lane).toBe('local_reply')
+  })
+
+  it('escalate: CLOUD:image / CLOUD:codegen', () => {
+    const img = classifyUserIntent('gera uma imagem de um gato')
+    expect(img.lane).toBe('escalate')
+    if (img.lane === 'escalate') {
+      expect(img.kind).toBe('image')
+    }
+
+    const site = classifyUserIntent('faz um site completo de landing page')
+    expect(site.lane).toBe('escalate')
+    if (site.lane === 'escalate') {
+      expect(site.kind).toBe('codegen')
+    }
+  })
+
+  it('D: conversa geral (ainda hub)', () => {
     expect(classifyUserIntent('me explique o que é um ADR').lane).toBe('chat')
+  })
+
+  it('opens não caem em escalate nem chat', () => {
+    expect(classifyUserIntent('abre o Google Chrome').lane).toBe('pc_action')
   })
 
   it('labels amigáveis', () => {
     expect(laneLabel('pc_action')).toContain('PC')
     expect(laneLabel('web_context')).toBe('Contexto web')
+    expect(laneLabel('local_reply')).toBe('Resposta local')
+    expect(laneLabel('escalate')).toContain('Cascata')
   })
 })
